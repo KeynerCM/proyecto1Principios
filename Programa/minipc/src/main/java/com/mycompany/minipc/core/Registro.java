@@ -1,19 +1,15 @@
 package com.mycompany.minipc.core;
 
 import com.mycompany.minipc.isa.RegistroID;
-import com.mycompany.minipc.util.BinUtil;
 
 /**
  * Nombre: Registro
  * Entradas: la identidad del registro que representa
  * Salidas: no aplica
- * Restricciones: el valor que almacena debe mantenerse siempre entre -127 y
- *                127, que es lo que admite el formato de ocho bits
+ * Restricciones: ninguna
  * Descripcion: un registro de proposito general del Mini PC. El valor se
- *              guarda como entero decimal de Java. La representacion en
- *              signo-magnitud solo se genera cuando hay que mostrarla, tal
- *              como se aclaro en clase: la aritmetica se resuelve en decimal
- *              y el binario aparece unicamente al codificar y al desplegar.
+ *              guarda como entero decimal de Java y la aritmetica se resuelve
+ *              directamente sobre el.
  */
 public class Registro {
 
@@ -58,29 +54,13 @@ public class Registro {
 
     /**
      * Nombre: setValor
-     * Entradas: valor, entero entre -127 y 127
+     * Entradas: valor, entero a guardar
      * Salidas: ninguna
-     * Restricciones: si el valor no es representable lanza
-     *                DesbordamientoException y el registro queda intacto
-     * Descripcion: asigna un valor validando antes que quepa en el formato
-     *              de ocho bits. La validacion se delega en BinUtil, de modo
-     *              que la regla del rango vive en un solo lugar.
+     * Restricciones: ninguna
+     * Descripcion: asigna el valor del registro.
      */
     public void setValor(int valor) {
-        BinUtil.aSignoMagnitud(valor);
         this.valor = valor;
-    }
-
-    /**
-     * Nombre: getBinario
-     * Entradas: ninguna
-     * Salidas: el contenido en signo-magnitud de ocho bits
-     * Restricciones: ninguna, el valor almacenado siempre es representable
-     * Descripcion: devuelve por ejemplo "10001000" para un registro que vale
-     *              -8. Se usa solo para mostrar en pantalla.
-     */
-    public String getBinario() {
-        return BinUtil.aBinarioEntero(valor);
     }
 
     /**

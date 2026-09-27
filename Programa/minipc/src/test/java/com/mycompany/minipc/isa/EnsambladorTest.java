@@ -15,7 +15,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Pruebas del ensamblador.
  *
  * La prueba central reproduce el programa de ejemplo del enunciado y
- * verifica que las siete lineas den exactamente el binario de la lamina 7.
+ * verifica que las siete lineas den la operacion, el registro y el operando
+ * esperados.
  */
 class EnsambladorTest {
 
@@ -39,24 +40,24 @@ class EnsambladorTest {
     }
 
     @Test
-    @DisplayName("El programa del enunciado produce las siete palabras esperadas")
+    @DisplayName("El programa del enunciado produce las siete instrucciones esperadas")
     void ensamblaElProgramaDelEnunciado() throws SintaxisException {
         List<Instruccion> programa = ensamblador.ensamblar(programaDelEnunciado());
 
         assertEquals(7, programa.size());
-        String[] esperados = {
-            "0011 0001 00000101",
-            "0011 0010 00000011",
-            "0001 0001 00000000",
-            "0101 0010 00000000",
-            "0100 0001 00000000",
-            "0010 0001 00000000",
-            "0011 0010 10001000"
-        };
-        for (int i = 0; i < esperados.length; i++) {
-            assertEquals(esperados[i], programa.get(i).aBinarioFormateado(),
-                    "Fallo la linea " + (i + 1));
-        }
+        verificar(programa.get(0), OpCode.MOV, RegistroID.AX, 5);
+        verificar(programa.get(1), OpCode.MOV, RegistroID.BX, 3);
+        verificar(programa.get(2), OpCode.LOAD, RegistroID.AX, 0);
+        verificar(programa.get(3), OpCode.ADD, RegistroID.BX, 0);
+        verificar(programa.get(4), OpCode.SUB, RegistroID.AX, 0);
+        verificar(programa.get(5), OpCode.STORE, RegistroID.AX, 0);
+        verificar(programa.get(6), OpCode.MOV, RegistroID.BX, -8);
+    }
+
+    private static void verificar(Instruccion i, OpCode op, RegistroID reg, int operando) {
+        assertEquals(op, i.getOpcode(), i.toString());
+        assertEquals(reg, i.getRegistro(), i.toString());
+        assertEquals(operando, i.getOperando(), i.toString());
     }
 
     @Test
@@ -96,9 +97,9 @@ class EnsambladorTest {
                 "  load   Ax  "));
 
         assertEquals(3, programa.size());
-        assertEquals("0011 0001 00000101", programa.get(0).aBinarioFormateado());
-        assertEquals("0011 0010 00000011", programa.get(1).aBinarioFormateado());
-        assertEquals("0001 0001 00000000", programa.get(2).aBinarioFormateado());
+        verificar(programa.get(0), OpCode.MOV, RegistroID.AX, 5);
+        verificar(programa.get(1), OpCode.MOV, RegistroID.BX, 3);
+        verificar(programa.get(2), OpCode.LOAD, RegistroID.AX, 0);
     }
 
     @Test
@@ -109,7 +110,7 @@ class EnsambladorTest {
                         "MOV AX, 5",
                         "JUMP 100",
                         "ADD EX",
-                        "MOV BX, 300")));
+                        "MOV BX, tres")));
 
         assertEquals(3, e.cantidad());
         assertTrue(e.getErrores().get(0).contains("Linea 2"), e.getErrores().get(0));
@@ -117,7 +118,7 @@ class EnsambladorTest {
         assertTrue(e.getErrores().get(1).contains("Linea 3"), e.getErrores().get(1));
         assertTrue(e.getErrores().get(1).contains("EX"), e.getErrores().get(1));
         assertTrue(e.getErrores().get(2).contains("Linea 4"), e.getErrores().get(2));
-        assertTrue(e.getErrores().get(2).contains("300"), e.getErrores().get(2));
+        assertTrue(e.getErrores().get(2).contains("tres"), e.getErrores().get(2));
     }
 
     @Test

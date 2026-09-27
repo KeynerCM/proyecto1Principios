@@ -4,7 +4,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.mycompany.minipc.excepciones.SintaxisException;
-import com.mycompany.minipc.util.BinUtil;
 
 /**
  * Nombre: Ensamblador
@@ -133,9 +132,8 @@ public class Ensamblador {
      *           opcode, operacion ya reconocida
      * Salidas: el valor inmediato, o cero si la operacion no lleva
      * Restricciones: lanza SintaxisException si sobran operandos, si falta el
-     *                inmediato que MOV exige, si el valor no es numerico o si
-     *                queda fuera del rango -127 a 127
-     * Descripcion: concentra las cuatro formas en que el operando puede estar
+     *                inmediato que MOV exige o si el valor no es numerico
+     * Descripcion: concentra las tres formas en que el operando puede estar
      *              mal escrito, usando requiereInmediato para saber cuantos
      *              tokens corresponden a cada operacion.
      */
@@ -155,19 +153,12 @@ public class Ensamblador {
                     "Linea " + numeroLinea + ": falta el valor inmediato para " + opcode);
         }
 
-        int valor;
         try {
-            valor = Integer.parseInt(tokens[2]);
+            return Integer.parseInt(tokens[2]);
         } catch (NumberFormatException e) {
             throw new SintaxisException(
                     "Linea " + numeroLinea + ": valor no numerico \"" + tokens[2] + "\"");
         }
-        if (!BinUtil.esRepresentable(valor)) {
-            throw new SintaxisException("Linea " + numeroLinea + ": el valor " + valor
-                    + " esta fuera del rango " + BinUtil.VALOR_MINIMO
-                    + " a " + BinUtil.VALOR_MAXIMO);
-        }
-        return valor;
     }
 
     /**

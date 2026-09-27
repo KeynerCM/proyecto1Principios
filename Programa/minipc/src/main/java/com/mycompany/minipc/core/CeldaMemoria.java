@@ -1,19 +1,18 @@
 package com.mycompany.minipc.core;
 
-import com.mycompany.minipc.util.BinUtil;
+import com.mycompany.minipc.isa.Instruccion;
 
 /**
  * Nombre: CeldaMemoria
  * Entradas: no aplica, se crea vacia y se llena despues
  * Salidas: no aplica
- * Restricciones: la palabra almacenada se recorta siempre a dieciseis bits
+ * Restricciones: una celda guarda una instruccion o un valor, nunca ambos
  * Descripcion: una posicion de memoria del Mini PC. Cada celda guarda una
- *              palabra de dieciseis bits y una instruccion codificada cabe
- *              completa en una palabra, asi que la correspondencia es directa:
- *              una linea, una celda. La etiqueta conserva el texto original
- *              de la instruccion para mostrarlo en la tabla de memoria, como
- *              en la maqueta del enunciado donde la posicion 21 muestra
- *              "MOV AX, 5".
+ *              instruccion completa, tal como la dejo el ensamblador, o un
+ *              valor entero, asi que la correspondencia es directa: una
+ *              linea, una celda. La etiqueta conserva el texto original de la
+ *              instruccion para mostrarlo en la tabla de memoria, como en la
+ *              maqueta del enunciado donde la posicion 21 muestra "MOV AX, 5".
  */
 public class CeldaMemoria {
 
@@ -47,7 +46,8 @@ public class CeldaMemoria {
         RESERVADA_KERNEL
     }
 
-    private int palabra;
+    private Instruccion instruccion;
+    private int valor;
     private Tipo tipo;
     private String etiqueta;
 
@@ -64,15 +64,26 @@ public class CeldaMemoria {
     }
 
     /**
-     * Nombre: getPalabra
+     * Nombre: getInstruccion
      * Entradas: ninguna
-     * Salidas: los dieciseis bits almacenados
+     * Salidas: la instruccion almacenada, o nulo si la celda no guarda una
      * Restricciones: ninguna
      * Descripcion: lo lee el procesador en la etapa de fetch para cargar el
      *              registro de instruccion.
      */
-    public int getPalabra() {
-        return palabra;
+    public Instruccion getInstruccion() {
+        return instruccion;
+    }
+
+    /**
+     * Nombre: getValor
+     * Entradas: ninguna
+     * Salidas: el valor entero almacenado, o cero si guarda una instruccion
+     * Restricciones: ninguna
+     * Descripcion: acceso de solo lectura al dato de la celda.
+     */
+    public int getValor() {
+        return valor;
     }
 
     /**
@@ -101,15 +112,32 @@ public class CeldaMemoria {
 
     /**
      * Nombre: escribir
-     * Entradas: palabra, los dieciseis bits a guardar; tipo, destino de la
-     *           celda; etiqueta, texto legible que puede ser nulo
+     * Entradas: instruccion, la instruccion a guardar
      * Salidas: ninguna
-     * Restricciones: de la palabra solo se conservan los dieciseis bits bajos
-     * Descripcion: escribe contenido en la celda, fijando de una vez los tres
-     *              campos para que nunca queden en un estado incoherente.
+     * Restricciones: la instruccion no debe ser nula
+     * Descripcion: guarda una instruccion en la celda y usa su texto fuente
+     *              como etiqueta, fijando todos los campos de una vez para
+     *              que nunca queden en un estado incoherente.
      */
-    public void escribir(int palabra, Tipo tipo, String etiqueta) {
-        this.palabra = palabra & 0xFFFF;
+    public void escribir(Instruccion instruccion) {
+        this.instruccion = instruccion;
+        this.valor = 0;
+        this.tipo = Tipo.INSTRUCCION;
+        this.etiqueta = instruccion.getTextoFuente();
+    }
+
+    /**
+     * Nombre: escribir
+     * Entradas: valor, el entero a guardar; tipo, destino de la celda;
+     *           etiqueta, texto legible que puede ser nulo
+     * Salidas: ninguna
+     * Restricciones: ninguna
+     * Descripcion: guarda un valor en la celda, descartando cualquier
+     *              instruccion que tuviera antes.
+     */
+    public void escribir(int valor, Tipo tipo, String etiqueta) {
+        this.instruccion = null;
+        this.valor = valor;
         this.tipo = tipo;
         this.etiqueta = etiqueta;
     }
@@ -122,7 +150,8 @@ public class CeldaMemoria {
      * Descripcion: deja la celda libre, en cero y sin etiqueta.
      */
     public final void limpiar() {
-        this.palabra = 0;
+        this.instruccion = null;
+        this.valor = 0;
         this.tipo = Tipo.LIBRE;
         this.etiqueta = "";
     }
@@ -137,19 +166,6 @@ public class CeldaMemoria {
      */
     public boolean estaLibre() {
         return tipo == Tipo.LIBRE;
-    }
-
-    /**
-     * Nombre: getBinario
-     * Entradas: ninguna
-     * Salidas: la palabra en binario agrupada, o cadena vacia si esta libre
-     * Restricciones: ninguna
-     * Descripcion: devuelve por ejemplo "0011 0001 00000101". Una celda libre
-     *              devuelve vacio en lugar de dieciseis ceros, porque mostrar
-     *              ceros sugeriria que guarda algo.
-     */
-    public String getBinario() {
-        return estaLibre() ? "" : BinUtil.aBinarioPalabra(palabra);
     }
 
     /**

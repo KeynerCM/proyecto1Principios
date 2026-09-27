@@ -4,6 +4,7 @@ import com.mycompany.minipc.excepciones.MemoriaInsuficienteException;
 import com.mycompany.minipc.excepciones.SintaxisException;
 import com.mycompany.minipc.isa.Ensamblador;
 import com.mycompany.minipc.isa.Instruccion;
+import com.mycompany.minipc.isa.OpCode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -78,7 +79,8 @@ class MemoriaTest {
         assertEquals(64, base);
         assertEquals(CeldaMemoria.Tipo.INSTRUCCION, memoria.leer(64).getTipo());
         assertEquals("MOV AX, 5", memoria.leer(64).getEtiqueta());
-        assertEquals("0011 0001 00000101", memoria.leer(64).getBinario());
+        assertEquals(OpCode.MOV, memoria.leer(64).getInstruccion().getOpcode());
+        assertEquals(5, memoria.leer(64).getInstruccion().getOperando());
         assertEquals("MOV BX, -8", memoria.leer(70).getEtiqueta());
         assertTrue(memoria.leer(71).estaLibre(), "La celda siguiente debe quedar libre");
         assertEquals(7, memoria.getPosicionesUsadas());

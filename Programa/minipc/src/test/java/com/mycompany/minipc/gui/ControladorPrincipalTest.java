@@ -154,8 +154,6 @@ class ControladorPrincipalTest {
         assertEquals(7, vista.instrucciones.size());
         assertEquals(7, controlador.getModeloInstrucciones().getRowCount());
         assertEquals("MOV AX, 5", controlador.getModeloInstrucciones().getValueAt(0, 1));
-        assertEquals("0011 0001 00000101",
-                controlador.getModeloInstrucciones().getValueAt(0, 2));
         assertTrue(vista.hayPrograma);
         assertFalse(vista.termino);
         assertEquals("file.asm", vista.archivoEnBarra);
@@ -176,7 +174,7 @@ class ControladorPrincipalTest {
     @DisplayName("Un archivo con errores de sintaxis los reporta todos y no carga nada")
     void reportaErroresDeSintaxis(@TempDir Path carpeta) throws Exception {
         vista.archivoAEntregar = crearAsm(carpeta, "error-sintaxis.asm",
-                "MOV AX, 5\nJUMP 100\nADD EX\nMOV BX, 300\n");
+                "MOV AX, 5\nJUMP 100\nADD EX\nMOV BX, tres\n");
 
         controlador.alCargarArchivo();
 
@@ -278,23 +276,6 @@ class ControladorPrincipalTest {
     }
 
     @Test
-    @DisplayName("Un desbordamiento detiene la ejecucion y avisa")
-    void desbordamientoSeInforma(@TempDir Path carpeta) throws Exception {
-        vista.archivoAEntregar = crearAsm(carpeta, "desborde.asm",
-                "MOV AX, 100\nMOV BX, 100\nLOAD AX\nADD BX\n");
-        controlador.alCargarArchivo();
-
-        for (int i = 0; i < 4; i++) {
-            controlador.alPasoAPaso();
-        }
-
-        assertEquals("Error de ejecucion", vista.tituloError);
-        assertTrue(vista.errores.get(0).contains("200"), vista.errores.get(0));
-        assertEquals(EstadoProceso.BLOQUEADO_ERROR.name(), vista.estadoEnBarra);
-        assertTrue(vista.termino);
-    }
-
-    @Test
     @DisplayName("Reiniciar vuelve al inicio conservando el programa")
     void reiniciarConservaElPrograma(@TempDir Path carpeta) throws Exception {
         vista.archivoAEntregar = ejemploDelEnunciado(carpeta);
@@ -359,7 +340,6 @@ class ControladorPrincipalTest {
         assertEquals("[reservada]", controlador.getModeloMemoria().getValueAt(0, 2));
         assertEquals("Usuario", controlador.getModeloMemoria().getValueAt(64, 1));
         assertEquals("MOV AX, 5", controlador.getModeloMemoria().getValueAt(64, 2));
-        assertEquals("0011 0001 00000101", controlador.getModeloMemoria().getValueAt(64, 3));
         assertEquals("", controlador.getModeloMemoria().getValueAt(200, 2));
     }
 

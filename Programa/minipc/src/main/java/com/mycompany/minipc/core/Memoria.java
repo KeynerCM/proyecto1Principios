@@ -12,8 +12,9 @@ import com.mycompany.minipc.isa.Instruccion;
  * Restricciones: el tamano minimo es 128 posiciones, el limite de kernel es
  *                de al menos 16 y siempre debe ser menor que el tamano total
  * Descripcion: memoria principal del Mini PC, dividida en zona de kernel y
- *              zona de usuario. Cada posicion guarda una palabra de 16 bits,
- *              de modo que una linea de programa ocupa exactamente una celda.
+ *              zona de usuario. Cada posicion guarda una instruccion completa
+ *              o un valor, de modo que una linea de programa ocupa
+ *              exactamente una celda.
  */
 public class Memoria {
 
@@ -164,9 +165,7 @@ public class Memoria {
 
         int base = limiteKernel;
         for (int i = 0; i < programa.size(); i++) {
-            Instruccion instruccion = programa.get(i);
-            celdas[base + i].escribir(instruccion.aPalabra(),
-                    CeldaMemoria.Tipo.INSTRUCCION, instruccion.getTextoFuente());
+            celdas[base + i].escribir(programa.get(i));
         }
         return base;
     }
@@ -208,16 +207,16 @@ public class Memoria {
 
     /**
      * Nombre: escribir
-     * Entradas: direccion, posicion a escribir; palabra, los 16 bits a
-     *           guardar; tipo, para que queda destinada la celda; etiqueta,
-     *           texto legible a mostrar
+     * Entradas: direccion, posicion a escribir; valor, el entero a guardar;
+     *           tipo, para que queda destinada la celda; etiqueta, texto
+     *           legible a mostrar
      * Salidas: ninguna
      * Restricciones: lanza IndexOutOfBoundsException si la direccion no existe
      * Descripcion: escribe en cualquier posicion, sin restriccion de zona.
      */
-    public void escribir(int direccion, int palabra, CeldaMemoria.Tipo tipo, String etiqueta) {
+    public void escribir(int direccion, int valor, CeldaMemoria.Tipo tipo, String etiqueta) {
         validarDireccion(direccion);
-        celdas[direccion].escribir(palabra, tipo, etiqueta);
+        celdas[direccion].escribir(valor, tipo, etiqueta);
     }
 
     /**

@@ -14,8 +14,7 @@ import java.awt.Font;
  * Entradas: la memoria que se esta dibujando y la direccion que apunta el PC
  * Salidas: el componente ya pintado que la tabla dibuja en cada celda
  * Restricciones: solo tiene sentido aplicado a la tabla de memoria, porque
- *                supone que la fila coincide con la direccion y que la
- *                columna 3 contiene el binario
+ *                supone que la fila coincide con la direccion
  * Descripcion: pinta la tabla de memoria distinguiendo las zonas. La
  *              separacion entre kernel y usuario es uno de los requisitos del
  *              enunciado, y verla en colores la vuelve evidente sin tener que
@@ -74,10 +73,10 @@ public class RenderZonaMemoria extends DefaultTableCellRenderer {
      * Salidas: el componente con el formato ya aplicado
      * Restricciones: si la fila esta seleccionada se respeta el color de
      *                seleccion del sistema y no se pinta nada encima
-     * Descripcion: aplica fuente monoespaciada a la columna del binario y
-     *              elige el color de fondo en este orden de prioridad: la
-     *              posicion actual, la zona de kernel, una celda con
-     *              instruccion, y por ultimo el fondo normal de la tabla.
+     * Descripcion: restablece la fuente de la tabla y elige el color de fondo
+     *              en este orden de prioridad: la posicion actual, la zona de
+     *              kernel, una celda con instruccion, y por ultimo el fondo
+     *              normal de la tabla.
      */
     @Override
     public Component getTableCellRendererComponent(JTable tabla, Object valor,
@@ -86,9 +85,7 @@ public class RenderZonaMemoria extends DefaultTableCellRenderer {
         Component celda = super.getTableCellRendererComponent(
                 tabla, valor, seleccionada, tieneFoco, fila, columna);
 
-        celda.setFont(columna == 3
-                ? new Font(Font.MONOSPACED, Font.PLAIN, 12)
-                : tabla.getFont());
+        celda.setFont(tabla.getFont());
 
         if (seleccionada) {
             return celda;

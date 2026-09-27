@@ -1,6 +1,7 @@
 package com.mycompany.minipc.core;
 
-import com.mycompany.minipc.excepciones.DesbordamientoException;
+import com.mycompany.minipc.isa.Instruccion;
+import com.mycompany.minipc.isa.OpCode;
 import com.mycompany.minipc.isa.RegistroID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -12,6 +13,8 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -47,22 +50,12 @@ class BancoRegistrosTest {
     }
 
     @Test
-    @DisplayName("El registro rechaza valores fuera del formato de 8 bits")
-    void rechazaFueraDeRango() {
-        assertThrows(DesbordamientoException.class,
-                () -> banco.escribir(RegistroID.AX, 128));
-        assertThrows(DesbordamientoException.class,
-                () -> banco.escribir(RegistroID.AX, -128));
-        assertEquals(0, banco.leer(RegistroID.AX), "El valor no debio cambiar");
-    }
-
-    @Test
-    @DisplayName("El binario del registro usa signo-magnitud")
-    void binarioEnSignoMagnitud() {
-        banco.escribir(RegistroID.BX, -8);
-        assertEquals("10001000", banco.obtener(RegistroID.BX).getBinario());
-        banco.escribir(RegistroID.AX, 5);
-        assertEquals("00000101", banco.obtener(RegistroID.AX).getBinario());
+    @DisplayName("El registro admite valores fuera de ocho bits")
+    void admiteValoresGrandes() {
+        banco.escribir(RegistroID.AX, 255);
+        banco.escribir(RegistroID.BX, -1000);
+        assertEquals(255, banco.leer(RegistroID.AX));
+        assertEquals(-1000, banco.leer(RegistroID.BX));
     }
 
     @Test
@@ -105,31 +98,48 @@ class BancoRegistrosTest {
         CeldaMemoria celda = new CeldaMemoria();
         assertTrue(celda.estaLibre());
         assertEquals(CeldaMemoria.Tipo.LIBRE, celda.getTipo());
-        assertEquals(0, celda.getPalabra());
-        assertEquals("", celda.getBinario());
+        assertNull(celda.getInstruccion());
+        assertEquals(0, celda.getValor());
     }
 
     @Test
-    @DisplayName("La celda guarda la palabra, el tipo y la etiqueta")
+    @DisplayName("La celda guarda la instruccion, el tipo y la etiqueta")
     void celdaGuardaContenido() {
         CeldaMemoria celda = new CeldaMemoria();
-        celda.escribir(0b0011000100000101, CeldaMemoria.Tipo.INSTRUCCION, "MOV AX, 5");
+        Instruccion mov = movAx5();
+        celda.escribir(mov);
 
         assertFalse(celda.estaLibre());
         assertEquals(CeldaMemoria.Tipo.INSTRUCCION, celda.getTipo());
         assertEquals("MOV AX, 5", celda.getEtiqueta());
-        assertEquals("0011 0001 00000101", celda.getBinario());
+        assertSame(mov, celda.getInstruccion());
+    }
+
+    @Test
+    @DisplayName("Escribir un valor descarta la instruccion anterior")
+    void celdaGuardaValor() {
+        CeldaMemoria celda = new CeldaMemoria();
+        celda.escribir(movAx5());
+        celda.escribir(42, CeldaMemoria.Tipo.DATO, "42");
+
+        assertEquals(CeldaMemoria.Tipo.DATO, celda.getTipo());
+        assertEquals(42, celda.getValor());
+        assertNull(celda.getInstruccion());
     }
 
     @Test
     @DisplayName("La celda se puede volver a dejar libre")
     void celdaSeLimpia() {
         CeldaMemoria celda = new CeldaMemoria();
-        celda.escribir(0b0011000100000101, CeldaMemoria.Tipo.INSTRUCCION, "MOV AX, 5");
+        celda.escribir(movAx5());
         celda.limpiar();
         assertTrue(celda.estaLibre());
-        assertEquals(0, celda.getPalabra());
+        assertNull(celda.getInstruccion());
         assertEquals("", celda.getEtiqueta());
+    }
+
+    private static Instruccion movAx5() {
+        return new Instruccion(OpCode.MOV, RegistroID.AX, 5, "MOV AX, 5", 1);
     }
 
     @Test

@@ -87,11 +87,11 @@ public class VentanaPrincipal extends javax.swing.JFrame implements VistaPrincip
 
         tblInstrucciones.setModel(controlador.getModeloInstrucciones());
         tblInstrucciones.setDefaultRenderer(Object.class, controlador.getRenderInstrucciones());
-        ajustarAnchos(tblInstrucciones.getColumnModel(), new int[]{40, 160, 190});
+        ajustarAnchos(tblInstrucciones.getColumnModel(), new int[]{40, 350});
 
         tblMemoria.setModel(controlador.getModeloMemoria());
         tblMemoria.setDefaultRenderer(Object.class, controlador.getRenderMemoria());
-        ajustarAnchos(tblMemoria.getColumnModel(), new int[]{50, 70, 130, 150});
+        ajustarAnchos(tblMemoria.getColumnModel(), new int[]{50, 70, 280});
 
         pintarBotones();
         controlador.inicializarVista();
@@ -188,7 +188,7 @@ public class VentanaPrincipal extends javax.swing.JFrame implements VistaPrincip
      * Restricciones: si el arreglo tiene mas entradas que columnas, las de mas
      *                se ignoran
      * Descripcion: fija el ancho preferido de cada columna, para que la
-     *              posicion no ocupe lo mismo que el binario.
+     *              posicion no ocupe lo mismo que el contenido.
      */
     private void ajustarAnchos(TableColumnModel columnas, int[] anchos) {
         for (int i = 0; i < anchos.length && i < columnas.getColumnCount(); i++) {
@@ -272,7 +272,6 @@ public class VentanaPrincipal extends javax.swing.JFrame implements VistaPrincip
         lblEstadoBcpValor.setText(bcp.getEstado().name());
         lblEstadoBcpValor.setForeground(colorDelEstado(bcp.getEstado().name()));
         lblPcValor.setText(String.valueOf(bcp.getPc()));
-        lblIrBinValor.setText(bcp.getIrBinario());
         lblIrTextoValor.setText(bcp.getIrTexto().isEmpty() ? "-" : bcp.getIrTexto());
         lblAcValor.setText(String.valueOf(bcp.getAc()));
         lblAxValor.setText(String.valueOf(bcp.getRegistro(RegistroID.AX)));
@@ -300,7 +299,6 @@ public class VentanaPrincipal extends javax.swing.JFrame implements VistaPrincip
         lblEstadoBcpValor.setText("-");
         lblEstadoBcpValor.setForeground(ESTADO_NEUTRO);
         lblPcValor.setText("-");
-        lblIrBinValor.setText("-");
         lblIrTextoValor.setText("-");
         lblAcValor.setText("0");
         lblAxValor.setText("0");
@@ -500,8 +498,6 @@ public class VentanaPrincipal extends javax.swing.JFrame implements VistaPrincip
         pnlContextoCpu = new javax.swing.JPanel();
         jLabel4 = new javax.swing.JLabel();
         lblPcValor = new javax.swing.JLabel();
-        jLabel5 = new javax.swing.JLabel();
-        lblIrBinValor = new javax.swing.JLabel();
         jLabel6 = new javax.swing.JLabel();
         lblIrTextoValor = new javax.swing.JLabel();
         jLabel7 = new javax.swing.JLabel();
@@ -732,14 +728,7 @@ public class VentanaPrincipal extends javax.swing.JFrame implements VistaPrincip
         lblPcValor.setText("-");
         pnlContextoCpu.add(lblPcValor);
 
-        jLabel5.setText("IR (binario):");
-        pnlContextoCpu.add(jLabel5);
-
-        lblIrBinValor.setFont(new java.awt.Font("Monospaced", 1, 12)); // NOI18N
-        lblIrBinValor.setText("-");
-        pnlContextoCpu.add(lblIrBinValor);
-
-        jLabel6.setText("IR (texto):");
+        jLabel6.setText("IR:");
         pnlContextoCpu.add(jLabel6);
 
         lblIrTextoValor.setText("-");
@@ -958,7 +947,6 @@ public class VentanaPrincipal extends javax.swing.JFrame implements VistaPrincip
     private javax.swing.JLabel jLabel2;
     private javax.swing.JLabel jLabel3;
     private javax.swing.JLabel jLabel4;
-    private javax.swing.JLabel jLabel5;
     private javax.swing.JLabel jLabel6;
     private javax.swing.JLabel jLabel7;
     private javax.swing.JLabel jLabel8;
@@ -977,7 +965,6 @@ public class VentanaPrincipal extends javax.swing.JFrame implements VistaPrincip
     private javax.swing.JLabel lblEstado;
     private javax.swing.JLabel lblEstadoBcpValor;
     private javax.swing.JLabel lblEstadoValor;
-    private javax.swing.JLabel lblIrBinValor;
     private javax.swing.JLabel lblIrTextoValor;
     private javax.swing.JLabel lblLimiteValor;
     private javax.swing.JLabel lblPcValor;

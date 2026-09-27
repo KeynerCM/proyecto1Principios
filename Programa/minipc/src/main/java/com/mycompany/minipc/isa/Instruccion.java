@@ -1,7 +1,5 @@
 package com.mycompany.minipc.isa;
 
-import com.mycompany.minipc.util.BinUtil;
-
 /**
  * Nombre: Instruccion
  * Entradas: la operacion, el registro, el operando, el texto original y el
@@ -10,12 +8,10 @@ import com.mycompany.minipc.util.BinUtil;
  * Restricciones: es inmutable y final; todos sus campos se fijan al
  *                construirla y no hay forma de alterarlos despues
  * Descripcion: una instruccion ya traducida, lista para guardarse en memoria.
+ *              Se guarda tal cual en la celda de memoria, sin codificarla.
  *              Conserva ademas el texto original y el numero de linea del
  *              archivo fuente, que la interfaz necesita para llenar la tabla
- *              de instrucciones y para resaltar la que apunta el PC. El
- *              formato de la palabra es de dieciseis bits: bits 15 a 12 el
- *              opcode, bits 11 a 8 el registro y bits 7 a 0 el operando en
- *              signo-magnitud.
+ *              de instrucciones y para resaltar la que apunta el PC.
  */
 public final class Instruccion {
 
@@ -33,13 +29,10 @@ public final class Instruccion {
      *           posicion dentro del archivo contando desde uno
      * Salidas: la instruccion construida
      * Restricciones: opcode y registro no pueden ser nulos; si la operacion
-     *                no admite inmediato el operando debe ser cero; el
-     *                operando debe caber en ocho bits de signo-magnitud. En
-     *                los dos primeros casos lanza IllegalArgumentException y
-     *                en el tercero DesbordamientoException
+     *                no admite inmediato el operando debe ser cero. En ambos
+     *                casos lanza IllegalArgumentException
      * Descripcion: valida de una vez todo lo que podria hacer invalida a la
-     *              instruccion, de modo que si el objeto existe se garantiza
-     *              que su codificacion es correcta.
+     *              instruccion, de modo que si el objeto existe es ejecutable.
      */
     public Instruccion(OpCode opcode, RegistroID registro, int operando,
             String textoFuente, int numeroLinea) {
@@ -50,8 +43,6 @@ public final class Instruccion {
             throw new IllegalArgumentException(
                     "La operacion " + opcode + " no admite operando inmediato");
         }
-        // Valida de una vez que el operando quepa en los ocho bits del formato.
-        BinUtil.aSignoMagnitud(operando);
 
         this.opcode = opcode;
         this.registro = registro;
@@ -117,34 +108,6 @@ public final class Instruccion {
      */
     public int getNumeroLinea() {
         return numeroLinea;
-    }
-
-    /**
-     * Nombre: aPalabra
-     * Entradas: ninguna
-     * Salidas: la instruccion codificada en dieciseis bits
-     * Restricciones: ninguna, el operando ya fue validado al construir
-     * Descripcion: arma la palabra que se guarda en la celda de memoria,
-     *              corriendo el opcode doce posiciones, el registro ocho, y
-     *              dejando el operando en el byte bajo.
-     */
-    public int aPalabra() {
-        return (opcode.getCodigo() << 12)
-                | (registro.getCodigo() << 8)
-                | BinUtil.aSignoMagnitud(operando);
-    }
-
-    /**
-     * Nombre: aBinarioFormateado
-     * Entradas: ninguna
-     * Salidas: la palabra en binario agrupada como en el enunciado
-     * Restricciones: ninguna
-     * Descripcion: devuelve por ejemplo "0011 0001 00000101" para MOV AX, 5.
-     *              Es lo que se muestra en la columna Binario de la tabla de
-     *              instrucciones.
-     */
-    public String aBinarioFormateado() {
-        return BinUtil.aBinarioPalabra(aPalabra());
     }
 
     /**

@@ -15,14 +15,13 @@ import javax.swing.table.AbstractTableModel;
  *              del procesador cada vez que la tabla se dibuja, asi nunca
  *              queda desfasado respecto al estado real y refrescar la vista
  *              se reduce a disparar fireTableDataChanged. Las columnas son la
- *              posicion, la zona a la que pertenece, el contenido legible y
- *              su codificacion binaria.
+ *              posicion, la zona a la que pertenece y el contenido legible.
  */
 public class ModeloTablaMemoria extends AbstractTableModel {
 
     private static final long serialVersionUID = 1L;
 
-    private static final String[] COLUMNAS = {"Pos", "Zona", "Contenido", "Binario"};
+    private static final String[] COLUMNAS = {"Pos", "Zona", "Contenido"};
 
     private final Memoria memoria;
 
@@ -54,7 +53,7 @@ public class ModeloTablaMemoria extends AbstractTableModel {
     /**
      * Nombre: getColumnCount
      * Entradas: ninguna
-     * Salidas: cuantas columnas tiene la tabla, siempre cuatro
+     * Salidas: cuantas columnas tiene la tabla, siempre tres
      * Restricciones: ninguna
      * Descripcion: Swing la consulta para saber cuantas columnas dibujar.
      */
@@ -91,7 +90,7 @@ public class ModeloTablaMemoria extends AbstractTableModel {
     /**
      * Nombre: getValueAt
      * Entradas: fila, direccion de memoria; columna, dato pedido
-     * Salidas: la direccion, la zona, el contenido o el binario
+     * Salidas: la direccion, la zona o el contenido
      * Restricciones: la fila debe ser una direccion valida de la memoria
      * Descripcion: la fila coincide con la direccion, de modo que la tabla
      *              refleja el mapa de memoria sin ninguna traduccion.
@@ -106,8 +105,6 @@ public class ModeloTablaMemoria extends AbstractTableModel {
                 return memoria.esDireccionKernel(fila) ? "Kernel" : "Usuario";
             case 2:
                 return contenidoDe(celda, fila);
-            case 3:
-                return celda.getBinario();
             default:
                 return "";
         }

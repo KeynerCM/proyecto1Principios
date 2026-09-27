@@ -8,7 +8,6 @@ import com.mycompany.minipc.excepciones.MemoriaInsuficienteException;
 import com.mycompany.minipc.isa.Instruccion;
 import com.mycompany.minipc.isa.OpCode;
 import com.mycompany.minipc.isa.RegistroID;
-import com.mycompany.minipc.util.BinUtil;
 
 /**
  * Nombre: Procesador
@@ -20,10 +19,9 @@ import com.mycompany.minipc.util.BinUtil;
  * Descripcion: el procesador del Mini PC. Implementa el ciclo de instruccion:
  *              el procesador repite indefinidamente traer la instruccion que
  *              apunta el PC (etapa fetch) e interpretarla y ejecutarla (etapa
- *              execute). La aritmetica se resuelve sobre enteros decimales de
- *              Java. El binario existe solo en tres momentos: al ensamblar, al
- *              decodificar la palabra leida de memoria, y al mostrar los
- *              valores en pantalla.
+ *              execute). La memoria guarda la instruccion ya ensamblada, asi
+ *              que el IR recibe el objeto directamente y la aritmetica se
+ *              resuelve sobre enteros de Java.
  */
 public class Procesador {
 
@@ -38,13 +36,10 @@ public class Procesador {
     private int pc;
 
     /** Instruction Register: la instruccion que se esta ejecutando. */
-    private int ir;
+    private Instruccion ir;
 
     /** Accumulator: almacenamiento temporal donde ocurre la aritmetica. */
     private int ac;
-
-    /** Texto legible de la instruccion en el IR, para mostrar en el BCP. */
-    private String irTexto;
 
     private int direccionBase;
     private int direccionFin;
@@ -70,7 +65,6 @@ public class Procesador {
         this.estadisticas = new Estadisticas();
         this.observadores = new ArrayList<>();
         this.siguientePid = 1;
-        this.irTexto = "";
         this.estado = EstadoProceso.NUEVO;
     }
 
@@ -97,9 +91,8 @@ public class Procesador {
         estadisticas.setPosicionesUsadas(memoria.getPosicionesUsadas());
 
         pc = direccionBase;
-        ir = 0;
+        ir = null;
         ac = 0;
-        irTexto = "";
         instruccionesEjecutadas = 0;
         ciclosReloj = 0;
 
@@ -115,8 +108,8 @@ public class Procesador {
      * Entradas: ninguna, opera sobre el estado interno del procesador
      * Salidas: true si queda al menos una instruccion por ejecutar
      * Restricciones: devuelve false sin hacer nada si no hay programa o si el
-     *                proceso ya termino; lanza DesbordamientoException si el
-     *                resultado aritmetico no cabe en ocho bits, dejando el
+     *                proceso ya termino; lanza DesbordamientoException si la
+     *                instruccion provoca un desbordamiento, dejando el
      *                proceso en BLOQUEADO_ERROR
      * Descripcion: ejecuta una sola instruccion, es decir un ciclo de fetch
      *              mas execute completo. El PC se incrementa en la etapa de
@@ -133,8 +126,7 @@ public class Procesador {
 
         // ---------- ETAPA FETCH ----------
         CeldaMemoria celda = memoria.leerComoUsuario(pc);
-        ir = celda.getPalabra();
-        irTexto = celda.getEtiqueta();
+        ir = celda.getInstruccion();
         pc++;
         ciclosReloj++;
         estadisticas.registrarLectura();
@@ -142,9 +134,9 @@ public class Procesador {
         notificar(Fase.FETCH);
 
         // ---------- ETAPA DECODE ----------
-        OpCode opcode = OpCode.desdeCodigo((ir >>> 12) & 0xF);
-        RegistroID registro = RegistroID.desdeCodigo((ir >>> 8) & 0xF);
-        int operando = BinUtil.aEntero(ir & 0xFF);
+        OpCode opcode = ir.getOpcode();
+        RegistroID registro = ir.getRegistro();
+        int operando = ir.getOperando();
 
         // ---------- ETAPA EXECUTE ----------
         try {
@@ -176,15 +168,12 @@ public class Procesador {
     /**
      * Nombre: ejecutar
      * Entradas: opcode, operacion decodificada; registro, registro sobre el
-     *           que opera; operando, valor inmediato ya convertido a decimal
+     *           que opera; operando, valor inmediato
      * Salidas: ninguna; modifica el acumulador o el banco de registros
-     * Restricciones: lanza DesbordamientoException en ADD y SUB si el
-     *                resultado no cabe, e IllegalStateException si aparece un
-     *                opcode sin implementar
+     * Restricciones: lanza IllegalStateException si aparece un opcode sin
+     *                implementar
      * Descripcion: etapa de ejecucion propiamente dicha. Cada operacion se
-     *              resuelve con aritmetica normal de enteros de Java; el
-     *              formato en signo-magnitud solo interviene al codificar y al
-     *              desplegar, tal como se aclaro en clase.
+     *              resuelve con aritmetica normal de enteros de Java.
      */
     private void ejecutar(OpCode opcode, RegistroID registro, int operando) {
         switch (opcode) {
@@ -200,34 +189,14 @@ public class Procesador {
                 estadisticas.registrarEscritura();
                 break;
             case ADD:
-                ac = validarRango(ac + registros.leer(registro), opcode);
+                ac = ac + registros.leer(registro);
                 break;
             case SUB:
-                ac = validarRango(ac - registros.leer(registro), opcode);
+                ac = ac - registros.leer(registro);
                 break;
             default:
                 throw new IllegalStateException("Operacion no implementada: " + opcode);
         }
-    }
-
-    /**
-     * Nombre: validarRango
-     * Entradas: resultado, valor recien calculado; opcode, operacion que lo
-     *           produjo, para el mensaje de error
-     * Salidas: el mismo resultado si es representable
-     * Restricciones: lanza DesbordamientoException si queda fuera de -127 a 127
-     * Descripcion: comprueba que un resultado aritmetico quepa en el formato
-     *              de ocho bits. Se eligio detener el proceso en lugar de
-     *              saturar en el limite: es mas honesto con el formato y
-     *              permite mostrar el manejo del error.
-     */
-    private int validarRango(int resultado, OpCode opcode) {
-        if (!BinUtil.esRepresentable(resultado)) {
-            throw new DesbordamientoException("Desbordamiento en " + opcode + ": el resultado "
-                    + resultado + " esta fuera del rango representable ("
-                    + BinUtil.VALOR_MINIMO + " a " + BinUtil.VALOR_MAXIMO + ")");
-        }
-        return resultado;
     }
 
     /**
@@ -248,9 +217,8 @@ public class Procesador {
         estadisticas.setPosicionesUsadas(memoria.getPosicionesUsadas());
 
         pc = direccionBase;
-        ir = 0;
+        ir = null;
         ac = 0;
-        irTexto = "";
         instruccionesEjecutadas = 0;
         ciclosReloj = 0;
         estado = EstadoProceso.LISTO;
@@ -274,9 +242,8 @@ public class Procesador {
         estadisticas.reset();
 
         pc = 0;
-        ir = 0;
+        ir = null;
         ac = 0;
-        irTexto = "";
         direccionBase = 0;
         direccionFin = -1;
         cantidadInstrucciones = 0;
@@ -436,11 +403,11 @@ public class Procesador {
     /**
      * Nombre: getIr
      * Entradas: ninguna
-     * Salidas: la palabra de la instruccion en curso
+     * Salidas: la instruccion en curso, o nulo si no se ha ejecutado nada
      * Restricciones: ninguna
      * Descripcion: acceso de solo lectura al registro de instruccion.
      */
-    public int getIr() {
+    public Instruccion getIr() {
         return ir;
     }
 
@@ -449,10 +416,10 @@ public class Procesador {
      * Entradas: ninguna
      * Salidas: el texto legible de la instruccion en curso
      * Restricciones: es cadena vacia mientras no se haya ejecutado nada
-     * Descripcion: acompana al binario del IR en el panel del BCP.
+     * Descripcion: es lo que se muestra del IR en el panel del BCP.
      */
     public String getIrTexto() {
-        return irTexto;
+        return ir == null ? "" : ir.getTextoFuente();
     }
 
     /**

@@ -54,10 +54,10 @@ public class BancoRegistros {
 
     /**
      * Nombre: escribir
-     * Entradas: id, registro a modificar; valor, entero entre -127 y 127
+     * Entradas: id, registro a modificar; valor, entero a guardar
      * Salidas: ninguna
-     * Restricciones: si el valor no es representable lanza
-     *                DesbordamientoException y el registro queda intacto
+     * Restricciones: el identificador debe existir; si no, lanza
+     *                IllegalArgumentException
      * Descripcion: escritura del contenido, usada por el procesador en las
      *              operaciones MOV y STORE.
      */
@@ -72,7 +72,7 @@ public class BancoRegistros {
      * Restricciones: si el identificador no existe lanza
      *                IllegalArgumentException
      * Descripcion: da acceso al objeto y no solo a su valor, para cuando hace
-     *              falta su representacion binaria o su identidad.
+     *              falta su identidad.
      */
     public Registro obtener(RegistroID id) {
         Registro registro = registros.get(id);

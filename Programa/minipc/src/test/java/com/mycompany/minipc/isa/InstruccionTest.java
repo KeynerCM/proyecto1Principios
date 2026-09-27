@@ -1,6 +1,5 @@
 package com.mycompany.minipc.isa;
 
-import com.mycompany.minipc.excepciones.DesbordamientoException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -10,10 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Pruebas de la codificacion a 16 bits.
- *
- * El caso de referencia es la tabla de la lamina 7 del enunciado, que da
- * el binario exacto de las siete instrucciones del programa de ejemplo.
+ * Pruebas de la instruccion y de las busquedas de operaciones y registros.
  */
 class InstruccionTest {
 
@@ -22,32 +18,12 @@ class InstruccionTest {
     }
 
     @Test
-    @DisplayName("Las siete lineas del enunciado producen el binario esperado")
-    void codificaLaTablaDelEnunciado() {
-        assertEquals("0011 0001 00000101",
-                instr(OpCode.MOV, RegistroID.AX, 5, "MOV AX, 5").aBinarioFormateado());
-        assertEquals("0011 0010 00000011",
-                instr(OpCode.MOV, RegistroID.BX, 3, "MOV BX, 3").aBinarioFormateado());
-        assertEquals("0001 0001 00000000",
-                instr(OpCode.LOAD, RegistroID.AX, 0, "LOAD AX").aBinarioFormateado());
-        assertEquals("0101 0010 00000000",
-                instr(OpCode.ADD, RegistroID.BX, 0, "ADD BX").aBinarioFormateado());
-        assertEquals("0100 0001 00000000",
-                instr(OpCode.SUB, RegistroID.AX, 0, "SUB AX").aBinarioFormateado());
-        assertEquals("0010 0001 00000000",
-                instr(OpCode.STORE, RegistroID.AX, 0, "STORE AX").aBinarioFormateado());
-        assertEquals("0011 0010 10001000",
-                instr(OpCode.MOV, RegistroID.BX, -8, "MOV BX, -8").aBinarioFormateado());
-    }
-
-    @Test
-    @DisplayName("La palabra ubica opcode, registro y operando en su lugar")
-    void ubicaLosTresCampos() {
-        int palabra = instr(OpCode.MOV, RegistroID.AX, 5, "MOV AX, 5").aPalabra();
-        assertEquals(0b0011, palabra >>> 12);
-        assertEquals(0b0001, (palabra >>> 8) & 0xF);
-        assertEquals(0b00000101, palabra & 0xFF);
-        assertEquals(0b0011000100000101, palabra);
+    @DisplayName("La instruccion conserva operacion, registro y operando")
+    void conservaLosTresCampos() {
+        Instruccion i = instr(OpCode.MOV, RegistroID.AX, 5, "MOV AX, 5");
+        assertEquals(OpCode.MOV, i.getOpcode());
+        assertEquals(RegistroID.AX, i.getRegistro());
+        assertEquals(5, i.getOperando());
     }
 
     @Test
@@ -61,12 +37,19 @@ class InstruccionTest {
     }
 
     @Test
-    @DisplayName("Un operando fuera de rango se rechaza al construir")
-    void rechazaOperandoFueraDeRango() {
-        assertThrows(DesbordamientoException.class,
-                () -> instr(OpCode.MOV, RegistroID.BX, 300, "MOV BX, 300"));
-        assertThrows(DesbordamientoException.class,
-                () -> instr(OpCode.MOV, RegistroID.BX, -128, "MOV BX, -128"));
+    @DisplayName("El operando inmediato admite valores de cualquier tamano")
+    void aceptaOperandosGrandes() {
+        assertEquals(300, instr(OpCode.MOV, RegistroID.BX, 300, "MOV BX, 300").getOperando());
+        assertEquals(-128, instr(OpCode.MOV, RegistroID.BX, -128, "MOV BX, -128").getOperando());
+    }
+
+    @Test
+    @DisplayName("Operacion y registro son obligatorios")
+    void rechazaNulos() {
+        assertThrows(IllegalArgumentException.class,
+                () -> instr(null, RegistroID.AX, 0, "?"));
+        assertThrows(IllegalArgumentException.class,
+                () -> instr(OpCode.LOAD, null, 0, "?"));
     }
 
     @Test
@@ -79,25 +62,6 @@ class InstruccionTest {
         assertFalse(OpCode.SUB.requiereInmediato());
         assertThrows(IllegalArgumentException.class,
                 () -> instr(OpCode.ADD, RegistroID.BX, 5, "ADD BX, 5"));
-    }
-
-    @Test
-    @DisplayName("Los opcodes valen lo que dice el enunciado")
-    void codigosDeOperacion() {
-        assertEquals(0b0001, OpCode.LOAD.getCodigo());
-        assertEquals(0b0010, OpCode.STORE.getCodigo());
-        assertEquals(0b0011, OpCode.MOV.getCodigo());
-        assertEquals(0b0100, OpCode.SUB.getCodigo());
-        assertEquals(0b0101, OpCode.ADD.getCodigo());
-    }
-
-    @Test
-    @DisplayName("Los registros valen lo que dice el enunciado")
-    void codigosDeRegistro() {
-        assertEquals(0b0001, RegistroID.AX.getCodigo());
-        assertEquals(0b0010, RegistroID.BX.getCodigo());
-        assertEquals(0b0011, RegistroID.CX.getCodigo());
-        assertEquals(0b0100, RegistroID.DX.getCodigo());
     }
 
     @Test
@@ -116,18 +80,5 @@ class InstruccionTest {
         assertThrows(IllegalArgumentException.class, () -> OpCode.desdeMnemonico(null));
         assertThrows(IllegalArgumentException.class, () -> RegistroID.desdeNombre("EX"));
         assertThrows(IllegalArgumentException.class, () -> RegistroID.desdeNombre(null));
-    }
-
-    @Test
-    @DisplayName("La busqueda por codigo binario reconstruye la operacion y el registro")
-    void busquedaPorCodigo() {
-        for (OpCode op : OpCode.values()) {
-            assertEquals(op, OpCode.desdeCodigo(op.getCodigo()));
-        }
-        for (RegistroID id : RegistroID.values()) {
-            assertEquals(id, RegistroID.desdeCodigo(id.getCodigo()));
-        }
-        assertThrows(IllegalArgumentException.class, () -> OpCode.desdeCodigo(0b1111));
-        assertThrows(IllegalArgumentException.class, () -> RegistroID.desdeCodigo(0b0000));
     }
 }

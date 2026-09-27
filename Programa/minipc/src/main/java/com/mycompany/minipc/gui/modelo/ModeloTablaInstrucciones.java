@@ -14,14 +14,14 @@ import com.mycompany.minipc.isa.Instruccion;
  * Restricciones: las celdas no son editables; el modelo guarda su propia
  *                copia de la lista
  * Descripcion: modelo de la tabla de instrucciones, que muestra el programa
- *              fuente junto a su traduccion binaria. Las columnas son el numero de orden, la instruccion
- *              tal como fue escrita y su codificacion de dieciseis bits.
+ *              fuente. Las columnas son el numero de orden y la instruccion
+ *              tal como fue escrita.
  */
 public class ModeloTablaInstrucciones extends AbstractTableModel {
 
     private static final long serialVersionUID = 1L;
 
-    private static final String[] COLUMNAS = {"#", "Instruccion", "Binario"};
+    private static final String[] COLUMNAS = {"#", "Instruccion"};
 
     private final List<Instruccion> programa = new ArrayList<>();
 
@@ -68,7 +68,7 @@ public class ModeloTablaInstrucciones extends AbstractTableModel {
     /**
      * Nombre: getColumnCount
      * Entradas: ninguna
-     * Salidas: cuantas columnas tiene la tabla, siempre tres
+     * Salidas: cuantas columnas tiene la tabla, siempre dos
      * Restricciones: ninguna
      * Descripcion: Swing la consulta para saber cuantas columnas dibujar.
      */
@@ -106,7 +106,7 @@ public class ModeloTablaInstrucciones extends AbstractTableModel {
     /**
      * Nombre: getValueAt
      * Entradas: fila, instruccion a mostrar; columna, dato pedido
-     * Salidas: el numero de orden, el texto fuente o el binario
+     * Salidas: el numero de orden o el texto fuente
      * Restricciones: la fila debe existir en el programa cargado
      * Descripcion: traduce la posicion de la celda al dato correspondiente de
      *              la instruccion. La primera columna muestra el numero de
@@ -120,8 +120,6 @@ public class ModeloTablaInstrucciones extends AbstractTableModel {
                 return fila + 1;
             case 1:
                 return instruccion.getTextoFuente();
-            case 2:
-                return instruccion.aBinarioFormateado();
             default:
                 return "";
         }

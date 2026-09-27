@@ -12,7 +12,7 @@ package com.mycompany.minipc.core;
  *              NUEVO a LISTO al terminar de cargarse en memoria;
  *              LISTO a EJECUCION al ejecutarse la primera instruccion;
  *              EJECUCION a TERMINADO al pasar el PC la ultima instruccion;
- *              EJECUCION a BLOQUEADO_ERROR ante un desbordamiento aritmetico.
+ *              EJECUCION a BLOQUEADO_ERROR ante un error de ejecucion.
  */
 public enum EstadoProceso {
 

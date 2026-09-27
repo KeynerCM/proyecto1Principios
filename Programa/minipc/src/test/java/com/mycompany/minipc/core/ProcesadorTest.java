@@ -1,6 +1,5 @@
 package com.mycompany.minipc.core;
 
-import com.mycompany.minipc.excepciones.DesbordamientoException;
 import com.mycompany.minipc.excepciones.MemoriaInsuficienteException;
 import com.mycompany.minipc.excepciones.SintaxisException;
 import com.mycompany.minipc.isa.Ensamblador;
@@ -16,6 +15,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -111,13 +111,18 @@ class ProcesadorTest {
     }
 
     @Test
-    @DisplayName("El IR guarda la palabra de la instruccion en curso")
+    @DisplayName("El IR guarda la instruccion en curso")
     void elIrGuardaLaInstruccion() throws Exception {
         cargarEjemplo();
+        assertNull(cpu.getIr());
+        assertEquals("", cpu.getIrTexto());
+
         cpu.paso();
-        assertEquals(0b0011000100000101, cpu.getIr());
+        assertEquals(OpCode.MOV, cpu.getIr().getOpcode());
+        assertEquals(RegistroID.AX, cpu.getIr().getRegistro());
+        assertEquals(5, cpu.getIr().getOperando());
         assertEquals("MOV AX, 5", cpu.getIrTexto());
-        assertEquals("0011 0001 00000101", cpu.getBcp().getIrBinario());
+        assertEquals("MOV AX, 5", cpu.getBcp().getIrTexto());
     }
 
     @Test
@@ -155,44 +160,26 @@ class ProcesadorTest {
     }
 
     @Test
-    @DisplayName("Un desbordamiento detiene el proceso en BLOQUEADO_ERROR")
-    void elDesbordamientoBloqueaElProceso() throws Exception {
+    @DisplayName("La aritmetica ya no esta limitada a ocho bits")
+    void laAritmeticaNoDesborda() throws Exception {
         cpu.cargar(ensamblador.ensamblar(List.of(
-                "MOV AX, 100",
+                "MOV AX, 200",
                 "MOV BX, 100",
                 "LOAD AX",
-                "ADD BX")), "desborde.asm");
-
-        cpu.paso();
-        cpu.paso();
-        cpu.paso();
-        assertEquals(100, cpu.getAc());
-
-        DesbordamientoException e = assertThrows(DesbordamientoException.class, cpu::paso);
-        assertTrue(e.getMessage().contains("200"), e.getMessage());
-        assertEquals(EstadoProceso.BLOQUEADO_ERROR, cpu.getEstado());
-        assertTrue(cpu.haTerminado());
-        assertFalse(cpu.paso(), "Un proceso bloqueado no sigue ejecutando");
-    }
-
-    @Test
-    @DisplayName("La resta tambien detecta desbordamiento por el lado negativo")
-    void desbordamientoNegativo() throws Exception {
-        cpu.cargar(ensamblador.ensamblar(List.of(
-                "MOV AX, 127",
-                "MOV BX, 100",
-                "LOAD BX",
+                "ADD BX",
                 "SUB AX",
-                "SUB AX")), "desborde2.asm");
+                "SUB AX")), "grande.asm");
 
         cpu.paso();
         cpu.paso();
         cpu.paso();
         cpu.paso();
-        assertEquals(-27, cpu.getAc());
+        assertEquals(300, cpu.getAc());
 
-        assertThrows(DesbordamientoException.class, cpu::paso);
-        assertEquals(EstadoProceso.BLOQUEADO_ERROR, cpu.getEstado());
+        cpu.paso();
+        cpu.paso();
+        assertEquals(-100, cpu.getAc());
+        assertEquals(EstadoProceso.TERMINADO, cpu.getEstado());
     }
 
     @Test

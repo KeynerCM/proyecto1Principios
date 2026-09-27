@@ -1,7 +1,6 @@
 package com.mycompany.minipc.core;
 
 import com.mycompany.minipc.isa.RegistroID;
-import com.mycompany.minipc.util.BinUtil;
 
 import java.time.LocalDateTime;
 import java.util.EnumMap;
@@ -28,7 +27,6 @@ public class BCP {
 
     // Contexto del procesador
     private int pc;
-    private int ir;
     private String irTexto;
     private int ac;
     private final Map<RegistroID, Integer> snapshotRegistros;
@@ -77,7 +75,6 @@ public class BCP {
     public void actualizarDesde(Procesador cpu) {
         this.estado = cpu.getEstado();
         this.pc = cpu.getPc();
-        this.ir = cpu.getIr();
         this.irTexto = cpu.getIrTexto();
         this.ac = cpu.getAc();
         this.snapshotRegistros.putAll(cpu.getRegistros().instantanea());
@@ -167,35 +164,12 @@ public class BCP {
     }
 
     /**
-     * Nombre: getIr
-     * Entradas: ninguna
-     * Salidas: la palabra cruda de la instruccion en curso
-     * Restricciones: ninguna
-     * Descripcion: acceso de solo lectura al registro de instruccion guardado.
-     */
-    public int getIr() {
-        return ir;
-    }
-
-    /**
-     * Nombre: getIrBinario
-     * Entradas: ninguna
-     * Salidas: la instruccion del IR en binario agrupado
-     * Restricciones: ninguna
-     * Descripcion: devuelve por ejemplo "0011 0001 00000101", que es lo que se
-     *              muestra en el panel del BCP.
-     */
-    public String getIrBinario() {
-        return BinUtil.aBinarioPalabra(ir);
-    }
-
-    /**
      * Nombre: getIrTexto
      * Entradas: ninguna
      * Salidas: la instruccion del IR en texto legible
      * Restricciones: puede ser cadena vacia si todavia no se ejecuto nada
-     * Descripcion: devuelve por ejemplo "MOV AX, 5". Acompana al binario para
-     *              que no haya que decodificar mentalmente.
+     * Descripcion: devuelve por ejemplo "MOV AX, 5", que es lo que se muestra
+     *              del IR en el panel del BCP.
      */
     public String getIrTexto() {
         return irTexto;

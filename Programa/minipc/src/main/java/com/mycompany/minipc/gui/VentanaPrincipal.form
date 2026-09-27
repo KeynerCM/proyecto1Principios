@@ -424,22 +424,9 @@
                                     <Property name="text" type="java.lang.String" value="-"/>
                                   </Properties>
                                 </Component>
-                                <Component class="javax.swing.JLabel" name="jLabel5">
-                                  <Properties>
-                                    <Property name="text" type="java.lang.String" value="IR (binario):"/>
-                                  </Properties>
-                                </Component>
-                                <Component class="javax.swing.JLabel" name="lblIrBinValor">
-                                  <Properties>
-                                    <Property name="font" type="java.awt.Font" editor="org.netbeans.beaninfo.editors.FontEditor">
-                                      <Font name="Monospaced" size="12" style="1"/>
-                                    </Property>
-                                    <Property name="text" type="java.lang.String" value="-"/>
-                                  </Properties>
-                                </Component>
                                 <Component class="javax.swing.JLabel" name="jLabel6">
                                   <Properties>
-                                    <Property name="text" type="java.lang.String" value="IR (texto):"/>
+                                    <Property name="text" type="java.lang.String" value="IR:"/>
                                   </Properties>
                                 </Component>
                                 <Component class="javax.swing.JLabel" name="lblIrTextoValor">
