@@ -1,5 +1,6 @@
 package com.mycompany.minipc.core;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import com.mycompany.minipc.excepciones.MemoriaInsuficienteException;
@@ -47,6 +48,33 @@ public class Memoria {
     }
 
     /**
+     * Nombre: validar
+     * Entradas: tamano, cantidad total de posiciones; limiteKernel, primera
+     *           direccion de la zona de usuario
+     * Salidas: la lista de problemas encontrados, vacia si todo es valido
+     * Restricciones: ninguna, no lanza excepciones
+     * Descripcion: concentra las reglas de tamano de la memoria en un solo
+     *              lugar. La usa redimensionar y tambien la configuracion,
+     *              que necesita reportar los errores sin construir la memoria.
+     */
+    public static List<String> validar(int tamano, int limiteKernel) {
+        List<String> errores = new ArrayList<>();
+        if (tamano < TAMANO_MINIMO) {
+            errores.add("El tamano de memoria debe ser de al menos " + TAMANO_MINIMO
+                    + ", se recibio " + tamano);
+        }
+        if (limiteKernel < LIMITE_KERNEL_MINIMO) {
+            errores.add("El limite de kernel debe ser de al menos " + LIMITE_KERNEL_MINIMO
+                    + ", se recibio " + limiteKernel);
+        }
+        if (limiteKernel >= tamano) {
+            errores.add("El limite de kernel (" + limiteKernel
+                    + ") debe ser menor que el tamano total (" + tamano + ")");
+        }
+        return errores;
+    }
+
+    /**
      * Nombre: redimensionar
      * Entradas: tamano, cantidad total de posiciones; limiteKernel, primera
      *           direccion de la zona de usuario
@@ -60,19 +88,9 @@ public class Memoria {
      *              porque el constructor la invoca.
      */
     public final void redimensionar(int tamano, int limiteKernel) {
-        if (tamano < TAMANO_MINIMO) {
-            throw new IllegalArgumentException(
-                    "El tamano de memoria debe ser de al menos " + TAMANO_MINIMO
-                    + ", se recibio " + tamano);
-        }
-        if (limiteKernel < LIMITE_KERNEL_MINIMO) {
-            throw new IllegalArgumentException(
-                    "El limite de kernel debe ser de al menos " + LIMITE_KERNEL_MINIMO
-                    + ", se recibio " + limiteKernel);
-        }
-        if (limiteKernel >= tamano) {
-            throw new IllegalArgumentException("El limite de kernel (" + limiteKernel
-                    + ") debe ser menor que el tamano total (" + tamano + ")");
+        List<String> errores = validar(tamano, limiteKernel);
+        if (!errores.isEmpty()) {
+            throw new IllegalArgumentException(String.join("; ", errores));
         }
 
         this.tamano = tamano;
