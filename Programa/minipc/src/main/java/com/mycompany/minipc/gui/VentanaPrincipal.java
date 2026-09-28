@@ -1,5 +1,6 @@
 package com.mycompany.minipc.gui;
 
+import com.mycompany.minipc.config.LectorConfiguracion;
 import com.mycompany.minipc.core.BCP;
 import com.mycompany.minipc.isa.Instruccion;
 import com.mycompany.minipc.isa.RegistroID;
@@ -8,6 +9,10 @@ import javax.swing.BorderFactory;
 import javax.swing.JButton;
 import javax.swing.JFileChooser;
 import javax.swing.JOptionPane;
+import javax.swing.JScrollPane;
+import javax.swing.JTabbedPane;
+import javax.swing.JTable;
+import javax.swing.ListSelectionModel;
 import javax.swing.filechooser.FileNameExtensionFilter;
 import javax.swing.table.AbstractTableModel;
 import javax.swing.table.TableColumnModel;
@@ -17,6 +22,8 @@ import java.beans.PropertyChangeListener;
 import java.io.File;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -70,6 +77,9 @@ public class VentanaPrincipal extends javax.swing.JFrame implements VistaPrincip
 
     private final ControladorPrincipal controlador;
 
+    /** Tabla del disco; se crea fuera del disenador (ver agregarPestanaDisco). */
+    private JTable tblDisco;
+
     /**
      * Nombre: VentanaPrincipal
      * Entradas: ninguna
@@ -83,7 +93,7 @@ public class VentanaPrincipal extends javax.swing.JFrame implements VistaPrincip
      */
     public VentanaPrincipal() {
         initComponents();
-        this.controlador = new ControladorPrincipal(this);
+        this.controlador = new ControladorPrincipal(this, new LectorConfiguracion());
 
         tblInstrucciones.setModel(controlador.getModeloInstrucciones());
         tblInstrucciones.setDefaultRenderer(Object.class, controlador.getRenderInstrucciones());
@@ -93,8 +103,38 @@ public class VentanaPrincipal extends javax.swing.JFrame implements VistaPrincip
         tblMemoria.setDefaultRenderer(Object.class, controlador.getRenderMemoria());
         ajustarAnchos(tblMemoria.getColumnModel(), new int[]{50, 70, 280});
 
+        agregarPestanaDisco();
+
         pintarBotones();
         controlador.inicializarVista();
+    }
+
+    /**
+     * Nombre: agregarPestanaDisco
+     * Entradas: ninguna
+     * Salidas: ninguna
+     * Restricciones: debe llamarse despues de initComponents, cuando la tabla
+     *                de memoria ya existe
+     * Descripcion: convierte el panel de memoria en dos pestanas, una para la
+     *              memoria principal y otra para el disco. Se arma aqui y no
+     *              en el disenador para no tocar el codigo generado; el
+     *              disenador sigue mostrando el panel de memoria como antes.
+     */
+    private void agregarPestanaDisco() {
+        tblDisco = new JTable(controlador.getModeloDisco());
+        tblDisco.setDefaultRenderer(Object.class, controlador.getRenderDisco());
+        tblDisco.setAutoResizeMode(JTable.AUTO_RESIZE_ALL_COLUMNS);
+        tblDisco.setRowHeight(tblMemoria.getRowHeight());
+        tblDisco.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        tblDisco.setShowVerticalLines(false);
+        ajustarAnchos(tblDisco.getColumnModel(), new int[]{50, 70, 280});
+
+        pnlMemoria.remove(scrMemoria);
+        JTabbedPane pestanas = new JTabbedPane();
+        pestanas.addTab("Memoria principal", scrMemoria);
+        pestanas.addTab("Disco", new JScrollPane(tblDisco));
+        pnlMemoria.add(pestanas, java.awt.BorderLayout.CENTER);
+        pnlMemoria.setBorder(BorderFactory.createTitledBorder("Almacenamiento"));
     }
 
     /**
@@ -253,6 +293,21 @@ public class VentanaPrincipal extends javax.swing.JFrame implements VistaPrincip
     }
 
     /**
+     * Nombre: refrescarDisco
+     * Entradas: ninguna
+     * Salidas: ninguna
+     * Restricciones: no hace nada si la pestana del disco todavia no existe
+     * Descripcion: avisa al modelo del disco de que su contenido cambio, por
+     *              ejemplo tras cargar archivos, limpiar o reconfigurar.
+     */
+    @Override
+    public void refrescarDisco() {
+        if (tblDisco != null) {
+            ((AbstractTableModel) tblDisco.getModel()).fireTableDataChanged();
+        }
+    }
+
+    /**
      * Nombre: mostrarBCP
      * Entradas: bcp, bloque a mostrar, o nulo si no hay proceso
      * Salidas: ninguna
@@ -402,22 +457,26 @@ public class VentanaPrincipal extends javax.swing.JFrame implements VistaPrincip
     }
 
     /**
-     * Nombre: seleccionarArchivoAsm
+     * Nombre: seleccionarArchivosAsm
      * Entradas: ninguna
-     * Salidas: el archivo elegido, o nulo si el usuario cancelo
+     * Salidas: los archivos elegidos, o una lista vacia si el usuario cancelo
      * Restricciones: el selector solo ofrece archivos con extension .asm
      * Descripcion: abre el selector de archivos ya posicionado en la carpeta
-     *              de ejemplos, para que el usuario no tenga que buscarla.
+     *              de ejemplos, para que el usuario no tenga que buscarla, y
+     *              permite elegir varios a la vez con Ctrl o Shift.
      */
     @Override
-    public File seleccionarArchivoAsm() {
+    public List<File> seleccionarArchivosAsm() {
         JFileChooser selector = new JFileChooser(carpetaInicial());
-        selector.setDialogTitle("Seleccionar programa en ensamblador");
+        selector.setDialogTitle("Seleccionar programas en ensamblador");
+        selector.setMultiSelectionEnabled(true);
         selector.setAcceptAllFileFilterUsed(false);
         selector.setFileFilter(new FileNameExtensionFilter(
                 "Archivos de ensamblador (*.asm)", "asm"));
-        return selector.showOpenDialog(this) == JFileChooser.APPROVE_OPTION
-                ? selector.getSelectedFile() : null;
+        if (selector.showOpenDialog(this) != JFileChooser.APPROVE_OPTION) {
+            return Collections.emptyList();
+        }
+        return Arrays.asList(selector.getSelectedFiles());
     }
 
     /**
@@ -537,7 +596,7 @@ public class VentanaPrincipal extends javax.swing.JFrame implements VistaPrincip
         tbBarra.setRollover(true);
 
         btnCargar.setText("Cargar .asm");
-        btnCargar.setToolTipText("Selecciona un archivo de codigo ensamblador y lo carga en memoria");
+        btnCargar.setToolTipText("Selecciona uno o varios archivos de codigo ensamblador y los guarda en el disco");
         btnCargar.setFocusable(false);
         btnCargar.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
@@ -855,7 +914,7 @@ public class VentanaPrincipal extends javax.swing.JFrame implements VistaPrincip
      * Descripcion: delega en el controlador la carga de un archivo .asm.
      */
     private void btnCargarActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnCargarActionPerformed
-        controlador.alCargarArchivo();
+        controlador.alCargarArchivos();
     }//GEN-LAST:event_btnCargarActionPerformed
 
     /**

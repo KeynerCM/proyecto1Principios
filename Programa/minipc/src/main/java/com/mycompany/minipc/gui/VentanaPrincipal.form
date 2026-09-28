@@ -45,7 +45,7 @@
             <Component class="javax.swing.JButton" name="btnCargar">
               <Properties>
                 <Property name="text" type="java.lang.String" value="Cargar .asm"/>
-                <Property name="toolTipText" type="java.lang.String" value="Selecciona un archivo de codigo ensamblador y lo carga en memoria"/>
+                <Property name="toolTipText" type="java.lang.String" value="Selecciona uno o varios archivos de codigo ensamblador y los guarda en el disco"/>
                 <Property name="focusable" type="boolean" value="false"/>
               </Properties>
               <Events>

@@ -267,6 +267,31 @@ public class Disco {
     }
 
     /**
+     * Nombre: nombreDisponible
+     * Entradas: nombre, nombre deseado para un archivo
+     * Salidas: el mismo nombre si esta libre, o una variante numerada, por
+     *          ejemplo "file (2).asm"
+     * Restricciones: el nombre no debe ser nulo
+     * Descripcion: permite guardar varias copias del mismo programa, que es
+     *              lo normal cuando se quiere ejecutar mas de un proceso con
+     *              el mismo codigo. El numero se inserta antes de la
+     *              extension para que el archivo conserve su tipo.
+     */
+    public String nombreDisponible(String nombre) {
+        if (buscar(nombre) == null) {
+            return nombre;
+        }
+        int punto = nombre.lastIndexOf('.');
+        String base = punto > 0 ? nombre.substring(0, punto) : nombre;
+        String extension = punto > 0 ? nombre.substring(punto) : "";
+        int copia = 2;
+        while (buscar(base + " (" + copia + ")" + extension) != null) {
+            copia++;
+        }
+        return base + " (" + copia + ")" + extension;
+    }
+
+    /**
      * Nombre: getIndice
      * Entradas: ninguna
      * Salidas: las entradas del indice, en el orden en que aparecen en el disco

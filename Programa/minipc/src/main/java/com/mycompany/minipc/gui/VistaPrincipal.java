@@ -53,6 +53,17 @@ public interface VistaPrincipal {
     void refrescarMemoria();
 
     /**
+     * Nombre: refrescarDisco
+     * Entradas: ninguna
+     * Salidas: ninguna
+     * Restricciones: ninguna
+     * Descripcion: vuelve a dibujar la tabla del disco, cuyo contenido
+     *              cambio. Igual que la memoria, el modelo lee directamente
+     *              del disco, por eso no recibe datos.
+     */
+    void refrescarDisco();
+
+    /**
      * Nombre: mostrarBCP
      * Entradas: bcp, bloque a mostrar, o nulo para dejar el panel en blanco
      * Salidas: ninguna
@@ -127,13 +138,15 @@ public interface VistaPrincipal {
     void actualizarUsoMemoria(int porcentaje);
 
     /**
-     * Nombre: seleccionarArchivoAsm
+     * Nombre: seleccionarArchivosAsm
      * Entradas: ninguna
-     * Salidas: el archivo elegido, o nulo si el usuario cancelo
-     * Restricciones: debe filtrar por la extension .asm
-     * Descripcion: pide al usuario que elija un archivo de codigo ensamblador.
-     *              Devolver nulo al cancelar permite al controlador distinguir
-     *              esa situacion de un error real.
+     * Salidas: los archivos elegidos, o una lista vacia si el usuario cancelo
+     * Restricciones: debe filtrar por la extension .asm y permitir elegir
+     *                varios archivos a la vez
+     * Descripcion: pide al usuario que elija uno o varios archivos de codigo
+     *              ensamblador, como pide el enunciado. Devolver una lista
+     *              vacia al cancelar permite al controlador distinguir esa
+     *              situacion de un error real.
      */
-    File seleccionarArchivoAsm();
+    List<File> seleccionarArchivosAsm();
 }

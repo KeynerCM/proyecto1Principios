@@ -1,6 +1,9 @@
 package com.mycompany.minipc.gui;
 
+import com.mycompany.minipc.config.Configuracion;
+import com.mycompany.minipc.core.Disco;
 import com.mycompany.minipc.core.Memoria;
+import com.mycompany.minipc.excepciones.ConfiguracionException;
 
 import javax.swing.SpinnerNumberModel;
 
@@ -8,15 +11,16 @@ import javax.swing.SpinnerNumberModel;
  * Nombre: DialogoConfiguracion
  * Entradas: la ventana padre y el controlador al que aplicar los cambios
  * Salidas: la nueva configuracion, entregada al controlador al aceptar
- * Restricciones: aplicar la configuracion descarga el programa cargado,
- *                porque redimensionar la memoria invalida las direcciones ya
- *                asignadas
+ * Restricciones: aplicar la configuracion vacia la memoria y el disco, porque
+ *                redimensionarlos invalida las direcciones ya asignadas
  * Descripcion: dialogo de configuracion de la maquina. Permite cambiar el
- *              tamano total de la memoria, el limite entre la zona de kernel
- *              y la de usuario, y la velocidad de la ejecucion automatica.
- *              Muestra en vivo como queda repartida la memoria segun lo que se
- *              elija, y deshabilita el boton Aceptar mientras la combinacion
- *              no sea valida, en lugar de dejar equivocarse y reclamar despues.
+ *              tamano de la memoria principal y su limite de kernel, el
+ *              tamano del disco y de su memoria virtual, y la duracion de cada
+ *              segundo de CPU en la ejecucion automatica. Muestra en vivo como
+ *              quedan repartidas la memoria y el disco, y deshabilita el boton
+ *              Aceptar mientras la combinacion no sea valida, en lugar de
+ *              dejar equivocarse y reclamar despues. Al aceptar, el
+ *              controlador guarda los valores en el archivo de configuracion.
  */
 public class DialogoConfiguracion extends javax.swing.JDialog {
 
@@ -35,7 +39,8 @@ public class DialogoConfiguracion extends javax.swing.JDialog {
      * Descripcion: arma los componentes y les asigna los modelos de los
      *              spinners. Esos modelos se crean aqui y no en el disenador
      *              para que los limites queden junto a las constantes de
-     *              Memoria que los definen, en lugar de duplicados en el XML.
+     *              Memoria, Disco y Configuracion que los definen, en lugar de
+     *              duplicados en el XML.
      */
     public DialogoConfiguracion(java.awt.Frame padre, boolean modal,
             ControladorPrincipal controlador) {
@@ -43,15 +48,17 @@ public class DialogoConfiguracion extends javax.swing.JDialog {
         this.controlador = controlador;
         initComponents();
 
-        // Los modelos se arman aqui y no en el disenador para que los
-        // limites queden junto a las constantes que los definen.
-        Memoria memoria = controlador.getProcesador().getMemoria();
+        Configuracion actual = controlador.getConfiguracion();
         spnTamano.setModel(new SpinnerNumberModel(
-                memoria.getTamano(), Memoria.TAMANO_MINIMO, 1024, 32));
+                actual.getTamanoMemoria(), Memoria.TAMANO_MINIMO, 1024, 32));
         spnKernel.setModel(new SpinnerNumberModel(
-                memoria.getLimiteKernel(), Memoria.LIMITE_KERNEL_MINIMO, 512, 8));
-        spnVelocidad.setModel(new SpinnerNumberModel(
-                controlador.getVelocidadMs(), 50, 2000, 50));
+                actual.getLimiteKernel(), Memoria.LIMITE_KERNEL_MINIMO, 512, 8));
+        spnDisco.setModel(new SpinnerNumberModel(
+                actual.getTamanoDisco(), Disco.TAMANO_MINIMO, 4096, 64));
+        spnMemoriaVirtual.setModel(new SpinnerNumberModel(
+                actual.getTamanoMemoriaVirtual(), 0, 2048, 16));
+        spnVelocidad.setModel(new SpinnerNumberModel(actual.getMsPorSegundo(),
+                Configuracion.MS_POR_SEGUNDO_MINIMO, Configuracion.MS_POR_SEGUNDO_MAXIMO, 50));
 
         actualizarResumen();
         getRootPane().setDefaultButton(btnAceptar);
@@ -60,40 +67,29 @@ public class DialogoConfiguracion extends javax.swing.JDialog {
     }
 
     /**
-     * Nombre: tamanoElegido
-     * Entradas: ninguna
-     * Salidas: el tamano de memoria seleccionado
-     * Restricciones: el spinner garantiza que el valor es un entero dentro de
-     *                su rango
+     * Nombre: valor
+     * Entradas: spinner, control del que se lee el numero
+     * Salidas: el entero seleccionado
+     * Restricciones: el spinner debe tener un SpinnerNumberModel de enteros
      * Descripcion: concentra la conversion del valor del spinner, que llega
      *              como Object, para no repetir el casteo en cada uso.
      */
-    private int tamanoElegido() {
-        return (Integer) spnTamano.getValue();
+    private static int valor(javax.swing.JSpinner spinner) {
+        return (Integer) spinner.getValue();
     }
 
     /**
-     * Nombre: kernelElegido
-     * Entradas: ninguna
-     * Salidas: el limite de kernel seleccionado
-     * Restricciones: el spinner garantiza que el valor es un entero dentro de
-     *                su rango
-     * Descripcion: analogo a tamanoElegido, para el limite entre zonas.
+     * Nombre: configuracionElegida
+     * Entradas: ninguna; lee los valores actuales de los spinners
+     * Salidas: la configuracion que resulta de lo elegido
+     * Restricciones: lanza ConfiguracionException si la combinacion no es
+     *                valida
+     * Descripcion: delega la validacion en Configuracion, que usa las mismas
+     *              reglas que la memoria y el disco, para no repetirlas aqui.
      */
-    private int kernelElegido() {
-        return (Integer) spnKernel.getValue();
-    }
-
-    /**
-     * Nombre: velocidadElegida
-     * Entradas: ninguna
-     * Salidas: los milisegundos entre instrucciones seleccionados
-     * Restricciones: el spinner garantiza que el valor es un entero dentro de
-     *                su rango
-     * Descripcion: analogo a tamanoElegido, para la velocidad de ejecucion.
-     */
-    private int velocidadElegida() {
-        return (Integer) spnVelocidad.getValue();
+    private Configuracion configuracionElegida() throws ConfiguracionException {
+        return new Configuracion(valor(spnTamano), valor(spnKernel), valor(spnDisco),
+                valor(spnMemoriaVirtual), valor(spnVelocidad));
     }
 
     /**
@@ -101,28 +97,39 @@ public class DialogoConfiguracion extends javax.swing.JDialog {
      * Entradas: ninguna; lee los valores actuales de los spinners
      * Salidas: ninguna; actualiza las etiquetas y el estado del boton Aceptar
      * Restricciones: ninguna
-     * Descripcion: recalcula como queda repartida la memoria y avisa si la
-     *              combinacion elegida no sirve. Cuando el limite de kernel
-     *              alcanza o supera el tamano total, borra el resumen, muestra
-     *              el aviso y deshabilita Aceptar, de modo que el error se
-     *              previene en vez de reclamarse despues.
+     * Descripcion: recalcula como quedan repartidas la memoria y el disco y
+     *              avisa si la combinacion elegida no sirve. Si no es valida,
+     *              borra el resumen, muestra el primer problema y deshabilita
+     *              Aceptar, de modo que el error se previene en vez de
+     *              reclamarse despues.
      */
     private void actualizarResumen() {
-        int tamano = tamanoElegido();
-        int kernel = kernelElegido();
-
-        if (kernel >= tamano) {
-            lblZonaKernelValor.setText("-");
-            lblZonaUsuarioValor.setText("-");
-            lblEspacioValor.setText("-");
-            lblAviso.setText("El limite de kernel debe ser menor que el tamano total.");
+        Configuracion elegida;
+        try {
+            elegida = configuracionElegida();
+        } catch (ConfiguracionException e) {
+            for (javax.swing.JLabel etiqueta : new javax.swing.JLabel[]{lblZonaKernelValor,
+                lblZonaUsuarioValor, lblEspacioValor, lblIndiceDiscoValor,
+                lblArchivosDiscoValor, lblVirtualDiscoValor}) {
+                etiqueta.setText("-");
+            }
+            lblAviso.setText(e.getErrores().get(0));
             btnAceptar.setEnabled(false);
             return;
         }
 
+        int tamano = elegida.getTamanoMemoria();
+        int kernel = elegida.getLimiteKernel();
+        int disco = elegida.getTamanoDisco();
+        int inicioVirtual = disco - elegida.getTamanoMemoriaVirtual();
+
         lblZonaKernelValor.setText("0 a " + (kernel - 1));
         lblZonaUsuarioValor.setText(kernel + " a " + (tamano - 1));
         lblEspacioValor.setText((tamano - kernel) + " posiciones");
+        lblIndiceDiscoValor.setText("0 a " + (Disco.ENTRADAS_INDICE - 1));
+        lblArchivosDiscoValor.setText(Disco.ENTRADAS_INDICE + " a " + (inicioVirtual - 1));
+        lblVirtualDiscoValor.setText(elegida.getTamanoMemoriaVirtual() == 0
+                ? "(ninguna)" : inicioVirtual + " a " + (disco - 1));
         lblAviso.setText(" ");
         btnAceptar.setEnabled(true);
     }
@@ -147,6 +154,10 @@ public class DialogoConfiguracion extends javax.swing.JDialog {
         spnTamano = new javax.swing.JSpinner();
         lblKernel = new javax.swing.JLabel();
         spnKernel = new javax.swing.JSpinner();
+        lblDisco = new javax.swing.JLabel();
+        spnDisco = new javax.swing.JSpinner();
+        lblMemoriaVirtual = new javax.swing.JLabel();
+        spnMemoriaVirtual = new javax.swing.JSpinner();
         lblVelocidad = new javax.swing.JLabel();
         spnVelocidad = new javax.swing.JSpinner();
         pnlResumen = new javax.swing.JPanel();
@@ -156,6 +167,12 @@ public class DialogoConfiguracion extends javax.swing.JDialog {
         lblZonaUsuarioValor = new javax.swing.JLabel();
         lblEspacio = new javax.swing.JLabel();
         lblEspacioValor = new javax.swing.JLabel();
+        lblIndiceDisco = new javax.swing.JLabel();
+        lblIndiceDiscoValor = new javax.swing.JLabel();
+        lblArchivosDisco = new javax.swing.JLabel();
+        lblArchivosDiscoValor = new javax.swing.JLabel();
+        lblVirtualDisco = new javax.swing.JLabel();
+        lblVirtualDiscoValor = new javax.swing.JLabel();
         pnlInferior = new javax.swing.JPanel();
         lblAviso = new javax.swing.JLabel();
         pnlBotones = new javax.swing.JPanel();
@@ -193,10 +210,32 @@ public class DialogoConfiguracion extends javax.swing.JDialog {
         });
         pnlParametros.add(spnKernel);
 
-        lblVelocidad.setText("Velocidad (ms):");
+        lblDisco.setText("Tamano del disco:");
+        pnlParametros.add(lblDisco);
+
+        spnDisco.setToolTipText("Cantidad total de posiciones del disco. Las primeras 20 son el indice de archivos");
+        spnDisco.addChangeListener(new javax.swing.event.ChangeListener() {
+            public void stateChanged(javax.swing.event.ChangeEvent evt) {
+                spnDiscoStateChanged(evt);
+            }
+        });
+        pnlParametros.add(spnDisco);
+
+        lblMemoriaVirtual.setText("Memoria virtual:");
+        pnlParametros.add(lblMemoriaVirtual);
+
+        spnMemoriaVirtual.setToolTipText("Posiciones al final del disco reservadas para intercambio");
+        spnMemoriaVirtual.addChangeListener(new javax.swing.event.ChangeListener() {
+            public void stateChanged(javax.swing.event.ChangeEvent evt) {
+                spnMemoriaVirtualStateChanged(evt);
+            }
+        });
+        pnlParametros.add(spnMemoriaVirtual);
+
+        lblVelocidad.setText("Segundo de CPU (ms):");
         pnlParametros.add(lblVelocidad);
 
-        spnVelocidad.setToolTipText("Milisegundos entre instrucciones en la ejecucion automatica");
+        spnVelocidad.setToolTipText("Milisegundos reales que dura cada segundo de CPU en la ejecucion automatica");
         pnlParametros.add(spnVelocidad);
 
         getContentPane().add(pnlParametros, java.awt.BorderLayout.NORTH);
@@ -225,6 +264,27 @@ public class DialogoConfiguracion extends javax.swing.JDialog {
         lblEspacioValor.setText("-");
         pnlResumen.add(lblEspacioValor);
 
+        lblIndiceDisco.setText("Indice del disco:");
+        pnlResumen.add(lblIndiceDisco);
+
+        lblIndiceDiscoValor.setFont(new java.awt.Font("Monospaced", 0, 12)); // NOI18N
+        lblIndiceDiscoValor.setText("-");
+        pnlResumen.add(lblIndiceDiscoValor);
+
+        lblArchivosDisco.setText("Area de archivos:");
+        pnlResumen.add(lblArchivosDisco);
+
+        lblArchivosDiscoValor.setFont(new java.awt.Font("Monospaced", 0, 12)); // NOI18N
+        lblArchivosDiscoValor.setText("-");
+        pnlResumen.add(lblArchivosDiscoValor);
+
+        lblVirtualDisco.setText("Area de memoria virtual:");
+        pnlResumen.add(lblVirtualDisco);
+
+        lblVirtualDiscoValor.setFont(new java.awt.Font("Monospaced", 0, 12)); // NOI18N
+        lblVirtualDiscoValor.setText("-");
+        pnlResumen.add(lblVirtualDiscoValor);
+
         getContentPane().add(pnlResumen, java.awt.BorderLayout.CENTER);
 
         pnlInferior.setLayout(new java.awt.BorderLayout());
@@ -236,7 +296,7 @@ public class DialogoConfiguracion extends javax.swing.JDialog {
         pnlBotones.setLayout(new java.awt.FlowLayout(java.awt.FlowLayout.RIGHT));
 
         btnRestaurar.setText("Valores por defecto");
-        btnRestaurar.setToolTipText("Memoria de 256 posiciones, kernel de 0 a 63, velocidad de 500 ms");
+        btnRestaurar.setToolTipText("Memoria de 256 con kernel de 0 a 63, disco de 512 con 64 de memoria virtual, 1000 ms por segundo");
         btnRestaurar.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 btnRestaurarActionPerformed(evt);
@@ -245,7 +305,7 @@ public class DialogoConfiguracion extends javax.swing.JDialog {
         pnlBotones.add(btnRestaurar);
 
         btnAceptar.setText("Aceptar");
-        btnAceptar.setToolTipText("Aplica la configuracion y descarga el programa actual");
+        btnAceptar.setToolTipText("Aplica la configuracion, la guarda en config.properties y vacia la memoria y el disco");
         btnAceptar.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 btnAceptarActionPerformed(evt);
@@ -294,19 +354,45 @@ public class DialogoConfiguracion extends javax.swing.JDialog {
     }//GEN-LAST:event_spnKernelStateChanged
 
     /**
+     * Nombre: spnDiscoStateChanged
+     * Entradas: evt, evento de cambio del spinner
+     * Salidas: ninguna
+     * Restricciones: ninguna
+     * Descripcion: recalcula el resumen cada vez que cambia el tamano del
+     *              disco.
+     */
+    private void spnDiscoStateChanged(javax.swing.event.ChangeEvent evt) {//GEN-FIRST:event_spnDiscoStateChanged
+        actualizarResumen();
+    }//GEN-LAST:event_spnDiscoStateChanged
+
+    /**
+     * Nombre: spnMemoriaVirtualStateChanged
+     * Entradas: evt, evento de cambio del spinner
+     * Salidas: ninguna
+     * Restricciones: ninguna
+     * Descripcion: recalcula el resumen cada vez que cambia el tamano de la
+     *              memoria virtual.
+     */
+    private void spnMemoriaVirtualStateChanged(javax.swing.event.ChangeEvent evt) {//GEN-FIRST:event_spnMemoriaVirtualStateChanged
+        actualizarResumen();
+    }//GEN-LAST:event_spnMemoriaVirtualStateChanged
+
+    /**
      * Nombre: btnRestaurarActionPerformed
      * Entradas: evt, evento de accion que genero el clic
      * Salidas: ninguna
      * Restricciones: no aplica nada todavia; solo cambia lo que muestran los
      *                spinners
-     * Descripcion: devuelve los tres valores a los de arranque, tomandolos de
-     *              las constantes de Memoria y del controlador en lugar de
-     *              escribirlos aqui.
+     * Descripcion: devuelve los valores a los de por defecto, tomandolos de
+     *              Configuracion en lugar de escribirlos aqui.
      */
     private void btnRestaurarActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnRestaurarActionPerformed
-        spnTamano.setValue(Memoria.TAMANO_POR_DEFECTO);
-        spnKernel.setValue(Memoria.LIMITE_KERNEL_POR_DEFECTO);
-        spnVelocidad.setValue(ControladorPrincipal.VELOCIDAD_POR_DEFECTO);
+        Configuracion porDefecto = Configuracion.porDefecto();
+        spnTamano.setValue(porDefecto.getTamanoMemoria());
+        spnKernel.setValue(porDefecto.getLimiteKernel());
+        spnDisco.setValue(porDefecto.getTamanoDisco());
+        spnMemoriaVirtual.setValue(porDefecto.getTamanoMemoriaVirtual());
+        spnVelocidad.setValue(porDefecto.getMsPorSegundo());
         actualizarResumen();
     }//GEN-LAST:event_btnRestaurarActionPerformed
 
@@ -315,13 +401,17 @@ public class DialogoConfiguracion extends javax.swing.JDialog {
      * Entradas: evt, evento de accion que genero el clic
      * Salidas: ninguna
      * Restricciones: el boton solo esta habilitado si la combinacion es
-     *                valida, de modo que aqui no hace falta volver a validar
+     *                valida; aun asi se atrapa la excepcion por seguridad
      * Descripcion: aplica la configuracion a traves del controlador y cierra
      *              el dialogo.
      */
     private void btnAceptarActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnAceptarActionPerformed
-        controlador.alConfigurar(tamanoElegido(), kernelElegido(), velocidadElegida());
-        dispose();
+        try {
+            controlador.alConfigurar(configuracionElegida());
+            dispose();
+        } catch (ConfiguracionException e) {
+            actualizarResumen();
+        }
     }//GEN-LAST:event_btnAceptarActionPerformed
 
     /**
@@ -339,12 +429,20 @@ public class DialogoConfiguracion extends javax.swing.JDialog {
     private javax.swing.JButton btnAceptar;
     private javax.swing.JButton btnCancelar;
     private javax.swing.JButton btnRestaurar;
+    private javax.swing.JLabel lblArchivosDisco;
+    private javax.swing.JLabel lblArchivosDiscoValor;
     private javax.swing.JLabel lblAviso;
+    private javax.swing.JLabel lblDisco;
     private javax.swing.JLabel lblEspacio;
     private javax.swing.JLabel lblEspacioValor;
+    private javax.swing.JLabel lblIndiceDisco;
+    private javax.swing.JLabel lblIndiceDiscoValor;
     private javax.swing.JLabel lblKernel;
+    private javax.swing.JLabel lblMemoriaVirtual;
     private javax.swing.JLabel lblTamano;
     private javax.swing.JLabel lblVelocidad;
+    private javax.swing.JLabel lblVirtualDisco;
+    private javax.swing.JLabel lblVirtualDiscoValor;
     private javax.swing.JLabel lblZonaKernel;
     private javax.swing.JLabel lblZonaKernelValor;
     private javax.swing.JLabel lblZonaUsuario;
@@ -353,7 +451,9 @@ public class DialogoConfiguracion extends javax.swing.JDialog {
     private javax.swing.JPanel pnlInferior;
     private javax.swing.JPanel pnlParametros;
     private javax.swing.JPanel pnlResumen;
+    private javax.swing.JSpinner spnDisco;
     private javax.swing.JSpinner spnKernel;
+    private javax.swing.JSpinner spnMemoriaVirtual;
     private javax.swing.JSpinner spnTamano;
     private javax.swing.JSpinner spnVelocidad;
     // End of variables declaration//GEN-END:variables

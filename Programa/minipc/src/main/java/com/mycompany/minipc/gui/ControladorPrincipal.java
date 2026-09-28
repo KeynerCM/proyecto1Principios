@@ -2,21 +2,30 @@ package com.mycompany.minipc.gui;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
 import javax.swing.Timer;
 
+import com.mycompany.minipc.config.Configuracion;
+import com.mycompany.minipc.config.LectorConfiguracion;
+import com.mycompany.minipc.core.Disco;
+import com.mycompany.minipc.core.EntradaIndice;
 import com.mycompany.minipc.core.Estadisticas;
 import com.mycompany.minipc.core.Fase;
 import com.mycompany.minipc.core.ObservadorCPU;
 import com.mycompany.minipc.core.Procesador;
+import com.mycompany.minipc.excepciones.ConfiguracionException;
 import com.mycompany.minipc.excepciones.DesbordamientoException;
+import com.mycompany.minipc.excepciones.DiscoException;
 import com.mycompany.minipc.excepciones.MemoriaInsuficienteException;
 import com.mycompany.minipc.excepciones.SintaxisException;
+import com.mycompany.minipc.gui.modelo.ModeloTablaDisco;
 import com.mycompany.minipc.gui.modelo.ModeloTablaInstrucciones;
 import com.mycompany.minipc.gui.modelo.ModeloTablaMemoria;
 import com.mycompany.minipc.gui.modelo.RenderInstruccionActual;
+import com.mycompany.minipc.gui.modelo.RenderZonaDisco;
 import com.mycompany.minipc.gui.modelo.RenderZonaMemoria;
 import com.mycompany.minipc.io.CargadorASM;
 import com.mycompany.minipc.isa.Ensamblador;
@@ -35,18 +44,27 @@ import com.mycompany.minipc.isa.Instruccion;
  */
 public class ControladorPrincipal implements ObservadorCPU {
 
-    /** Milisegundos entre instrucciones en la ejecucion automatica. */
-    public static final int VELOCIDAD_POR_DEFECTO = 500;
-
     private final VistaPrincipal vista;
     private final Procesador cpu;
+    private final Disco disco;
     private final CargadorASM cargador;
     private final Ensamblador ensamblador;
 
+    /** Lector del archivo de configuracion, o nulo si no se usa archivo. */
+    private final LectorConfiguracion lectorConfiguracion;
+
+    /** Configuracion aplicada en este momento. */
+    private Configuracion configuracion;
+
+    /** Problemas al leer la configuracion, que se informan al mostrar la vista. */
+    private final List<String> erroresConfiguracion;
+
     private final ModeloTablaInstrucciones modeloInstrucciones;
     private final ModeloTablaMemoria modeloMemoria;
+    private final ModeloTablaDisco modeloDisco;
     private final RenderInstruccionActual renderInstrucciones;
     private final RenderZonaMemoria renderMemoria;
+    private final RenderZonaDisco renderDisco;
 
     /**
      * Temporizador de la ejecucion automatica.
@@ -63,75 +81,207 @@ public class ControladorPrincipal implements ObservadorCPU {
     /**
      * Nombre: ControladorPrincipal
      * Entradas: vista, ventana a la que este controlador da servicio
-     * Salidas: el controlador construido
-     * Restricciones: la vista no debe ser nula; el controlador queda ya
-     *                registrado como observador del procesador
-     * Descripcion: crea el procesador, los modelos de tabla, los renderers y
-     *              el temporizador. Los renderers se crean aqui y no en la
-     *              ventana porque necesitan consultar la memoria, que vive
-     *              dentro del procesador.
+     * Salidas: el controlador construido con la configuracion por defecto
+     * Restricciones: la vista no debe ser nula; no lee ni escribe ningun
+     *                archivo de configuracion
+     * Descripcion: variante sin archivo, pensada para las pruebas, que no
+     *              deben depender de lo que haya en la carpeta de trabajo.
      */
     public ControladorPrincipal(VistaPrincipal vista) {
+        this(vista, null);
+    }
+
+    /**
+     * Nombre: ControladorPrincipal
+     * Entradas: vista, ventana a la que este controlador da servicio;
+     *           lectorConfiguracion, lector del archivo de configuracion, o
+     *           nulo para usar los valores por defecto sin archivo
+     * Salidas: el controlador construido
+     * Restricciones: la vista no debe ser nula; el controlador queda ya
+     *                registrado como observador del procesador. Si el archivo
+     *                tiene errores no falla: usa los valores por defecto y
+     *                guarda los problemas para informarlos en
+     *                inicializarVista, cuando la ventana ya existe
+     * Descripcion: lee la configuracion, crea el procesador y el disco con
+     *              esos tamanos, los modelos de tabla, los renderers y el
+     *              temporizador. Los renderers se crean aqui y no en la
+     *              ventana porque necesitan consultar la memoria y el disco.
+     */
+    public ControladorPrincipal(VistaPrincipal vista, LectorConfiguracion lectorConfiguracion) {
         this.vista = vista;
+        this.lectorConfiguracion = lectorConfiguracion;
+        this.erroresConfiguracion = new ArrayList<>();
+        this.configuracion = leerConfiguracion();
+
         this.cpu = new Procesador();
+        this.cpu.configurarMemoria(configuracion.getTamanoMemoria(),
+                configuracion.getLimiteKernel());
+        this.disco = new Disco(configuracion.getTamanoDisco(),
+                configuracion.getTamanoMemoriaVirtual());
         this.cargador = new CargadorASM();
         this.ensamblador = new Ensamblador();
         this.nombreArchivo = "(ninguno)";
 
         this.modeloInstrucciones = new ModeloTablaInstrucciones();
         this.modeloMemoria = new ModeloTablaMemoria(cpu.getMemoria());
+        this.modeloDisco = new ModeloTablaDisco(disco);
         this.renderInstrucciones = new RenderInstruccionActual();
         this.renderMemoria = new RenderZonaMemoria(cpu.getMemoria());
+        this.renderDisco = new RenderZonaDisco(disco);
 
-        this.temporizador = new Timer(VELOCIDAD_POR_DEFECTO, e -> alTicDelTemporizador());
+        this.temporizador = new Timer(configuracion.getMsPorSegundo(),
+                e -> alTicDelTemporizador());
         this.cpu.agregarObservador(this);
     }
 
-    // Acciones de los botones
-    
     /**
-     * Nombre: alCargarArchivo
-     * Entradas: ninguna; el archivo lo pide a la vista
-     * Salidas: ninguna; deja el programa cargado y la vista actualizada
-     * Restricciones: si algo falla no se carga nada y la memoria queda como
-     *                estaba; si el usuario cancela el dialogo no ocurre nada
-     * Descripcion: encadena las cuatro etapas de la carga: elegir archivo,
-     *              leerlo, ensamblarlo y cargarlo en memoria. Cada tipo de
-     *              fallo se informa con su propio titulo, de modo que el
-     *              usuario sepa si el problema es del archivo, de su sintaxis
-     *              o del espacio disponible.
+     * Nombre: leerConfiguracion
+     * Entradas: ninguna; usa el lector recibido en el constructor
+     * Salidas: la configuracion a aplicar
+     * Restricciones: nunca lanza excepciones; ante cualquier problema devuelve
+     *                los valores por defecto y anota el motivo
+     * Descripcion: si no hay lector, usa los valores por defecto. Si el
+     *              archivo tiene valores invalidos o no se puede leer, tambien,
+     *              para que el programa arranque igual y el usuario pueda
+     *              corregir el archivo o la configuracion desde el dialogo.
      */
-    public void alCargarArchivo() {
-        File archivo = vista.seleccionarArchivoAsm();
-        if (archivo == null) {
-            return;
+    private Configuracion leerConfiguracion() {
+        if (lectorConfiguracion == null) {
+            return Configuracion.porDefecto();
         }
         try {
-            List<String> lineas = cargador.leer(archivo);
-            List<Instruccion> programa = ensamblador.ensamblar(lineas);
-            cpu.cargar(programa, archivo.getName());
+            return lectorConfiguracion.cargar();
+        } catch (ConfiguracionException e) {
+            erroresConfiguracion.addAll(e.getErrores());
+        } catch (IOException e) {
+            erroresConfiguracion.add("No se pudo leer "
+                    + lectorConfiguracion.getArchivo().toAbsolutePath() + ": " + e.getMessage());
+        }
+        erroresConfiguracion.add("Se usan los valores por defecto.");
+        return Configuracion.porDefecto();
+    }
 
-            nombreArchivo = archivo.getName();
-            modeloInstrucciones.cargar(programa);
-            vista.mostrarInstrucciones(programa);
-            vista.escribirEnConsola("Programa cargado en la posicion "
-                    + cpu.getDireccionBase() + ". " + programa.size() + " instrucciones.");
-            actualizarVista();
+    // Acciones de los botones
+
+    /**
+     * Nombre: alCargarArchivos
+     * Entradas: ninguna; los archivos los pide a la vista
+     * Salidas: ninguna; deja los programas validos guardados en el disco y
+     *          la vista actualizada
+     * Restricciones: si el usuario cancela el dialogo no ocurre nada. Un
+     *                archivo con problemas no se guarda, pero no impide que
+     *                se guarden los demas
+     * Descripcion: carga uno o varios archivos .asm. Por cada uno encadena
+     *              leerlo, ensamblarlo y guardarlo en el disco, que es donde
+     *              viven los programas antes de ejecutarse. Los problemas de
+     *              todos los archivos se juntan en un solo cuadro, cada uno
+     *              con el nombre de su archivo, para que el usuario los
+     *              corrija en una pasada. Despues pasa el primer programa
+     *              guardado del disco a la memoria para poder ejecutarlo.
+     */
+    public void alCargarArchivos() {
+        List<File> archivos = vista.seleccionarArchivosAsm();
+        if (archivos == null || archivos.isEmpty()) {
+            return;
+        }
+
+        List<String> errores = new ArrayList<>();
+        List<EntradaIndice> guardados = new ArrayList<>();
+        for (File archivo : archivos) {
+            EntradaIndice entrada = guardarEnDisco(archivo, errores);
+            if (entrada != null) {
+                guardados.add(entrada);
+            }
+        }
+        vista.refrescarDisco();
+
+        if (!guardados.isEmpty()) {
+            cargarEnMemoria(guardados.get(0), errores);
+            if (guardados.size() > 1) {
+                vista.escribirEnConsola((guardados.size() - 1)
+                        + " programa(s) mas quedan guardados en el disco.");
+            }
+        }
+        if (!errores.isEmpty()) {
+            vista.mostrarErrores("Errores al cargar archivos", errores);
+        }
+        actualizarVista();
+    }
+
+    /**
+     * Nombre: guardarEnDisco
+     * Entradas: archivo, archivo .asm elegido; errores, lista donde anotar
+     *           los problemas encontrados
+     * Salidas: la entrada del indice creada, o nulo si el archivo no se guardo
+     * Restricciones: no lanza excepciones; cada fallo queda en la lista con el
+     *                nombre del archivo
+     * Descripcion: valida el archivo en el orden en que puede fallar: que se
+     *              pueda leer y tenga extension .asm, que su sintaxis sea
+     *              correcta y que haya lugar en el disco. Si ya hay un archivo
+     *              con el mismo nombre, guarda una copia numerada.
+     */
+    private EntradaIndice guardarEnDisco(File archivo, List<String> errores) {
+        String nombre = archivo.getName();
+        try {
+            List<Instruccion> programa = ensamblador.ensamblar(cargador.leer(archivo));
+            EntradaIndice entrada = disco.guardarPrograma(disco.nombreDisponible(nombre),
+                    programa);
+            vista.escribirEnConsola("Guardado en disco: " + entrada.getNombre()
+                    + ", posiciones " + entrada.getDireccionInicio() + " a "
+                    + entrada.getDireccionFin() + ".");
+            return entrada;
 
         } catch (SintaxisException e) {
-            vista.mostrarErrores("Errores de sintaxis", e.getErrores());
-            vista.escribirEnConsola("El archivo " + archivo.getName() + " tiene "
-                    + e.cantidad() + " error(es) de sintaxis. No se cargo nada.");
+            errores.add(nombre + ": " + e.cantidad() + " error(es) de sintaxis");
+            for (String error : e.getErrores()) {
+                errores.add("    " + error);
+            }
+            vista.escribirEnConsola("El archivo " + nombre + " tiene " + e.cantidad()
+                    + " error(es) de sintaxis. No se guardo.");
 
-        } catch (MemoriaInsuficienteException e) {
-            vista.mostrarErrores("Memoria insuficiente",
-                    Collections.singletonList(e.getMessage()));
+        } catch (DiscoException e) {
+            errores.add(nombre + ": " + e.getMessage());
             vista.escribirEnConsola(e.getMessage());
 
         } catch (IOException | IllegalArgumentException e) {
-            vista.mostrarErrores("No se pudo leer el archivo",
-                    Collections.singletonList(e.getMessage()));
-            vista.escribirEnConsola("Error al leer el archivo: " + e.getMessage());
+            errores.add(nombre + ": " + e.getMessage());
+            vista.escribirEnConsola("Error al leer " + nombre + ": " + e.getMessage());
+        }
+        return null;
+    }
+
+    /**
+     * Nombre: cargarEnMemoria
+     * Entradas: entrada, archivo del disco a cargar; errores, lista donde
+     *           anotar el problema si no cabe
+     * Salidas: ninguna
+     * Restricciones: si el programa no cabe, queda en el disco y la memoria no
+     *                cambia
+     * Descripcion: lee el programa del disco y lo carga en la memoria
+     *              principal. Mientras no exista el planificador de trabajos,
+     *              esta es la forma de pasar un programa del disco a la
+     *              memoria.
+     */
+    private void cargarEnMemoria(EntradaIndice entrada, List<String> errores) {
+        try {
+            List<Instruccion> programa = disco.leerPrograma(entrada.getNombre());
+            cpu.cargar(programa, entrada.getNombre());
+
+            nombreArchivo = entrada.getNombre();
+            modeloInstrucciones.cargar(programa);
+            vista.mostrarInstrucciones(programa);
+            vista.escribirEnConsola("Programa " + entrada.getNombre()
+                    + " cargado en memoria en la posicion " + cpu.getDireccionBase()
+                    + ". " + programa.size() + " instrucciones.");
+
+        } catch (MemoriaInsuficienteException e) {
+            errores.add(entrada.getNombre() + ": se guardo en el disco, pero no cabe en la"
+                    + " memoria. " + e.getMessage());
+            vista.escribirEnConsola(e.getMessage());
+
+        } catch (DiscoException e) {
+            // El programa se acaba de guardar, asi que no puede faltar.
+            throw new IllegalStateException(e);
         }
     }
 
@@ -190,51 +340,78 @@ public class ControladorPrincipal implements ObservadorCPU {
      * Entradas: ninguna
      * Salidas: ninguna
      * Restricciones: detiene antes la ejecucion automatica si estaba corriendo
-     * Descripcion: descarga el programa y deja la memoria de usuario, los
-     *              registros, las tablas y la consola en blanco.
+     * Descripcion: descarga el programa, borra los archivos del disco y deja
+     *              la memoria de usuario, los registros, las tablas y la
+     *              consola en blanco.
      */
     public void alLimpiar() {
         detener();
         cpu.limpiar();
+        disco.formatear();
         nombreArchivo = "(ninguno)";
         modeloInstrucciones.limpiar();
         vista.mostrarInstrucciones(Collections.emptyList());
+        vista.refrescarDisco();
         vista.limpiarConsola();
-        vista.escribirEnConsola("Memoria de usuario, registros y tablas vaciados.");
+        vista.escribirEnConsola("Memoria de usuario, disco, registros y tablas vaciados.");
         actualizarVista();
     }
 
     /**
      * Nombre: alConfigurar
-     * Entradas: tamanoMemoria, cantidad total de posiciones; limiteKernel,
-     *           primera direccion de la zona de usuario; velocidadMs,
-     *           milisegundos entre instrucciones
+     * Entradas: nueva, configuracion ya validada
      * Salidas: ninguna
-     * Restricciones: si los valores no son coherentes se informa el error y no
-     *                se cambia nada; descarga siempre el programa actual
-     * Descripcion: aplica una nueva configuracion. El programa se descarga
-     *              porque redimensionar la memoria invalida las direcciones ya
-     *              asignadas.
+     * Restricciones: descarga el programa actual y borra el disco, porque
+     *                redimensionarlos invalida las direcciones ya asignadas.
+     *                Si el archivo no se puede escribir, la configuracion se
+     *                aplica igual y se informa el problema
+     * Descripcion: aplica la configuracion a la memoria, al disco y al
+     *              temporizador, y la guarda en el archivo de configuracion
+     *              para que se conserve la proxima vez que se abra el programa.
      */
-    public void alConfigurar(int tamanoMemoria, int limiteKernel, int velocidadMs) {
+    public void alConfigurar(Configuracion nueva) {
         detener();
-        try {
-            cpu.configurarMemoria(tamanoMemoria, limiteKernel);
-            temporizador.setDelay(velocidadMs);
+        cpu.configurarMemoria(nueva.getTamanoMemoria(), nueva.getLimiteKernel());
+        disco.redimensionar(nueva.getTamanoDisco(), nueva.getTamanoMemoriaVirtual());
+        temporizador.setDelay(nueva.getMsPorSegundo());
+        configuracion = nueva;
 
-            nombreArchivo = "(ninguno)";
-            modeloInstrucciones.limpiar();
-            vista.mostrarInstrucciones(Collections.emptyList());
-            vista.escribirEnConsola("Memoria configurada: " + tamanoMemoria
-                    + " posiciones, kernel de 0 a " + (limiteKernel - 1)
-                    + ", usuario de " + limiteKernel + " a " + (tamanoMemoria - 1)
-                    + ". Velocidad: " + velocidadMs + " ms.");
-            actualizarVista();
+        nombreArchivo = "(ninguno)";
+        modeloInstrucciones.limpiar();
+        vista.mostrarInstrucciones(Collections.emptyList());
+        vista.refrescarDisco();
+        vista.escribirEnConsola("Configuracion aplicada. " + describirConfiguracion());
 
-        } catch (IllegalArgumentException e) {
-            vista.mostrarErrores("Configuracion invalida",
-                    Collections.singletonList(e.getMessage()));
+        if (lectorConfiguracion != null) {
+            try {
+                lectorConfiguracion.guardar(nueva);
+                vista.escribirEnConsola("Configuracion guardada en "
+                        + lectorConfiguracion.getArchivo().toAbsolutePath() + ".");
+            } catch (IOException e) {
+                vista.mostrarErrores("No se pudo guardar la configuracion",
+                        Collections.singletonList(e.getMessage()));
+            }
         }
+        actualizarVista();
+    }
+
+    /**
+     * Nombre: describirConfiguracion
+     * Entradas: ninguna
+     * Salidas: la configuracion actual en una frase
+     * Restricciones: ninguna
+     * Descripcion: se usa en la consola al arrancar y al reconfigurar.
+     */
+    private String describirConfiguracion() {
+        int limite = configuracion.getLimiteKernel();
+        int tamano = configuracion.getTamanoMemoria();
+        return "Memoria de " + tamano + " posiciones (kernel de 0 a " + (limite - 1)
+                + ", usuario de " + limite + " a " + (tamano - 1) + "). Disco de "
+                + disco.getTamano() + " posiciones (indice de 0 a "
+                + (Disco.ENTRADAS_INDICE - 1) + ", archivos de " + disco.getInicioArchivos()
+                + " a " + (disco.getInicioMemoriaVirtual() - 1) + ", memoria virtual: "
+                + disco.getTamanoMemoriaVirtual() + "). Segundo de CPU: "
+                + configuracion.getMsPorSegundo() + " ms.";
     }
 
     // ------------------------------------------------------------------
@@ -394,6 +571,51 @@ public class ControladorPrincipal implements ObservadorCPU {
     }
 
     /**
+     * Nombre: getModeloDisco
+     * Entradas: ninguna
+     * Salidas: el modelo de la tabla del disco
+     * Restricciones: ninguna
+     * Descripcion: la ventana se lo asigna a su tabla al construirse.
+     */
+    public ModeloTablaDisco getModeloDisco() {
+        return modeloDisco;
+    }
+
+    /**
+     * Nombre: getRenderDisco
+     * Entradas: ninguna
+     * Salidas: el renderer que colorea las zonas del disco
+     * Restricciones: ninguna
+     * Descripcion: la ventana se lo asigna a su tabla al construirse.
+     */
+    public RenderZonaDisco getRenderDisco() {
+        return renderDisco;
+    }
+
+    /**
+     * Nombre: getDisco
+     * Entradas: ninguna
+     * Salidas: el disco de la minicomputadora
+     * Restricciones: ninguna
+     * Descripcion: lo necesitan las pruebas para verificar lo que se guardo.
+     */
+    public Disco getDisco() {
+        return disco;
+    }
+
+    /**
+     * Nombre: getConfiguracion
+     * Entradas: ninguna
+     * Salidas: la configuracion aplicada en este momento
+     * Restricciones: ninguna
+     * Descripcion: el dialogo de configuracion la usa para mostrar los
+     *              valores actuales al abrirse.
+     */
+    public Configuracion getConfiguracion() {
+        return configuracion;
+    }
+
+    /**
      * Nombre: getRenderInstrucciones
      * Entradas: ninguna
      * Salidas: el renderer que resalta la instruccion actual
@@ -441,7 +663,7 @@ public class ControladorPrincipal implements ObservadorCPU {
     /**
      * Nombre: getVelocidadMs
      * Entradas: ninguna
-     * Salidas: milisegundos configurados entre instrucciones
+     * Salidas: milisegundos reales que dura cada segundo de CPU en automatico
      * Restricciones: ninguna
      * Descripcion: el dialogo de configuracion lo usa para mostrar el valor
      *              actual al abrirse.
@@ -456,13 +678,22 @@ public class ControladorPrincipal implements ObservadorCPU {
      * Salidas: ninguna
      * Restricciones: debe llamarse una vez, al final del constructor de la
      *                ventana, cuando sus componentes ya existen
-     * Descripcion: deja la ventana en su estado inicial y escribe en la
-     *              consola la configuracion de memoria con la que arranco.
+     * Descripcion: deja la ventana en su estado inicial, escribe en la
+     *              consola la configuracion con la que arranco y, si el
+     *              archivo de configuracion tenia problemas, los informa.
      */
     public void inicializarVista() {
         actualizarVista();
-        vista.escribirEnConsola("Mini PC listo. Memoria de "
-                + cpu.getMemoria().getTamano() + " posiciones, kernel de 0 a "
-                + (cpu.getMemoria().getLimiteKernel() - 1) + ".");
+        vista.refrescarDisco();
+        vista.escribirEnConsola("Mini PC listo. " + describirConfiguracion());
+        if (lectorConfiguracion != null && erroresConfiguracion.isEmpty()) {
+            vista.escribirEnConsola("Configuracion leida de "
+                    + lectorConfiguracion.getArchivo().toAbsolutePath() + ".");
+        }
+        if (!erroresConfiguracion.isEmpty()) {
+            vista.escribirEnConsola("La configuracion tiene errores. "
+                    + "Se usan los valores por defecto.");
+            vista.mostrarErrores("Configuracion invalida", erroresConfiguracion);
+        }
     }
 }

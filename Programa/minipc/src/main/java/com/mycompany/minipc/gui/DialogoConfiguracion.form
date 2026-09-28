@@ -71,14 +71,40 @@
             <EventHandler event="stateChanged" listener="javax.swing.event.ChangeListener" parameters="javax.swing.event.ChangeEvent" handler="spnKernelStateChanged"/>
           </Events>
         </Component>
+        <Component class="javax.swing.JLabel" name="lblDisco">
+          <Properties>
+            <Property name="text" type="java.lang.String" value="Tamano del disco:"/>
+          </Properties>
+        </Component>
+        <Component class="javax.swing.JSpinner" name="spnDisco">
+          <Properties>
+            <Property name="toolTipText" type="java.lang.String" value="Cantidad total de posiciones del disco. Las primeras 20 son el indice de archivos"/>
+          </Properties>
+          <Events>
+            <EventHandler event="stateChanged" listener="javax.swing.event.ChangeListener" parameters="javax.swing.event.ChangeEvent" handler="spnDiscoStateChanged"/>
+          </Events>
+        </Component>
+        <Component class="javax.swing.JLabel" name="lblMemoriaVirtual">
+          <Properties>
+            <Property name="text" type="java.lang.String" value="Memoria virtual:"/>
+          </Properties>
+        </Component>
+        <Component class="javax.swing.JSpinner" name="spnMemoriaVirtual">
+          <Properties>
+            <Property name="toolTipText" type="java.lang.String" value="Posiciones al final del disco reservadas para intercambio"/>
+          </Properties>
+          <Events>
+            <EventHandler event="stateChanged" listener="javax.swing.event.ChangeListener" parameters="javax.swing.event.ChangeEvent" handler="spnMemoriaVirtualStateChanged"/>
+          </Events>
+        </Component>
         <Component class="javax.swing.JLabel" name="lblVelocidad">
           <Properties>
-            <Property name="text" type="java.lang.String" value="Velocidad (ms):"/>
+            <Property name="text" type="java.lang.String" value="Segundo de CPU (ms):"/>
           </Properties>
         </Component>
         <Component class="javax.swing.JSpinner" name="spnVelocidad">
           <Properties>
-            <Property name="toolTipText" type="java.lang.String" value="Milisegundos entre instrucciones en la ejecucion automatica"/>
+            <Property name="toolTipText" type="java.lang.String" value="Milisegundos reales que dura cada segundo de CPU en la ejecucion automatica"/>
           </Properties>
         </Component>
       </SubComponents>
@@ -143,6 +169,45 @@
             <Property name="text" type="java.lang.String" value="-"/>
           </Properties>
         </Component>
+        <Component class="javax.swing.JLabel" name="lblIndiceDisco">
+          <Properties>
+            <Property name="text" type="java.lang.String" value="Indice del disco:"/>
+          </Properties>
+        </Component>
+        <Component class="javax.swing.JLabel" name="lblIndiceDiscoValor">
+          <Properties>
+            <Property name="font" type="java.awt.Font" editor="org.netbeans.beaninfo.editors.FontEditor">
+              <Font name="Monospaced" size="12" style="0"/>
+            </Property>
+            <Property name="text" type="java.lang.String" value="-"/>
+          </Properties>
+        </Component>
+        <Component class="javax.swing.JLabel" name="lblArchivosDisco">
+          <Properties>
+            <Property name="text" type="java.lang.String" value="Area de archivos:"/>
+          </Properties>
+        </Component>
+        <Component class="javax.swing.JLabel" name="lblArchivosDiscoValor">
+          <Properties>
+            <Property name="font" type="java.awt.Font" editor="org.netbeans.beaninfo.editors.FontEditor">
+              <Font name="Monospaced" size="12" style="0"/>
+            </Property>
+            <Property name="text" type="java.lang.String" value="-"/>
+          </Properties>
+        </Component>
+        <Component class="javax.swing.JLabel" name="lblVirtualDisco">
+          <Properties>
+            <Property name="text" type="java.lang.String" value="Area de memoria virtual:"/>
+          </Properties>
+        </Component>
+        <Component class="javax.swing.JLabel" name="lblVirtualDiscoValor">
+          <Properties>
+            <Property name="font" type="java.awt.Font" editor="org.netbeans.beaninfo.editors.FontEditor">
+              <Font name="Monospaced" size="12" style="0"/>
+            </Property>
+            <Property name="text" type="java.lang.String" value="-"/>
+          </Properties>
+        </Component>
       </SubComponents>
     </Container>
     <Container class="javax.swing.JPanel" name="pnlInferior">
@@ -181,7 +246,7 @@
             <Component class="javax.swing.JButton" name="btnRestaurar">
               <Properties>
                 <Property name="text" type="java.lang.String" value="Valores por defecto"/>
-                <Property name="toolTipText" type="java.lang.String" value="Memoria de 256 posiciones, kernel de 0 a 63, velocidad de 500 ms"/>
+                <Property name="toolTipText" type="java.lang.String" value="Memoria de 256 con kernel de 0 a 63, disco de 512 con 64 de memoria virtual, 1000 ms por segundo"/>
               </Properties>
               <Events>
                 <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="btnRestaurarActionPerformed"/>
@@ -190,7 +255,7 @@
             <Component class="javax.swing.JButton" name="btnAceptar">
               <Properties>
                 <Property name="text" type="java.lang.String" value="Aceptar"/>
-                <Property name="toolTipText" type="java.lang.String" value="Aplica la configuracion y descarga el programa actual"/>
+                <Property name="toolTipText" type="java.lang.String" value="Aplica la configuracion, la guarda en config.properties y vacia la memoria y el disco"/>
               </Properties>
               <Events>
                 <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="btnAceptarActionPerformed"/>
