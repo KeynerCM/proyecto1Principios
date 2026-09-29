@@ -4,6 +4,8 @@ import com.mycompany.minipc.excepciones.SintaxisException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.util.List;
 
@@ -89,11 +91,11 @@ class EnsambladorTest {
     }
 
     @Test
-    @DisplayName("La coma es opcional y las mayusculas no importan")
+    @DisplayName("Los espacios alrededor de la coma y las mayusculas no importan")
     void aceptaVariantesDeEscritura() throws SintaxisException {
         List<Instruccion> programa = ensamblador.ensamblar(List.of(
-                "mov ax 5",
-                "MOV   bx,3",
+                "mov ax,5",
+                "MOV   bx ,   3",
                 "  load   Ax  "));
 
         assertEquals(3, programa.size());
@@ -134,7 +136,78 @@ class EnsambladorTest {
     void detectaInmediatoFaltante() {
         SintaxisException e = assertThrows(SintaxisException.class,
                 () -> ensamblador.ensamblar(List.of("MOV AX")));
-        assertTrue(e.getMessage().contains("falta el valor inmediato"), e.getMessage());
+        assertTrue(e.getMessage().contains("faltan operandos para MOV"), e.getMessage());
+        assertTrue(e.getMessage().contains("MOV REG, NUMERO"), e.getMessage());
+    }
+
+    @ParameterizedTest(name = "rechaza \"{0}\"")
+    @DisplayName("Las comas mal colocadas se rechazan")
+    @ValueSource(strings = {
+        "MOV AX,,, 5",
+        "MOV AX , , 5",
+        "MOV AX ,, 5",
+        "MOV, AX, 5",
+        "MOV,AX,5",
+        "ADD BX,",
+        "MOV AX, 5,",
+        ",LOAD AX",
+        ", MOV AX, 5"
+    })
+    void rechazaComasMalColocadas(String linea) {
+        SintaxisException e = assertThrows(SintaxisException.class,
+                () -> ensamblador.ensamblar(List.of(linea)));
+        assertTrue(e.getMessage().contains("coma"), e.getMessage());
+    }
+
+    @ParameterizedTest(name = "rechaza \"{0}\"")
+    @DisplayName("Las lineas mal formadas se rechazan aunque tengan pocas comas")
+    @ValueSource(strings = {
+        "MOV AX 5",
+        "MOV AX, 5, 6",
+        "MOV AX, BX, CX",
+        "ADD BX 5",
+        "ADD BX, CX",
+        "LOADAX",
+        "LOAD 5",
+        "MOV 5, AX",
+        "MOV AX, 5 6",
+        "MOV AX, 5x"
+    })
+    void rechazaLineasMalFormadas(String linea) {
+        assertThrows(SintaxisException.class, () -> ensamblador.ensamblar(List.of(linea)));
+    }
+
+    @Test
+    @DisplayName("Si solo falta la coma, el mensaje lo dice")
+    void detectaComaFaltante() {
+        SintaxisException e = assertThrows(SintaxisException.class,
+                () -> ensamblador.ensamblar(List.of("MOV AX 5")));
+        assertTrue(e.getMessage().contains("falta la coma"), e.getMessage());
+    }
+
+    @Test
+    @DisplayName("Las tres comas seguidas de la Tarea 1 se reportan con numero de linea")
+    void reportaLasTresComas() {
+        SintaxisException e = assertThrows(SintaxisException.class,
+                () -> ensamblador.ensamblar(List.of("MOV BX, 3", "MOV AX,,, 5")));
+        assertEquals(1, e.cantidad());
+        assertTrue(e.getErrores().get(0).startsWith("Linea 2: comas mal colocadas"),
+                e.getErrores().get(0));
+    }
+
+    @ParameterizedTest(name = "acepta \"{0}\"")
+    @DisplayName("Las lineas bien escritas se aceptan")
+    @ValueSource(strings = {
+        "mov bx,5",
+        "MOV   BX ,   5",
+        "MOV BX, -8",
+        "MOV BX, +8",
+        "Load Ax",
+        "STORE DX",
+        "ADD\tCX"
+    })
+    void aceptaLineasBienEscritas(String linea) throws SintaxisException {
+        assertEquals(1, ensamblador.ensamblar(List.of(linea)).size());
     }
 
     @Test

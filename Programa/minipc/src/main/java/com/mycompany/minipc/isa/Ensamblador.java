@@ -1,7 +1,9 @@
 package com.mycompany.minipc.isa;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.regex.Matcher;
 
 import com.mycompany.minipc.excepciones.SintaxisException;
 
@@ -12,12 +14,15 @@ import com.mycompany.minipc.excepciones.SintaxisException;
  * Restricciones: no tiene estado, de modo que una misma instancia puede
  *                ensamblar varios archivos sin interferencia entre ellos
  * Descripcion: traduce el texto de un archivo .asm a instrucciones del Mini
- *              PC. Es un ensamblador de una sola pasada: el juego de
- *              instrucciones no tiene saltos ni etiquetas, asi que no hay
- *              referencias hacia adelante que resolver. Recorre el archivo
- *              completo antes de fallar y junta todos los errores en una
- *              sola SintaxisException, para que la interfaz los muestre de
- *              una vez.
+ *              PC. Cada linea se valida con una expresion regular que debe
+ *              coincidir con la linea completa: una por cada forma valida de
+ *              su operacion. Entre dos operandos va exactamente una coma, de
+ *              modo que lineas como "MOV AX,,, 5" o "ADD BX," se rechazan.
+ *              Los operandos se toman de los grupos de la expresion regular,
+ *              nunca separando el texto por comas o espacios. Recorre el
+ *              archivo completo antes de fallar y junta todos los errores en
+ *              una sola SintaxisException, para que la interfaz los muestre
+ *              de una vez.
  */
 public class Ensamblador {
 
@@ -70,23 +75,130 @@ public class Ensamblador {
      * Salidas: la instruccion correspondiente a esa linea
      * Restricciones: lanza SintaxisException ante cualquier problema de
      *                formato; la linea no debe venir vacia
-     * Descripcion: separa la linea en tokens tratando la coma como espacio,
-     *              de modo que "MOV AX, 5" y "MOV AX 5" son equivalentes, y
-     *              luego lee operacion, registro y operando en ese orden.
+     * Descripcion: reconoce la operacion, descarta las comas mal colocadas y
+     *              prueba la linea contra el patron de cada forma de la
+     *              operacion. Si ninguna coincide, diagnostica la causa para
+     *              dar un mensaje concreto.
      */
     private Instruccion ensamblarLinea(String linea, int numeroLinea) throws SintaxisException {
-        String[] tokens = linea.replace(',', ' ').trim().split("\\s+");
+        // Las comas se revisan primero: una coma al inicio tambien impide
+        // reconocer el mnemonico, y el mensaje correcto es el de la coma.
+        if (Sintaxis.COMAS_MAL.matcher(linea).find()) {
+            throw error(numeroLinea, "comas mal colocadas en \"" + linea + "\". Los"
+                    + " operandos se separan con una sola coma, por ejemplo \"MOV AX, 5\"");
+        }
 
-        OpCode opcode = leerOpcode(tokens[0], numeroLinea);
-        RegistroID registro = leerRegistro(tokens, numeroLinea, opcode);
-        int operando = leerOperando(tokens, numeroLinea, opcode);
+        Matcher mnemonico = Sintaxis.MNEMONICO.matcher(linea);
+        if (!mnemonico.find()) {
+            throw error(numeroLinea, "la instruccion debe empezar con el nombre de una"
+                    + " operacion: \"" + linea + "\"");
+        }
+        OpCode opcode = leerOpcode(mnemonico.group(1), numeroLinea);
 
+        for (Forma forma : opcode.getFormas()) {
+            Matcher coincidencia = forma.patron(opcode).matcher(linea);
+            if (coincidencia.matches()) {
+                return construir(opcode, forma, coincidencia, linea, numeroLinea);
+            }
+        }
+        throw error(numeroLinea, diagnosticar(opcode, linea));
+    }
+
+    /**
+     * Nombre: construir
+     * Entradas: opcode, operacion reconocida; forma, forma con la que
+     *           coincidio la linea; coincidencia, resultado de la expresion
+     *           regular; linea, texto fuente; numeroLinea, para los mensajes
+     * Salidas: la instruccion armada con los operandos de la linea
+     * Restricciones: lanza SintaxisException si un registro no existe o un
+     *                numero no cabe en un entero
+     * Descripcion: convierte cada grupo de la expresion regular segun el
+     *              tipo de operando que la forma espera en esa posicion.
+     */
+    private Instruccion construir(OpCode opcode, Forma forma, Matcher coincidencia,
+            String linea, int numeroLinea) throws SintaxisException {
+        RegistroID registro = null;
+        int operando = 0;
+        List<Forma.TipoOperando> tipos = forma.getOperandos();
+        for (int i = 0; i < tipos.size(); i++) {
+            String texto = coincidencia.group(i + 1);
+            if (tipos.get(i) == Forma.TipoOperando.REGISTRO) {
+                registro = leerRegistro(texto, numeroLinea);
+            } else {
+                operando = leerNumero(texto, numeroLinea);
+            }
+        }
         return new Instruccion(opcode, registro, operando, linea, numeroLinea);
     }
 
     /**
+     * Nombre: diagnosticar
+     * Entradas: opcode, operacion reconocida; linea, texto que no coincidio
+     *           con ninguna forma
+     * Salidas: el mensaje que explica por que la linea es invalida
+     * Restricciones: solo se usa despues de que la validacion con expresiones
+     *                regulares ya rechazo la linea; separar el texto aqui es
+     *                solo para explicar el error, nunca para aceptarlo
+     * Descripcion: revisa, en orden, si faltan operandos, si sobran, si solo
+     *              falta la coma, o si algun operando no es del tipo esperado.
+     *              Si nada de eso explica el fallo, dice que formas se
+     *              esperaban.
+     */
+    private String diagnosticar(OpCode opcode, String linea) {
+        String resto = linea.substring(opcode.name().length()).trim();
+        List<String> operandos = resto.isEmpty() ? List.of()
+                : Arrays.asList(Sintaxis.SEPARADOR_DIAGNOSTICO.split(resto));
+        String esperado = ". Se esperaba " + opcode.describirFormas();
+
+        int minimo = Integer.MAX_VALUE;
+        int maximo = 0;
+        for (Forma forma : opcode.getFormas()) {
+            minimo = Math.min(minimo, forma.getOperandos().size());
+            maximo = Math.max(maximo, forma.getOperandos().size());
+        }
+
+        if (operandos.size() < minimo) {
+            if (operandos.isEmpty()
+                    && opcode.getFormas().get(0).getOperandos().get(0) == Forma.TipoOperando.REGISTRO) {
+                return "falta el registro para " + opcode + esperado;
+            }
+            return "faltan operandos para " + opcode + esperado;
+        }
+        if (operandos.size() > maximo) {
+            return "sobran operandos para " + opcode + esperado;
+        }
+
+        for (Forma forma : opcode.getFormas()) {
+            if (forma.getOperandos().size() == operandos.size()
+                    && forma.patronSinComa(opcode).matcher(linea).matches()) {
+                return "falta la coma entre los operandos en \"" + linea + "\"" + esperado;
+            }
+        }
+
+        for (Forma forma : opcode.getFormas()) {
+            if (forma.getOperandos().size() != operandos.size()) {
+                continue;
+            }
+            for (int i = 0; i < operandos.size(); i++) {
+                String texto = operandos.get(i);
+                Forma.TipoOperando tipo = forma.getOperandos().get(i);
+                if (tipo == Forma.TipoOperando.NUMERO
+                        && !Sintaxis.ES_NUMERO.matcher(texto).matches()) {
+                    return "valor no numerico \"" + texto + "\"" + esperado;
+                }
+                if (tipo == Forma.TipoOperando.REGISTRO
+                        && !Sintaxis.ES_IDENT.matcher(texto).matches()) {
+                    return "se esperaba un registro y se encontro \"" + texto + "\"" + esperado;
+                }
+            }
+        }
+        return "formato invalido: \"" + linea + "\"" + esperado;
+    }
+
+    /**
      * Nombre: leerOpcode
-     * Entradas: token, primer elemento de la linea; numeroLinea, para el mensaje
+     * Entradas: token, mnemonico al inicio de la linea; numeroLinea, para el
+     *           mensaje
      * Salidas: la operacion reconocida
      * Restricciones: lanza SintaxisException si el mnemonico no existe
      * Descripcion: traduce el fallo tecnico de OpCode.desdeMnemonico en un
@@ -97,68 +209,53 @@ public class Ensamblador {
         try {
             return OpCode.desdeMnemonico(token);
         } catch (IllegalArgumentException e) {
-            throw new SintaxisException(
-                    "Linea " + numeroLinea + ": operacion desconocida \"" + token + "\"");
+            throw error(numeroLinea, "operacion desconocida \"" + token + "\"");
         }
     }
 
     /**
      * Nombre: leerRegistro
-     * Entradas: tokens, elementos de la linea; numeroLinea, para el mensaje;
-     *           opcode, operacion ya reconocida
-     * Salidas: el registro sobre el que opera la instruccion
-     * Restricciones: lanza SintaxisException si falta el registro o si el
-     *                nombre indicado no existe
-     * Descripcion: toma el segundo token y lo traduce, informando con numero
-     *              de linea tanto la ausencia como el nombre invalido.
+     * Entradas: texto, nombre del registro; numeroLinea, para el mensaje
+     * Salidas: el registro correspondiente
+     * Restricciones: lanza SintaxisException si el nombre no es un registro
+     * Descripcion: la expresion regular acepta cualquier palabra en la
+     *              posicion del registro; aqui se comprueba que exista, para
+     *              poder nombrarla en el mensaje.
      */
-    private RegistroID leerRegistro(String[] tokens, int numeroLinea, OpCode opcode)
-            throws SintaxisException {
-        if (tokens.length < 2) {
-            throw new SintaxisException(
-                    "Linea " + numeroLinea + ": falta el registro para " + opcode);
-        }
+    private RegistroID leerRegistro(String texto, int numeroLinea) throws SintaxisException {
         try {
-            return RegistroID.desdeNombre(tokens[1]);
+            return RegistroID.desdeNombre(texto);
         } catch (IllegalArgumentException e) {
-            throw new SintaxisException(
-                    "Linea " + numeroLinea + ": registro inexistente \"" + tokens[1] + "\"");
+            throw error(numeroLinea, "registro inexistente \"" + texto + "\"");
         }
     }
 
     /**
-     * Nombre: leerOperando
-     * Entradas: tokens, elementos de la linea; numeroLinea, para el mensaje;
-     *           opcode, operacion ya reconocida
-     * Salidas: el valor inmediato, o cero si la operacion no lleva
-     * Restricciones: lanza SintaxisException si sobran operandos, si falta el
-     *                inmediato que MOV exige o si el valor no es numerico
-     * Descripcion: concentra las tres formas en que el operando puede estar
-     *              mal escrito, usando requiereInmediato para saber cuantos
-     *              tokens corresponden a cada operacion.
+     * Nombre: leerNumero
+     * Entradas: texto, digitos con signo opcional; numeroLinea, para el mensaje
+     * Salidas: el valor numerico
+     * Restricciones: lanza SintaxisException si el numero no cabe en un entero
+     * Descripcion: la expresion regular ya garantizo que son digitos; lo unico
+     *              que puede fallar es el tamano.
      */
-    private int leerOperando(String[] tokens, int numeroLinea, OpCode opcode)
-            throws SintaxisException {
-        int esperados = opcode.requiereInmediato() ? 3 : 2;
-
-        if (tokens.length > esperados) {
-            throw new SintaxisException("Linea " + numeroLinea + ": sobran operandos para "
-                    + opcode + ", se esperaban " + esperados + " elementos");
-        }
-        if (!opcode.requiereInmediato()) {
-            return 0;
-        }
-        if (tokens.length < 3) {
-            throw new SintaxisException(
-                    "Linea " + numeroLinea + ": falta el valor inmediato para " + opcode);
-        }
-
+    private int leerNumero(String texto, int numeroLinea) throws SintaxisException {
         try {
-            return Integer.parseInt(tokens[2]);
+            return Integer.parseInt(texto);
         } catch (NumberFormatException e) {
-            throw new SintaxisException(
-                    "Linea " + numeroLinea + ": valor no numerico \"" + tokens[2] + "\"");
+            throw error(numeroLinea, "el valor " + texto + " es demasiado grande");
         }
+    }
+
+    /**
+     * Nombre: error
+     * Entradas: numeroLinea, linea del archivo; detalle, descripcion del
+     *           problema
+     * Salidas: la excepcion con el mensaje ya armado
+     * Restricciones: ninguna
+     * Descripcion: da a todos los mensajes el mismo formato, "Linea N: ...".
+     */
+    private SintaxisException error(int numeroLinea, String detalle) {
+        return new SintaxisException("Linea " + numeroLinea + ": " + detalle);
     }
 
     /**

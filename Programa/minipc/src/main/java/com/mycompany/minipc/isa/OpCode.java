@@ -1,42 +1,55 @@
 package com.mycompany.minipc.isa;
 
+import java.util.List;
+
 /**
  * Nombre: OpCode
  * Entradas: no aplica, es una enumeracion de valores fijos
  * Salidas: no aplica
  * Restricciones: ninguna
- * Descripcion: juego de instrucciones del Mini PC. Cada operacion indica si
- *              su sintaxis exige un valor inmediato.
+ * Descripcion: juego de instrucciones del Mini PC. Cada operacion declara las
+ *              formas en que se pueden escribir sus operandos; el ensamblador
+ *              solo acepta una linea si coincide completa con alguna de ellas.
  */
 public enum OpCode {
 
     /** Carga un valor inmediato en un registro. Rx recibe el operando. */
-    MOV(true),
+    MOV(Forma.REGISTRO_NUMERO),
 
     /** Copia el contenido de un registro al acumulador. AC recibe Rx. */
-    LOAD(false),
+    LOAD(Forma.REGISTRO),
 
     /** Copia el acumulador a un registro. Rx recibe AC. */
-    STORE(false),
+    STORE(Forma.REGISTRO),
 
     /** Suma un registro al acumulador. AC recibe AC mas Rx. */
-    ADD(false),
+    ADD(Forma.REGISTRO),
 
     /** Resta un registro del acumulador. AC recibe AC menos Rx. */
-    SUB(false);
+    SUB(Forma.REGISTRO);
 
-    private final boolean requiereInmediato;
+    private final List<Forma> formas;
 
     /**
      * Nombre: OpCode
-     * Entradas: requiereInmediato, si la sintaxis exige un valor literal
+     * Entradas: formas, maneras validas de escribir los operandos
      * Salidas: la constante construida
      * Restricciones: privado, solo lo invoca la propia enumeracion
-     * Descripcion: asocia a cada operacion si lleva o no un operando
-     *              inmediato.
+     * Descripcion: asocia a cada operacion sus formas validas.
      */
-    OpCode(boolean requiereInmediato) {
-        this.requiereInmediato = requiereInmediato;
+    OpCode(Forma... formas) {
+        this.formas = List.of(formas);
+    }
+
+    /**
+     * Nombre: getFormas
+     * Entradas: ninguna
+     * Salidas: las formas validas de la operacion, en orden
+     * Restricciones: la lista es inmutable
+     * Descripcion: el ensamblador prueba la linea contra cada una.
+     */
+    public List<Forma> getFormas() {
+        return formas;
     }
 
     /**
@@ -45,11 +58,29 @@ public enum OpCode {
      * Salidas: true si la instruccion lleva un valor inmediato
      * Restricciones: ninguna
      * Descripcion: solo MOV lo lleva; el resto operan unicamente sobre
-     *              registros y dejan el campo de operando en cero. El
-     *              ensamblador lo consulta para saber cuantos tokens esperar.
+     *              registros y dejan el campo de operando en cero.
      */
     public boolean requiereInmediato() {
-        return requiereInmediato;
+        return formas.contains(Forma.REGISTRO_NUMERO);
+    }
+
+    /**
+     * Nombre: describirFormas
+     * Entradas: ninguna
+     * Salidas: las formas validas en texto, por ejemplo "MOV REG, NUMERO"
+     * Restricciones: ninguna
+     * Descripcion: se usa en los mensajes de error para decir que se
+     *              esperaba; si hay varias formas se unen con " o ".
+     */
+    public String describirFormas() {
+        StringBuilder texto = new StringBuilder();
+        for (Forma forma : formas) {
+            if (texto.length() > 0) {
+                texto.append(" o ");
+            }
+            texto.append('"').append(forma.describir(this)).append('"');
+        }
+        return texto.toString();
     }
 
     /**
