@@ -4,6 +4,7 @@ import com.mycompany.minipc.isa.RegistroID;
 
 import java.time.LocalDateTime;
 import java.util.EnumMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -29,7 +30,11 @@ public class BCP {
     private int pc;
     private String irTexto;
     private int ac;
+    private boolean zf;
     private final Map<RegistroID, Integer> snapshotRegistros;
+
+    // Informacion de la pila: valores del fondo al tope
+    private List<Integer> pila;
 
     // Informacion de memoria
     private int direccionBase;
@@ -58,6 +63,7 @@ public class BCP {
             snapshotRegistros.put(id, 0);
         }
         this.irTexto = "";
+        this.pila = List.of();
         this.horaCreacion = LocalDateTime.now();
     }
 
@@ -77,7 +83,9 @@ public class BCP {
         this.pc = cpu.getPc();
         this.irTexto = cpu.getIrTexto();
         this.ac = cpu.getAc();
+        this.zf = cpu.getZf();
         this.snapshotRegistros.putAll(cpu.getRegistros().instantanea());
+        this.pila = List.copyOf(cpu.getPila().getValores());
         this.direccionBase = cpu.getDireccionBase();
         this.limite = cpu.getLimite();
         this.instruccionesEjecutadas = cpu.getInstruccionesEjecutadas();
@@ -184,6 +192,30 @@ public class BCP {
      */
     public int getAc() {
         return ac;
+    }
+
+    /**
+     * Nombre: getZf
+     * Entradas: ninguna
+     * Salidas: el valor guardado de la bandera de cero
+     * Restricciones: ninguna
+     * Descripcion: forma parte del contexto: si el proceso se interrumpe
+     *              entre un CMP y su JE, la bandera debe volver igual.
+     */
+    public boolean getZf() {
+        return zf;
+    }
+
+    /**
+     * Nombre: getPila
+     * Entradas: ninguna
+     * Salidas: los valores guardados de la pila, del fondo al tope
+     * Restricciones: la lista es inmutable
+     * Descripcion: el enunciado pide que el BCP guarde la informacion de la
+     *              pila del proceso.
+     */
+    public List<Integer> getPila() {
+        return pila;
     }
 
     /**

@@ -3,11 +3,13 @@ package com.mycompany.minipc.core;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.mycompany.minipc.excepciones.DesbordamientoException;
 import com.mycompany.minipc.excepciones.EjecucionException;
 import com.mycompany.minipc.excepciones.MemoriaInsuficienteException;
 import com.mycompany.minipc.isa.Forma;
 import com.mycompany.minipc.isa.Instruccion;
 import com.mycompany.minipc.isa.OpCode;
+import com.mycompany.minipc.isa.RegistroID;
 
 /**
  * Nombre: Procesador
@@ -41,6 +43,19 @@ public class Procesador {
     /** Accumulator: almacenamiento temporal donde ocurre la aritmetica. */
     private int ac;
 
+    /**
+     * Bandera de cero: resultado de la ultima comparacion CMP. Es el codigo
+     * de condicion que Stallings ubica en la palabra de estado (PSW) y que
+     * consultan JE y JNE.
+     */
+    private boolean zf;
+
+    /** Pila del proceso, de capacidad 5. */
+    private final Pila pila;
+
+    /** Se activa al ejecutar INT 20H, para terminar el proceso. */
+    private boolean finSolicitado;
+
     private int direccionBase;
     private int direccionFin;
     private int cantidadInstrucciones;
@@ -63,6 +78,7 @@ public class Procesador {
         this.memoria = new Memoria();
         this.registros = new BancoRegistros();
         this.estadisticas = new Estadisticas();
+        this.pila = new Pila();
         this.observadores = new ArrayList<>();
         this.siguientePid = 1;
         this.estado = EstadoProceso.NUEVO;
@@ -93,6 +109,9 @@ public class Procesador {
         pc = direccionBase;
         ir = null;
         ac = 0;
+        zf = false;
+        pila.vaciar();
+        finSolicitado = false;
         instruccionesEjecutadas = 0;
         ciclosReloj = 0;
 
@@ -151,7 +170,7 @@ public class Procesador {
         instruccionesEjecutadas++;
         estadisticas.registrar(opcode);
 
-        if (pc > direccionFin) {
+        if (finSolicitado || pc > direccionFin) {
             estado = EstadoProceso.TERMINADO;
         }
 
@@ -164,9 +183,11 @@ public class Procesador {
     /**
      * Nombre: ejecutar
      * Entradas: instruccion, la que esta en el IR
-     * Salidas: ninguna; modifica el acumulador o el banco de registros
-     * Restricciones: lanza EjecucionException si la instruccion todavia no se
-     *                puede ejecutar en esta version del simulador
+     * Salidas: ninguna; modifica el acumulador, los registros, la bandera de
+     *          cero, la pila o el PC
+     * Restricciones: lanza EjecucionException si un salto sale del programa,
+     *                si la pila se desborda o queda vacia, o si la
+     *                interrupcion todavia no esta disponible
      * Descripcion: etapa de ejecucion propiamente dicha. Cada operacion se
      *              resuelve con aritmetica normal de enteros de Java.
      */
@@ -176,15 +197,13 @@ public class Procesador {
                 int valor = instruccion.getForma() == Forma.REGISTRO_REGISTRO
                         ? registros.leer(instruccion.getRegistro(1))
                         : instruccion.getValor(1);
-                registros.escribir(instruccion.getRegistro(0), valor);
-                estadisticas.registrarEscritura();
+                escribirRegistro(instruccion.getRegistro(0), valor);
                 break;
             case LOAD:
                 ac = registros.leer(instruccion.getRegistro(0));
                 break;
             case STORE:
-                registros.escribir(instruccion.getRegistro(0), ac);
-                estadisticas.registrarEscritura();
+                escribirRegistro(instruccion.getRegistro(0), ac);
                 break;
             case ADD:
                 ac = ac + registros.leer(instruccion.getRegistro(0));
@@ -192,10 +211,148 @@ public class Procesador {
             case SUB:
                 ac = ac - registros.leer(instruccion.getRegistro(0));
                 break;
+            case INC:
+                sumarUno(instruccion, 1);
+                break;
+            case DEC:
+                sumarUno(instruccion, -1);
+                break;
+            case SWAP:
+                RegistroID primero = instruccion.getRegistro(0);
+                RegistroID segundo = instruccion.getRegistro(1);
+                int temporal = registros.leer(primero);
+                escribirRegistro(primero, registros.leer(segundo));
+                escribirRegistro(segundo, temporal);
+                break;
+            case CMP:
+                zf = registros.leer(instruccion.getRegistro(0))
+                        == registros.leer(instruccion.getRegistro(1));
+                break;
+            case JMP:
+                saltar(instruccion);
+                break;
+            case JE:
+                if (zf) {
+                    saltar(instruccion);
+                }
+                break;
+            case JNE:
+                if (!zf) {
+                    saltar(instruccion);
+                }
+                break;
+            case PUSH:
+                pila.apilar(registros.leer(instruccion.getRegistro(0)));
+                break;
+            case POP:
+                escribirRegistro(instruccion.getRegistro(0), pila.desapilar());
+                break;
+            case PARAM:
+                apilarParametros(instruccion);
+                break;
+            case INT:
+                interrumpir(instruccion);
+                break;
             default:
                 throw new EjecucionException("La instruccion \"" + instruccion
-                        + "\" todavia no se puede ejecutar en esta version del simulador");
+                        + "\" no se puede ejecutar");
         }
+    }
+
+    /**
+     * Nombre: escribirRegistro
+     * Entradas: id, registro destino; valor, entero a guardar
+     * Salidas: ninguna
+     * Restricciones: ninguna
+     * Descripcion: escribe el registro y lo anota en las estadisticas, para
+     *              no repetir las dos lineas en cada operacion que escribe.
+     */
+    private void escribirRegistro(RegistroID id, int valor) {
+        registros.escribir(id, valor);
+        estadisticas.registrarEscritura();
+    }
+
+    /**
+     * Nombre: sumarUno
+     * Entradas: instruccion, INC o DEC; delta, 1 para incrementar o -1 para
+     *           decrementar
+     * Salidas: ninguna
+     * Restricciones: ninguna
+     * Descripcion: sin operandos actua sobre el AC; con un registro, sobre
+     *              ese registro, como pide el enunciado.
+     */
+    private void sumarUno(Instruccion instruccion, int delta) {
+        if (instruccion.getForma() == Forma.SIN_OPERANDOS) {
+            ac = ac + delta;
+        } else {
+            RegistroID id = instruccion.getRegistro(0);
+            escribirRegistro(id, registros.leer(id) + delta);
+        }
+    }
+
+    /**
+     * Nombre: saltar
+     * Entradas: instruccion, JMP, JE o JNE con su desplazamiento
+     * Salidas: ninguna; cambia el PC
+     * Restricciones: lanza DesbordamientoException si el destino queda fuera
+     *                de la region del proceso
+     * Descripcion: el desplazamiento se suma al PC, que ya apunta a la
+     *              instruccion siguiente porque avanzo en la etapa de fetch.
+     *              Antes de saltar se compara el destino con la direccion
+     *              base y el limite del proceso, como hace el hardware de
+     *              reubicacion del libro (Stallings, figura 7.8): un salto
+     *              fuera de la region genera una interrupcion hacia el
+     *              sistema operativo.
+     */
+    private void saltar(Instruccion instruccion) {
+        int destino = pc + instruccion.getValor(0);
+        if (destino < direccionBase || destino > direccionFin) {
+            throw new DesbordamientoException("Desbordamiento: el salto \"" + instruccion
+                    + "\" lleva a la direccion " + destino + ", fuera del programa (direcciones "
+                    + direccionBase + " a " + direccionFin + ")");
+        }
+        pc = destino;
+    }
+
+    /**
+     * Nombre: apilarParametros
+     * Entradas: instruccion, PARAM con uno a tres valores
+     * Salidas: ninguna
+     * Restricciones: lanza DesbordamientoException si no caben todos los
+     *                valores; en ese caso no se apila ninguno
+     * Descripcion: guarda los valores en la pila en el orden en que se
+     *              escribieron, de modo que el ultimo queda en el tope y es
+     *              el primero que devuelve POP.
+     */
+    private void apilarParametros(Instruccion instruccion) {
+        int cantidad = instruccion.getOperandos().size();
+        if (cantidad > pila.getLibres()) {
+            throw new DesbordamientoException("Desbordamiento de pila: \"" + instruccion
+                    + "\" necesita " + cantidad + " posiciones y la pila solo tiene "
+                    + pila.getLibres() + " libres de " + Pila.CAPACIDAD);
+        }
+        for (int i = 0; i < cantidad; i++) {
+            pila.apilar(instruccion.getValor(i));
+        }
+    }
+
+    /**
+     * Nombre: interrumpir
+     * Entradas: instruccion, INT con su codigo
+     * Salidas: ninguna
+     * Restricciones: lanza EjecucionException para las interrupciones de
+     *                pantalla, teclado y archivos, que todavia no estan
+     *                disponibles
+     * Descripcion: INT 20H termina el proceso. Las demas necesitan los
+     *              dispositivos de entrada y salida del simulador.
+     */
+    private void interrumpir(Instruccion instruccion) {
+        if (instruccion.esFinDePrograma()) {
+            finSolicitado = true;
+            return;
+        }
+        throw new EjecucionException("La interrupcion \"" + instruccion
+                + "\" todavia no esta disponible en esta version del simulador");
     }
 
     /**
@@ -218,6 +375,9 @@ public class Procesador {
         pc = direccionBase;
         ir = null;
         ac = 0;
+        zf = false;
+        pila.vaciar();
+        finSolicitado = false;
         instruccionesEjecutadas = 0;
         ciclosReloj = 0;
         estado = EstadoProceso.LISTO;
@@ -243,6 +403,9 @@ public class Procesador {
         pc = 0;
         ir = null;
         ac = 0;
+        zf = false;
+        pila.vaciar();
+        finSolicitado = false;
         direccionBase = 0;
         direccionFin = -1;
         cantidadInstrucciones = 0;
@@ -430,6 +593,29 @@ public class Procesador {
      */
     public int getAc() {
         return ac;
+    }
+
+    /**
+     * Nombre: getZf
+     * Entradas: ninguna
+     * Salidas: true si la ultima comparacion CMP dio igual
+     * Restricciones: es false mientras no se haya comparado nada
+     * Descripcion: acceso de solo lectura a la bandera de cero.
+     */
+    public boolean getZf() {
+        return zf;
+    }
+
+    /**
+     * Nombre: getPila
+     * Entradas: ninguna
+     * Salidas: la pila del proceso
+     * Restricciones: ninguna
+     * Descripcion: el BCP la copia para guardar el contexto; las pruebas la
+     *              consultan para verificar PUSH, POP y PARAM.
+     */
+    public Pila getPila() {
+        return pila;
     }
 
     /**
