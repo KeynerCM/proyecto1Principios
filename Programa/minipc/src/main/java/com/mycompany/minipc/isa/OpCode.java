@@ -6,39 +6,93 @@ import java.util.List;
  * Nombre: OpCode
  * Entradas: no aplica, es una enumeracion de valores fijos
  * Salidas: no aplica
- * Restricciones: ninguna
- * Descripcion: juego de instrucciones del Mini PC. Cada operacion declara las
- *              formas en que se pueden escribir sus operandos; el ensamblador
- *              solo acepta una linea si coincide completa con alguna de ellas.
+ * Restricciones: los pesos son los del enunciado
+ * Descripcion: juego de instrucciones del Mini PC. Cada operacion declara su
+ *              peso, es decir, cuantos segundos de CPU consume, y las formas
+ *              en que se pueden escribir sus operandos. El ensamblador solo
+ *              acepta una linea si coincide completa con alguna de ellas. El
+ *              peso de INT depende del codigo de interrupcion, por eso se
+ *              toma de Interrupcion.
  */
 public enum OpCode {
 
-    /** Carga un valor inmediato en un registro. Rx recibe el operando. */
-    MOV(Forma.REGISTRO_NUMERO),
+    /** AC recibe el valor del registro. */
+    LOAD(2, Forma.REGISTRO),
 
-    /** Copia el contenido de un registro al acumulador. AC recibe Rx. */
-    LOAD(Forma.REGISTRO),
+    /** El registro recibe el valor del AC. */
+    STORE(2, Forma.REGISTRO),
 
-    /** Copia el acumulador a un registro. Rx recibe AC. */
-    STORE(Forma.REGISTRO),
+    /** El registro destino recibe otro registro o un valor inmediato. */
+    MOV(1, Forma.REGISTRO_REGISTRO, Forma.REGISTRO_NUMERO),
 
-    /** Suma un registro al acumulador. AC recibe AC mas Rx. */
-    ADD(Forma.REGISTRO),
+    /** AC recibe AC mas el registro. */
+    ADD(3, Forma.REGISTRO),
 
-    /** Resta un registro del acumulador. AC recibe AC menos Rx. */
-    SUB(Forma.REGISTRO);
+    /** AC recibe AC menos el registro. */
+    SUB(3, Forma.REGISTRO),
 
+    /** Incrementa en 1 el AC, o el registro indicado. */
+    INC(1, Forma.SIN_OPERANDOS, Forma.REGISTRO),
+
+    /** Decrementa en 1 el AC, o el registro indicado. */
+    DEC(1, Forma.SIN_OPERANDOS, Forma.REGISTRO),
+
+    /** Intercambia los valores de dos registros. */
+    SWAP(1, Forma.REGISTRO_REGISTRO),
+
+    /** Pide un servicio al sistema operativo; el peso depende del codigo. */
+    INT(OpCode.PESO_DE_LA_INTERRUPCION, Forma.INTERRUPCION),
+
+    /** Salta segun el desplazamiento. */
+    JMP(2, Forma.DESPLAZAMIENTO),
+
+    /** Compara dos registros y deja el resultado para JE y JNE. */
+    CMP(2, Forma.REGISTRO_REGISTRO),
+
+    /** Salta si la ultima comparacion dio igual. */
+    JE(2, Forma.DESPLAZAMIENTO),
+
+    /** Salta si la ultima comparacion dio distinto. */
+    JNE(2, Forma.DESPLAZAMIENTO),
+
+    /** Guarda en la pila de uno a tres valores de entrada. */
+    PARAM(3, Forma.PARAMETROS),
+
+    /** Guarda en la pila el valor del registro. */
+    PUSH(1, Forma.REGISTRO),
+
+    /** Saca el valor del tope de la pila y lo guarda en el registro. */
+    POP(1, Forma.REGISTRO);
+
+    /** Marca del peso de INT, que no es fijo sino que depende del codigo. */
+    public static final int PESO_DE_LA_INTERRUPCION = 0;
+
+    private final int peso;
     private final List<Forma> formas;
 
     /**
      * Nombre: OpCode
-     * Entradas: formas, maneras validas de escribir los operandos
+     * Entradas: peso, segundos de CPU que consume; formas, maneras validas
+     *           de escribir los operandos
      * Salidas: la constante construida
      * Restricciones: privado, solo lo invoca la propia enumeracion
-     * Descripcion: asocia a cada operacion sus formas validas.
+     * Descripcion: asocia a cada operacion su peso y sus formas validas.
      */
-    OpCode(Forma... formas) {
+    OpCode(int peso, Forma... formas) {
+        this.peso = peso;
         this.formas = List.of(formas);
+    }
+
+    /**
+     * Nombre: getPeso
+     * Entradas: ninguna
+     * Salidas: los segundos de CPU que consume la operacion
+     * Restricciones: para INT devuelve PESO_DE_LA_INTERRUPCION; el peso real
+     *                se obtiene de la instruccion, que conoce el codigo
+     * Descripcion: acceso de solo lectura al campo correspondiente.
+     */
+    public int getPeso() {
+        return peso;
     }
 
     /**
@@ -53,15 +107,15 @@ public enum OpCode {
     }
 
     /**
-     * Nombre: requiereInmediato
+     * Nombre: esSalto
      * Entradas: ninguna
-     * Salidas: true si la instruccion lleva un valor inmediato
+     * Salidas: true si la operacion cambia el PC con un desplazamiento
      * Restricciones: ninguna
-     * Descripcion: solo MOV lo lleva; el resto operan unicamente sobre
-     *              registros y dejan el campo de operando en cero.
+     * Descripcion: el ensamblador la usa para validar que el destino de los
+     *              saltos quede dentro del programa.
      */
-    public boolean requiereInmediato() {
-        return formas.contains(Forma.REGISTRO_NUMERO);
+    public boolean esSalto() {
+        return formas.contains(Forma.DESPLAZAMIENTO);
     }
 
     /**

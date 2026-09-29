@@ -59,6 +59,9 @@ public class Ensamblador {
             }
         }
 
+        if (errores.isEmpty()) {
+            validarSaltos(programa, errores);
+        }
         if (!errores.isEmpty()) {
             throw new SintaxisException(errores);
         }
@@ -66,6 +69,35 @@ public class Ensamblador {
             throw new SintaxisException("El archivo no contiene ninguna instruccion");
         }
         return programa;
+    }
+
+    /**
+     * Nombre: validarSaltos
+     * Entradas: programa, instrucciones ya ensambladas; errores, lista donde
+     *           anotar los saltos invalidos
+     * Salidas: ninguna
+     * Restricciones: solo se llama si todas las lineas eran validas
+     * Descripcion: comprueba que el destino de cada JMP, JE y JNE quede dentro
+     *              del programa. El desplazamiento se cuenta desde la
+     *              instruccion siguiente, porque el PC ya avanzo al traer la
+     *              instruccion (Stallings, seccion 1.3). Salir del programa
+     *              es el desbordamiento que pide controlar el enunciado; el
+     *              procesador lo vuelve a revisar al ejecutar.
+     */
+    private void validarSaltos(List<Instruccion> programa, List<String> errores) {
+        for (int i = 0; i < programa.size(); i++) {
+            Instruccion instruccion = programa.get(i);
+            if (!instruccion.getOpcode().esSalto()) {
+                continue;
+            }
+            int destino = i + 1 + instruccion.getValor(0);
+            if (destino < 0 || destino >= programa.size()) {
+                errores.add("Linea " + instruccion.getNumeroLinea() + ": el salto \""
+                        + instruccion.getTextoFuente() + "\" sale del programa: llevaria a la"
+                        + " instruccion " + (destino + 1) + " y el programa tiene de 1 a "
+                        + programa.size());
+            }
+        }
     }
 
     /**
@@ -110,25 +142,40 @@ public class Ensamblador {
      *           coincidio la linea; coincidencia, resultado de la expresion
      *           regular; linea, texto fuente; numeroLinea, para los mensajes
      * Salidas: la instruccion armada con los operandos de la linea
-     * Restricciones: lanza SintaxisException si un registro no existe o un
-     *                numero no cabe en un entero
+     * Restricciones: lanza SintaxisException si un registro o un codigo de
+     *                interrupcion no existe, o si un numero no cabe en un
+     *                entero
      * Descripcion: convierte cada grupo de la expresion regular segun el
-     *              tipo de operando que la forma espera en esa posicion.
+     *              tipo de operando que la forma espera en esa posicion. Los
+     *              operandos opcionales que no se escribieron quedan con el
+     *              grupo en nulo y se omiten.
      */
     private Instruccion construir(OpCode opcode, Forma forma, Matcher coincidencia,
             String linea, int numeroLinea) throws SintaxisException {
-        RegistroID registro = null;
-        int operando = 0;
+        List<Operando> operandos = new ArrayList<>();
         List<Forma.TipoOperando> tipos = forma.getOperandos();
         for (int i = 0; i < tipos.size(); i++) {
             String texto = coincidencia.group(i + 1);
-            if (tipos.get(i) == Forma.TipoOperando.REGISTRO) {
-                registro = leerRegistro(texto, numeroLinea);
-            } else {
-                operando = leerNumero(texto, numeroLinea);
+            if (texto == null) {
+                break;
+            }
+            switch (tipos.get(i)) {
+                case REGISTRO:
+                    operandos.add(Operando.registro(
+                            leerRegistro(opcode, i, texto, numeroLinea)));
+                    break;
+                case NUMERO:
+                    operandos.add(Operando.numero(leerNumero(texto, numeroLinea)));
+                    break;
+                case DESPLAZAMIENTO:
+                    operandos.add(Operando.desplazamiento(leerNumero(texto, numeroLinea)));
+                    break;
+                default:
+                    operandos.add(Operando.interrupcion(leerInterrupcion(texto, numeroLinea)));
+                    break;
             }
         }
-        return new Instruccion(opcode, registro, operando, linea, numeroLinea);
+        return new Instruccion(opcode, forma, operandos, linea, numeroLinea);
     }
 
     /**
@@ -153,8 +200,8 @@ public class Ensamblador {
         int minimo = Integer.MAX_VALUE;
         int maximo = 0;
         for (Forma forma : opcode.getFormas()) {
-            minimo = Math.min(minimo, forma.getOperandos().size());
-            maximo = Math.max(maximo, forma.getOperandos().size());
+            minimo = Math.min(minimo, forma.getMinimo());
+            maximo = Math.max(maximo, forma.getMaximo());
         }
 
         if (operandos.size() < minimo) {
@@ -165,30 +212,46 @@ public class Ensamblador {
             return "faltan operandos para " + opcode + esperado;
         }
         if (operandos.size() > maximo) {
+            if (opcode == OpCode.PARAM) {
+                return "PARAM admite como maximo " + maximo + " parametros y se escribieron "
+                        + operandos.size();
+            }
             return "sobran operandos para " + opcode + esperado;
         }
 
         for (Forma forma : opcode.getFormas()) {
-            if (forma.getOperandos().size() == operandos.size()
+            if (forma.admite(operandos.size())
                     && forma.patronSinComa(opcode).matcher(linea).matches()) {
                 return "falta la coma entre los operandos en \"" + linea + "\"" + esperado;
             }
         }
 
         for (Forma forma : opcode.getFormas()) {
-            if (forma.getOperandos().size() != operandos.size()) {
+            if (!forma.admite(operandos.size())) {
                 continue;
             }
             for (int i = 0; i < operandos.size(); i++) {
                 String texto = operandos.get(i);
-                Forma.TipoOperando tipo = forma.getOperandos().get(i);
-                if (tipo == Forma.TipoOperando.NUMERO
-                        && !Sintaxis.ES_NUMERO.matcher(texto).matches()) {
-                    return "valor no numerico \"" + texto + "\"" + esperado;
-                }
-                if (tipo == Forma.TipoOperando.REGISTRO
-                        && !Sintaxis.ES_IDENT.matcher(texto).matches()) {
-                    return "se esperaba un registro y se encontro \"" + texto + "\"" + esperado;
+                switch (forma.getOperandos().get(i)) {
+                    case NUMERO:
+                        if (!Sintaxis.ES_NUMERO.matcher(texto).matches()) {
+                            return "valor no numerico \"" + texto + "\"" + esperado;
+                        }
+                        break;
+                    case DESPLAZAMIENTO:
+                        if (!Sintaxis.ES_NUMERO.matcher(texto).matches()) {
+                            return "desplazamiento invalido \"" + texto + "\": debe ser un"
+                                    + " entero, por ejemplo +2 o -3";
+                        }
+                        break;
+                    case REGISTRO:
+                        if (!Sintaxis.ES_IDENT.matcher(texto).matches()) {
+                            return "se esperaba un registro y se encontro \"" + texto + "\""
+                                    + esperado;
+                        }
+                        break;
+                    default:
+                        break;
                 }
             }
         }
@@ -215,18 +278,49 @@ public class Ensamblador {
 
     /**
      * Nombre: leerRegistro
-     * Entradas: texto, nombre del registro; numeroLinea, para el mensaje
+     * Entradas: opcode, operacion de la linea; posicion, indice del operando;
+     *           texto, nombre del registro; numeroLinea, para el mensaje
      * Salidas: el registro correspondiente
      * Restricciones: lanza SintaxisException si el nombre no es un registro
      * Descripcion: la expresion regular acepta cualquier palabra en la
      *              posicion del registro; aqui se comprueba que exista, para
-     *              poder nombrarla en el mensaje.
+     *              poder nombrarla en el mensaje. Si en esa posicion la
+     *              operacion tambien admite un numero, como el segundo
+     *              operando de MOV, el mensaje lo dice.
      */
-    private RegistroID leerRegistro(String texto, int numeroLinea) throws SintaxisException {
+    private RegistroID leerRegistro(OpCode opcode, int posicion, String texto, int numeroLinea)
+            throws SintaxisException {
         try {
             return RegistroID.desdeNombre(texto);
         } catch (IllegalArgumentException e) {
+            for (Forma forma : opcode.getFormas()) {
+                if (forma.getMaximo() > posicion
+                        && forma.getOperandos().get(posicion) == Forma.TipoOperando.NUMERO) {
+                    throw error(numeroLinea, "\"" + texto + "\" no es un registro ni un numero."
+                            + " Se esperaba " + opcode.describirFormas());
+                }
+            }
             throw error(numeroLinea, "registro inexistente \"" + texto + "\"");
+        }
+    }
+
+    /**
+     * Nombre: leerInterrupcion
+     * Entradas: texto, codigo escrito despues de INT; numeroLinea, para el
+     *           mensaje
+     * Salidas: la interrupcion correspondiente
+     * Restricciones: lanza SintaxisException si el codigo no existe
+     * Descripcion: igual que con los registros, la expresion regular acepta
+     *              cualquier palabra y aqui se valida, para poder listar los
+     *              codigos validos en el mensaje.
+     */
+    private Interrupcion leerInterrupcion(String texto, int numeroLinea)
+            throws SintaxisException {
+        try {
+            return Interrupcion.desdeCodigo(texto);
+        } catch (IllegalArgumentException e) {
+            throw error(numeroLinea, "codigo de interrupcion desconocido \"" + texto
+                    + "\". Los validos son " + Interrupcion.codigosValidos());
         }
     }
 

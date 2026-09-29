@@ -119,8 +119,8 @@ class ProcesadorTest {
 
         cpu.paso();
         assertEquals(OpCode.MOV, cpu.getIr().getOpcode());
-        assertEquals(RegistroID.AX, cpu.getIr().getRegistro());
-        assertEquals(5, cpu.getIr().getOperando());
+        assertEquals(RegistroID.AX, cpu.getIr().getRegistro(0));
+        assertEquals(5, cpu.getIr().getValor(1));
         assertEquals("MOV AX, 5", cpu.getIrTexto());
         assertEquals("MOV AX, 5", cpu.getBcp().getIrTexto());
     }

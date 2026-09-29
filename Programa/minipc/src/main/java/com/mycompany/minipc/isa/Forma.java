@@ -12,15 +12,35 @@ import java.util.regex.Pattern;
  * Descripcion: las maneras validas de escribir los operandos de una
  *              instruccion. Cada forma sabe armar la expresion regular que la
  *              linea debe cumplir completa, y describirse en texto para los
- *              mensajes de error, por ejemplo "REG, NUMERO".
+ *              mensajes de error, por ejemplo "REG, NUMERO". Una forma puede
+ *              tener operandos opcionales al final, como PARAM, que admite
+ *              de uno a tres valores.
  */
 public enum Forma {
 
+    /** Sin operandos, por ejemplo "INC". */
+    SIN_OPERANDOS("", List.of(), 0),
+
     /** Un registro, por ejemplo "ADD BX". */
-    REGISTRO("REG", List.of(TipoOperando.REGISTRO)),
+    REGISTRO("REG", List.of(TipoOperando.REGISTRO), 1),
+
+    /** Dos registros, por ejemplo "MOV BX, AX". */
+    REGISTRO_REGISTRO("REG, REG",
+            List.of(TipoOperando.REGISTRO, TipoOperando.REGISTRO), 2),
 
     /** Un registro y un valor inmediato, por ejemplo "MOV BX, 5". */
-    REGISTRO_NUMERO("REG, NUMERO", List.of(TipoOperando.REGISTRO, TipoOperando.NUMERO));
+    REGISTRO_NUMERO("REG, NUMERO",
+            List.of(TipoOperando.REGISTRO, TipoOperando.NUMERO), 2),
+
+    /** Un codigo de interrupcion, por ejemplo "INT 21H". */
+    INTERRUPCION("CODIGO", List.of(TipoOperando.INTERRUPCION), 1),
+
+    /** Un desplazamiento con signo opcional, por ejemplo "JNE -3". */
+    DESPLAZAMIENTO("+/-DESPLAZAMIENTO", List.of(TipoOperando.DESPLAZAMIENTO), 1),
+
+    /** De uno a tres valores numericos, por ejemplo "PARAM 1, 2, 3". */
+    PARAMETROS("v1[, v2[, v3]]",
+            List.of(TipoOperando.NUMERO, TipoOperando.NUMERO, TipoOperando.NUMERO), 1);
 
     /**
      * Nombre: TipoOperando
@@ -32,11 +52,17 @@ public enum Forma {
      */
     public enum TipoOperando {
 
-        /** Un nombre de registro. */
+        /** Un nombre de registro; el nombre se valida despues. */
         REGISTRO(Sintaxis.IDENT),
 
         /** Un entero con signo opcional. */
-        NUMERO(Sintaxis.NUM);
+        NUMERO(Sintaxis.NUM),
+
+        /** Un desplazamiento de salto, entero con signo opcional. */
+        DESPLAZAMIENTO(Sintaxis.NUM),
+
+        /** Un codigo de interrupcion; el codigo se valida despues. */
+        INTERRUPCION(Sintaxis.CODIGO);
 
         private final String regex;
 
@@ -58,30 +84,66 @@ public enum Forma {
 
     private final String descripcion;
     private final List<TipoOperando> operandos;
+    private final int minimo;
 
     /**
      * Nombre: Forma
      * Entradas: descripcion, como se muestra la forma en los mensajes;
-     *           operandos, tipo de cada operando en orden
+     *           operandos, tipo de cada operando en orden; minimo, cuantos
+     *           de ellos son obligatorios
      * Salidas: la constante construida
      * Restricciones: privado, solo lo invoca la propia enumeracion
-     * Descripcion: guarda la descripcion y los tipos de operando.
+     * Descripcion: guarda la descripcion, los tipos y el minimo.
      */
-    Forma(String descripcion, List<TipoOperando> operandos) {
+    Forma(String descripcion, List<TipoOperando> operandos, int minimo) {
         this.descripcion = descripcion;
         this.operandos = operandos;
+        this.minimo = minimo;
     }
 
     /**
      * Nombre: getOperandos
      * Entradas: ninguna
-     * Salidas: el tipo de cada operando, en orden
+     * Salidas: el tipo de cada operando posible, en orden
      * Restricciones: la lista es inmutable
      * Descripcion: el ensamblador la usa para convertir cada grupo de la
      *              expresion regular y para diagnosticar errores.
      */
     public List<TipoOperando> getOperandos() {
         return operandos;
+    }
+
+    /**
+     * Nombre: getMinimo
+     * Entradas: ninguna
+     * Salidas: cuantos operandos son obligatorios
+     * Restricciones: ninguna
+     * Descripcion: acceso de solo lectura al campo correspondiente.
+     */
+    public int getMinimo() {
+        return minimo;
+    }
+
+    /**
+     * Nombre: getMaximo
+     * Entradas: ninguna
+     * Salidas: cuantos operandos admite como maximo
+     * Restricciones: ninguna
+     * Descripcion: es el largo de la lista de tipos.
+     */
+    public int getMaximo() {
+        return operandos.size();
+    }
+
+    /**
+     * Nombre: admite
+     * Entradas: cantidad, numero de operandos de una linea
+     * Salidas: true si la forma acepta esa cantidad
+     * Restricciones: ninguna
+     * Descripcion: usada para validar instrucciones y para diagnosticar.
+     */
+    public boolean admite(int cantidad) {
+        return cantidad >= minimo && cantidad <= getMaximo();
     }
 
     /**
@@ -125,13 +187,16 @@ public enum Forma {
      * Entradas: opcode, operacion; separador, expresion entre operandos
      * Salidas: la expresion regular completa
      * Restricciones: ninguna
-     * Descripcion: concatena el mnemonico y los operandos de la forma.
+     * Descripcion: concatena el mnemonico y los operandos. Los operandos a
+     *              partir del minimo van dentro de un grupo opcional, con su
+     *              separador, de modo que "PARAM 1" y "PARAM 1, 2, 3" cumplen
+     *              el mismo patron pero "PARAM 1,, 2" no.
      */
     private String armar(OpCode opcode, String separador) {
         StringBuilder regex = new StringBuilder(opcode.name());
         for (int i = 0; i < operandos.size(); i++) {
-            regex.append(i == 0 ? Sintaxis.ESP : separador);
-            regex.append(operandos.get(i).getRegex());
+            String pieza = (i == 0 ? Sintaxis.ESP : separador) + operandos.get(i).getRegex();
+            regex.append(i < minimo ? pieza : "(?:" + pieza + ")?");
         }
         return regex.toString();
     }

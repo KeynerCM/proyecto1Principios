@@ -1,7 +1,9 @@
 package com.mycompany.minipc.core;
 
+import com.mycompany.minipc.isa.Forma;
 import com.mycompany.minipc.isa.Instruccion;
 import com.mycompany.minipc.isa.OpCode;
+import com.mycompany.minipc.isa.Operando;
 import com.mycompany.minipc.isa.RegistroID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -139,7 +141,8 @@ class BancoRegistrosTest {
     }
 
     private static Instruccion movAx5() {
-        return new Instruccion(OpCode.MOV, RegistroID.AX, 5, "MOV AX, 5", 1);
+        return new Instruccion(OpCode.MOV, Forma.REGISTRO_NUMERO,
+                List.of(Operando.registro(RegistroID.AX), Operando.numero(5)), "MOV AX, 5", 1);
     }
 
     @Test

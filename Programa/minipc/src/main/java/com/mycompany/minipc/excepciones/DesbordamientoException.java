@@ -8,10 +8,10 @@ package com.mycompany.minipc.excepciones;
  *                medio del ciclo de ejecucion, dentro de Procesador.paso(),
  *                cuyo contrato no declara excepciones
  * Descripcion: se lanza cuando una estructura de tamano fijo del proceso se
- *              desborda, por ejemplo la pila. El controlador de la interfaz
- *              la atrapa y deja el proceso en BLOQUEADO_ERROR.
+ *              desborda, por ejemplo la pila, o cuando un salto lleva fuera
+ *              del programa. Es un caso particular de error de ejecucion.
  */
-public class DesbordamientoException extends RuntimeException {
+public class DesbordamientoException extends EjecucionException {
 
     private static final long serialVersionUID = 1L;
 

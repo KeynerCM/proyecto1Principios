@@ -58,8 +58,9 @@ class EnsambladorTest {
 
     private static void verificar(Instruccion i, OpCode op, RegistroID reg, int operando) {
         assertEquals(op, i.getOpcode(), i.toString());
-        assertEquals(reg, i.getRegistro(), i.toString());
-        assertEquals(operando, i.getOperando(), i.toString());
+        assertEquals(reg, i.getRegistro(0), i.toString());
+        int valor = i.getOperandos().size() > 1 ? i.getValor(1) : 0;
+        assertEquals(operando, valor, i.toString());
     }
 
     @Test
@@ -219,11 +220,11 @@ class EnsambladorTest {
     }
 
     @Test
-    @DisplayName("El valor inmediato tiene que ser numerico")
+    @DisplayName("Donde solo cabe un numero, un texto se reporta como valor no numerico")
     void detectaValorNoNumerico() {
         SintaxisException e = assertThrows(SintaxisException.class,
-                () -> ensamblador.ensamblar(List.of("MOV AX, cinco")));
-        assertTrue(e.getMessage().contains("valor no numerico"), e.getMessage());
+                () -> ensamblador.ensamblar(List.of("PARAM cinco")));
+        assertTrue(e.getMessage().contains("valor no numerico \"cinco\""), e.getMessage());
     }
 
     @Test
@@ -240,7 +241,7 @@ class EnsambladorTest {
         List<Instruccion> programa = ensamblador.ensamblar(List.of(
                 "MOV DX, -25",
                 "MOV CX, -127"));
-        assertEquals(-25, programa.get(0).getOperando());
-        assertEquals(-127, programa.get(1).getOperando());
+        assertEquals(-25, programa.get(0).getValor(1));
+        assertEquals(-127, programa.get(1).getValor(1));
     }
 }

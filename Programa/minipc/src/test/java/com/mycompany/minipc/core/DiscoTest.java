@@ -1,8 +1,10 @@
 package com.mycompany.minipc.core;
 
 import com.mycompany.minipc.excepciones.DiscoException;
+import com.mycompany.minipc.isa.Forma;
 import com.mycompany.minipc.isa.Instruccion;
 import com.mycompany.minipc.isa.OpCode;
+import com.mycompany.minipc.isa.Operando;
 import com.mycompany.minipc.isa.RegistroID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -34,7 +36,9 @@ class DiscoTest {
     private static List<Instruccion> programaDe(int lineas) {
         List<Instruccion> programa = new ArrayList<>();
         for (int i = 0; i < lineas; i++) {
-            programa.add(new Instruccion(OpCode.MOV, RegistroID.AX, i, "MOV AX, " + i, i + 1));
+            programa.add(new Instruccion(OpCode.MOV, Forma.REGISTRO_NUMERO,
+                    List.of(Operando.registro(RegistroID.AX), Operando.numero(i)),
+                    "MOV AX, " + i, i + 1));
         }
         return programa;
     }

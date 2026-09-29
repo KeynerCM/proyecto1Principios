@@ -3,11 +3,11 @@ package com.mycompany.minipc.core;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.mycompany.minipc.excepciones.DesbordamientoException;
+import com.mycompany.minipc.excepciones.EjecucionException;
 import com.mycompany.minipc.excepciones.MemoriaInsuficienteException;
+import com.mycompany.minipc.isa.Forma;
 import com.mycompany.minipc.isa.Instruccion;
 import com.mycompany.minipc.isa.OpCode;
-import com.mycompany.minipc.isa.RegistroID;
 
 /**
  * Nombre: Procesador
@@ -108,8 +108,8 @@ public class Procesador {
      * Entradas: ninguna, opera sobre el estado interno del procesador
      * Salidas: true si queda al menos una instruccion por ejecutar
      * Restricciones: devuelve false sin hacer nada si no hay programa o si el
-     *                proceso ya termino; lanza DesbordamientoException si la
-     *                instruccion provoca un desbordamiento, dejando el
+     *                proceso ya termino; lanza EjecucionException si la
+     *                instruccion provoca un error de ejecucion, dejando el
      *                proceso en BLOQUEADO_ERROR
      * Descripcion: ejecuta una sola instruccion, es decir un ciclo de fetch
      *              mas execute completo. El PC se incrementa en la etapa de
@@ -133,15 +133,11 @@ public class Procesador {
         bcp.actualizarDesde(this);
         notificar(Fase.FETCH);
 
-        // ---------- ETAPA DECODE ----------
-        OpCode opcode = ir.getOpcode();
-        RegistroID registro = ir.getRegistro();
-        int operando = ir.getOperando();
-
         // ---------- ETAPA EXECUTE ----------
+        OpCode opcode = ir.getOpcode();
         try {
-            ejecutar(opcode, registro, operando);
-        } catch (DesbordamientoException e) {
+            ejecutar(ir);
+        } catch (EjecucionException e) {
             // El proceso no puede continuar, pero la interfaz tiene que
             // poder mostrar en que estado quedo antes de ver el error.
             estado = EstadoProceso.BLOQUEADO_ERROR;
@@ -167,35 +163,38 @@ public class Procesador {
 
     /**
      * Nombre: ejecutar
-     * Entradas: opcode, operacion decodificada; registro, registro sobre el
-     *           que opera; operando, valor inmediato
+     * Entradas: instruccion, la que esta en el IR
      * Salidas: ninguna; modifica el acumulador o el banco de registros
-     * Restricciones: lanza IllegalStateException si aparece un opcode sin
-     *                implementar
+     * Restricciones: lanza EjecucionException si la instruccion todavia no se
+     *                puede ejecutar en esta version del simulador
      * Descripcion: etapa de ejecucion propiamente dicha. Cada operacion se
      *              resuelve con aritmetica normal de enteros de Java.
      */
-    private void ejecutar(OpCode opcode, RegistroID registro, int operando) {
-        switch (opcode) {
+    private void ejecutar(Instruccion instruccion) {
+        switch (instruccion.getOpcode()) {
             case MOV:
-                registros.escribir(registro, operando);
+                int valor = instruccion.getForma() == Forma.REGISTRO_REGISTRO
+                        ? registros.leer(instruccion.getRegistro(1))
+                        : instruccion.getValor(1);
+                registros.escribir(instruccion.getRegistro(0), valor);
                 estadisticas.registrarEscritura();
                 break;
             case LOAD:
-                ac = registros.leer(registro);
+                ac = registros.leer(instruccion.getRegistro(0));
                 break;
             case STORE:
-                registros.escribir(registro, ac);
+                registros.escribir(instruccion.getRegistro(0), ac);
                 estadisticas.registrarEscritura();
                 break;
             case ADD:
-                ac = ac + registros.leer(registro);
+                ac = ac + registros.leer(instruccion.getRegistro(0));
                 break;
             case SUB:
-                ac = ac - registros.leer(registro);
+                ac = ac - registros.leer(instruccion.getRegistro(0));
                 break;
             default:
-                throw new IllegalStateException("Operacion no implementada: " + opcode);
+                throw new EjecucionException("La instruccion \"" + instruccion
+                        + "\" todavia no se puede ejecutar en esta version del simulador");
         }
     }
 

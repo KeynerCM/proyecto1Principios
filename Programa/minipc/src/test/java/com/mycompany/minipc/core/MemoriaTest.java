@@ -80,7 +80,7 @@ class MemoriaTest {
         assertEquals(CeldaMemoria.Tipo.INSTRUCCION, memoria.leer(64).getTipo());
         assertEquals("MOV AX, 5", memoria.leer(64).getEtiqueta());
         assertEquals(OpCode.MOV, memoria.leer(64).getInstruccion().getOpcode());
-        assertEquals(5, memoria.leer(64).getInstruccion().getOperando());
+        assertEquals(5, memoria.leer(64).getInstruccion().getValor(1));
         assertEquals("MOV BX, -8", memoria.leer(70).getEtiqueta());
         assertTrue(memoria.leer(71).estaLibre(), "La celda siguiente debe quedar libre");
         assertEquals(7, memoria.getPosicionesUsadas());

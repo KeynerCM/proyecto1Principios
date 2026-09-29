@@ -32,6 +32,12 @@ final class Sintaxis {
     /** Un entero con signo opcional. */
     static final String NUM = "([+-]?\\d+)";
 
+    /**
+     * Un codigo de interrupcion. Se acepta cualquier palabra y el codigo se
+     * valida despues, para poder decir cuales son los codigos validos.
+     */
+    static final String CODIGO = "(\\w+)";
+
     /** Un numero cualquiera, para reconocer operandos en el diagnostico. */
     static final Pattern ES_NUMERO = Pattern.compile("[+-]?\\d+");
 

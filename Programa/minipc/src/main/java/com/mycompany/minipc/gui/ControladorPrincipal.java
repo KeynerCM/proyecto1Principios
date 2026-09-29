@@ -17,7 +17,7 @@ import com.mycompany.minipc.core.Fase;
 import com.mycompany.minipc.core.ObservadorCPU;
 import com.mycompany.minipc.core.Procesador;
 import com.mycompany.minipc.excepciones.ConfiguracionException;
-import com.mycompany.minipc.excepciones.DesbordamientoException;
+import com.mycompany.minipc.excepciones.EjecucionException;
 import com.mycompany.minipc.excepciones.DiscoException;
 import com.mycompany.minipc.excepciones.MemoriaInsuficienteException;
 import com.mycompany.minipc.excepciones.SintaxisException;
@@ -229,6 +229,11 @@ public class ControladorPrincipal implements ObservadorCPU {
             vista.escribirEnConsola("Guardado en disco: " + entrada.getNombre()
                     + ", posiciones " + entrada.getDireccionInicio() + " a "
                     + entrada.getDireccionFin() + ".");
+            if (programa.stream().noneMatch(Instruccion::esFinDePrograma)) {
+                vista.escribirEnConsola("Advertencia: " + entrada.getNombre()
+                        + " no tiene INT 20H; el programa terminara al llegar a su ultima"
+                        + " instruccion.");
+            }
             return entrada;
 
         } catch (SintaxisException e) {
@@ -436,11 +441,11 @@ public class ControladorPrincipal implements ObservadorCPU {
      * Nombre: ejecutarUnPaso
      * Entradas: ninguna
      * Salidas: true si queda alguna instruccion por ejecutar
-     * Restricciones: atrapa DesbordamientoException, de modo que el error no
+     * Restricciones: atrapa EjecucionException, de modo que el error no
      *                se propaga hacia Swing
      * Descripcion: ejecuta una instruccion y atiende los dos finales posibles:
-     *              que el programa termine normalmente o que se detenga por
-     *              desbordamiento. En el segundo caso el procesador ya dejo el
+     *              que el programa termine normalmente o que se detenga por un
+     *              error de ejecucion. En el segundo caso el procesador ya dejo el
      *              proceso en BLOQUEADO_ERROR y aviso a los observadores, asi
      *              que la pantalla ya refleja el estado y aqui solo falta
      *              informar al usuario.
@@ -455,7 +460,7 @@ public class ControladorPrincipal implements ObservadorCPU {
             }
             return quedan;
 
-        } catch (DesbordamientoException e) {
+        } catch (EjecucionException e) {
             // El procesador ya dejo el proceso en BLOQUEADO_ERROR y aviso a
             // los observadores, asi que la pantalla ya refleja el estado.
             detener();

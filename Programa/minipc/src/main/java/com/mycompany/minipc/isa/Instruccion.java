@@ -1,9 +1,11 @@
 package com.mycompany.minipc.isa;
 
+import java.util.List;
+
 /**
  * Nombre: Instruccion
- * Entradas: la operacion, el registro, el operando, el texto original y el
- *           numero de linea del archivo
+ * Entradas: la operacion, la forma con que se escribio, sus operandos, el
+ *           texto original y el numero de linea del archivo
  * Salidas: no aplica
  * Restricciones: es inmutable y final; todos sus campos se fijan al
  *                construirla y no hay forma de alterarlos despues
@@ -16,37 +18,48 @@ package com.mycompany.minipc.isa;
 public final class Instruccion {
 
     private final OpCode opcode;
-    private final RegistroID registro;
-    private final int operando;
+    private final Forma forma;
+    private final List<Operando> operandos;
     private final String textoFuente;
     private final int numeroLinea;
 
     /**
      * Nombre: Instruccion
-     * Entradas: opcode, operacion a ejecutar; registro, registro sobre el que
-     *           opera; operando, valor inmediato o cero si no lo usa;
-     *           textoFuente, linea original tal como venia; numeroLinea,
-     *           posicion dentro del archivo contando desde uno
+     * Entradas: opcode, operacion a ejecutar; forma, forma con que se
+     *           escribieron los operandos; operandos, en orden; textoFuente,
+     *           linea original tal como venia; numeroLinea, posicion dentro
+     *           del archivo contando desde uno
      * Salidas: la instruccion construida
-     * Restricciones: opcode y registro no pueden ser nulos; si la operacion
-     *                no admite inmediato el operando debe ser cero. En ambos
-     *                casos lanza IllegalArgumentException
+     * Restricciones: lanza IllegalArgumentException si la forma no pertenece
+     *                a la operacion, si la cantidad de operandos no es la que
+     *                admite la forma, o si algun operando no es del tipo
+     *                esperado
      * Descripcion: valida de una vez todo lo que podria hacer invalida a la
      *              instruccion, de modo que si el objeto existe es ejecutable.
      */
-    public Instruccion(OpCode opcode, RegistroID registro, int operando,
+    public Instruccion(OpCode opcode, Forma forma, List<Operando> operandos,
             String textoFuente, int numeroLinea) {
-        if (opcode == null || registro == null) {
-            throw new IllegalArgumentException("La operacion y el registro son obligatorios");
-        }
-        if (!opcode.requiereInmediato() && operando != 0) {
+        if (opcode == null || forma == null || operandos == null) {
             throw new IllegalArgumentException(
-                    "La operacion " + opcode + " no admite operando inmediato");
+                    "La operacion, la forma y los operandos son obligatorios");
         }
-
+        if (!opcode.getFormas().contains(forma)) {
+            throw new IllegalArgumentException("La operacion " + opcode
+                    + " no admite la forma " + forma);
+        }
+        if (!forma.admite(operandos.size())) {
+            throw new IllegalArgumentException("La forma " + forma + " no admite "
+                    + operandos.size() + " operando(s)");
+        }
+        for (int i = 0; i < operandos.size(); i++) {
+            if (operandos.get(i).getTipo() != forma.getOperandos().get(i)) {
+                throw new IllegalArgumentException("El operando " + (i + 1) + " de " + opcode
+                        + " debe ser de tipo " + forma.getOperandos().get(i));
+            }
+        }
         this.opcode = opcode;
-        this.registro = registro;
-        this.operando = operando;
+        this.forma = forma;
+        this.operandos = List.copyOf(operandos);
         this.textoFuente = textoFuente;
         this.numeroLinea = numeroLinea;
     }
@@ -63,25 +76,91 @@ public final class Instruccion {
     }
 
     /**
-     * Nombre: getRegistro
+     * Nombre: getForma
      * Entradas: ninguna
-     * Salidas: el registro sobre el que opera la instruccion
+     * Salidas: la forma con que se escribieron los operandos
      * Restricciones: ninguna
-     * Descripcion: acceso de solo lectura al campo correspondiente.
+     * Descripcion: el procesador la consulta para distinguir, por ejemplo,
+     *              MOV REG, REG de MOV REG, NUMERO, o INC de INC REG.
      */
-    public RegistroID getRegistro() {
-        return registro;
+    public Forma getForma() {
+        return forma;
     }
 
     /**
-     * Nombre: getOperando
+     * Nombre: getOperandos
      * Entradas: ninguna
-     * Salidas: el valor inmediato, o cero si la operacion no lo usa
-     * Restricciones: ninguna
+     * Salidas: los operandos, en orden
+     * Restricciones: la lista es inmutable
      * Descripcion: acceso de solo lectura al campo correspondiente.
      */
-    public int getOperando() {
-        return operando;
+    public List<Operando> getOperandos() {
+        return operandos;
+    }
+
+    /**
+     * Nombre: getRegistro
+     * Entradas: indice, posicion del operando contando desde cero
+     * Salidas: el registro en esa posicion
+     * Restricciones: lanza IllegalStateException si el operando no es un
+     *                registro, e IndexOutOfBoundsException si no existe
+     * Descripcion: acceso comodo para el procesador, que ya sabe por la forma
+     *              que tipo hay en cada posicion.
+     */
+    public RegistroID getRegistro(int indice) {
+        Operando operando = operandos.get(indice);
+        if (operando.getTipo() != Forma.TipoOperando.REGISTRO) {
+            throw new IllegalStateException("El operando " + (indice + 1) + " de " + this
+                    + " no es un registro");
+        }
+        return operando.getRegistro();
+    }
+
+    /**
+     * Nombre: getValor
+     * Entradas: indice, posicion del operando contando desde cero
+     * Salidas: el numero o el desplazamiento en esa posicion
+     * Restricciones: lanza IndexOutOfBoundsException si no existe
+     * Descripcion: acceso comodo para el procesador.
+     */
+    public int getValor(int indice) {
+        return operandos.get(indice).getValor();
+    }
+
+    /**
+     * Nombre: getInterrupcion
+     * Entradas: ninguna
+     * Salidas: la interrupcion pedida, o nulo si no es una instruccion INT
+     * Restricciones: ninguna
+     * Descripcion: acceso comodo para el procesador.
+     */
+    public Interrupcion getInterrupcion() {
+        return forma == Forma.INTERRUPCION ? operandos.get(0).getInterrupcion() : null;
+    }
+
+    /**
+     * Nombre: getPeso
+     * Entradas: ninguna
+     * Salidas: los segundos de CPU que consume la instruccion, o
+     *          Interrupcion.PESO_VARIABLE si depende del usuario
+     * Restricciones: ninguna
+     * Descripcion: el peso de INT sale del codigo de interrupcion; el de las
+     *              demas, de la operacion.
+     */
+    public int getPeso() {
+        return opcode == OpCode.INT ? getInterrupcion().getPeso() : opcode.getPeso();
+    }
+
+    /**
+     * Nombre: esFinDePrograma
+     * Entradas: ninguna
+     * Salidas: true si es INT 20H
+     * Restricciones: ninguna
+     * Descripcion: permite avisar si un programa no tiene su instruccion de
+     *              fin.
+     */
+    public boolean esFinDePrograma() {
+        return getInterrupcion() == Interrupcion.FIN_PROGRAMA;
     }
 
     /**
@@ -116,10 +195,17 @@ public final class Instruccion {
      * Salidas: representacion legible de la instruccion
      * Restricciones: ninguna
      * Descripcion: devuelve el texto original si existe; si no, reconstruye
-     *              una descripcion a partir de la operacion y el registro.
+     *              la instruccion a partir de la operacion y sus operandos.
      */
     @Override
     public String toString() {
-        return textoFuente != null ? textoFuente : (opcode + " " + registro);
+        if (textoFuente != null) {
+            return textoFuente;
+        }
+        StringBuilder texto = new StringBuilder(opcode.name());
+        for (int i = 0; i < operandos.size(); i++) {
+            texto.append(i == 0 ? " " : ", ").append(operandos.get(i));
+        }
+        return texto.toString();
     }
 }
