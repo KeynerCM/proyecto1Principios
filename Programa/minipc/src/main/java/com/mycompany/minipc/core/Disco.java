@@ -1,10 +1,10 @@
 package com.mycompany.minipc.core;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import com.mycompany.minipc.excepciones.DiscoException;
-import com.mycompany.minipc.isa.Instruccion;
 
 /**
  * Nombre: Disco
@@ -19,11 +19,12 @@ import com.mycompany.minipc.isa.Instruccion;
  *                20 .. inicioVirtual - 1  archivos (programas .asm)
  *                inicioVirtual .. fin     memoria virtual (intercambio)
  *
- *              El indice vive en las primeras posiciones del propio disco,
- *              como pide el enunciado: cada entrada ocupa una celda y guarda
- *              el nombre, la direccion y el tamano del archivo. No hay una
- *              copia aparte del indice; buscar un archivo es recorrer esas
- *              celdas. Los archivos se guardan de forma contigua, con la
+ *              Igual que la memoria, el disco es un arreglo de texto. El
+ *              indice vive en las primeras posiciones del propio disco, como
+ *              pide el enunciado: cada entrada ocupa una celda con el texto
+ *              "nombre|inicio|tamano". No hay una copia aparte del indice;
+ *              buscar un archivo es recorrer esas celdas. Los archivos se
+ *              guardan de forma contigua, una linea por posicion, con la
  *              politica de primer ajuste.
  */
 public class Disco {
@@ -40,7 +41,10 @@ public class Disco {
     /** Cantidad de posiciones reservadas al indice, una por archivo. */
     public static final int ENTRADAS_INDICE = 20;
 
-    private CeldaDisco[] celdas;
+    /** Contenido de una posicion libre. */
+    public static final String VACIA = "";
+
+    private String[] celdas;
     private int tamano;
     private int tamanoMemoriaVirtual;
 
@@ -113,10 +117,8 @@ public class Disco {
         }
         this.tamano = tamano;
         this.tamanoMemoriaVirtual = tamanoMemoriaVirtual;
-        this.celdas = new CeldaDisco[tamano];
-        for (int i = 0; i < tamano; i++) {
-            celdas[i] = new CeldaDisco();
-        }
+        this.celdas = new String[tamano];
+        Arrays.fill(celdas, VACIA);
     }
 
     /**
@@ -199,8 +201,8 @@ public class Disco {
 
     /**
      * Nombre: guardarPrograma
-     * Entradas: nombre, nombre del archivo; programa, instrucciones ya
-     *           ensambladas
+     * Entradas: nombre, nombre del archivo; lineas, texto de cada instruccion
+     *           ya validada, en orden
      * Salidas: la entrada del indice creada para el archivo
      * Restricciones: lanza DiscoException si ya existe un archivo con ese
      *                nombre, si el indice esta lleno o si no hay un bloque
@@ -208,17 +210,17 @@ public class Disco {
      *                Lanza IllegalArgumentException si el nombre es vacio o
      *                el programa no tiene instrucciones
      * Descripcion: guarda el programa en el primer bloque contiguo libre del
-     *              area de archivos que lo contenga (primer ajuste) y anota la
-     *              entrada en la primera celda libre del indice. Primero se
-     *              valida todo y solo entonces se escribe, de modo que la
-     *              operacion es atomica.
+     *              area de archivos que lo contenga (primer ajuste), una linea
+     *              por posicion, y anota la entrada en la primera celda libre
+     *              del indice. Primero se valida todo y solo entonces se
+     *              escribe, de modo que la operacion es atomica.
      */
-    public EntradaIndice guardarPrograma(String nombre, List<Instruccion> programa)
+    public EntradaIndice guardarPrograma(String nombre, List<String> lineas)
             throws DiscoException {
         if (nombre == null || nombre.isBlank()) {
             throw new IllegalArgumentException("El nombre del archivo es obligatorio");
         }
-        if (programa == null || programa.isEmpty()) {
+        if (lineas == null || lineas.isEmpty()) {
             throw new IllegalArgumentException("El programa no tiene instrucciones");
         }
         if (buscar(nombre) != null) {
@@ -230,18 +232,18 @@ public class Disco {
             throw new DiscoException("No se puede guardar \"" + nombre + "\": el indice del"
                     + " disco esta lleno (" + ENTRADAS_INDICE + " archivos)");
         }
-        int inicio = buscarBloqueLibre(programa.size());
+        int inicio = buscarBloqueLibre(lineas.size());
         if (inicio < 0) {
             throw new DiscoException("No se puede guardar \"" + nombre + "\": requiere "
-                    + programa.size() + " posiciones contiguas y el bloque libre mas grande"
+                    + lineas.size() + " posiciones contiguas y el bloque libre mas grande"
                     + " del disco es de " + mayorBloqueLibre());
         }
 
-        for (int i = 0; i < programa.size(); i++) {
-            celdas[inicio + i].escribirInstruccion(programa.get(i));
+        EntradaIndice entrada = new EntradaIndice(nombre, inicio, lineas.size());
+        for (int i = 0; i < lineas.size(); i++) {
+            celdas[inicio + i] = lineas.get(i);
         }
-        EntradaIndice entrada = new EntradaIndice(nombre, inicio, programa.size());
-        celdas[ranura].escribirIndice(entrada);
+        celdas[ranura] = entrada.aTexto();
         return entrada;
     }
 
@@ -254,16 +256,8 @@ public class Disco {
      * Descripcion: recorre las celdas del indice en el disco.
      */
     public EntradaIndice buscar(String nombre) {
-        if (nombre == null) {
-            return null;
-        }
-        for (int i = 0; i < ENTRADAS_INDICE; i++) {
-            EntradaIndice entrada = celdas[i].getEntrada();
-            if (entrada != null && entrada.getNombre().equalsIgnoreCase(nombre)) {
-                return entrada;
-            }
-        }
-        return null;
+        int ranura = ranuraDe(nombre);
+        return ranura < 0 ? null : EntradaIndice.desdeTexto(celdas[ranura]);
     }
 
     /**
@@ -302,8 +296,8 @@ public class Disco {
     public List<EntradaIndice> getIndice() {
         List<EntradaIndice> indice = new ArrayList<>();
         for (int i = 0; i < ENTRADAS_INDICE; i++) {
-            if (celdas[i].getEntrada() != null) {
-                indice.add(celdas[i].getEntrada());
+            if (!celdas[i].isEmpty()) {
+                indice.add(EntradaIndice.desdeTexto(celdas[i]));
             }
         }
         return indice;
@@ -312,19 +306,19 @@ public class Disco {
     /**
      * Nombre: leerPrograma
      * Entradas: nombre, nombre del archivo a leer
-     * Salidas: las instrucciones del programa, en orden
+     * Salidas: el texto de cada instruccion del programa, en orden
      * Restricciones: lanza DiscoException si el archivo no existe
      * Descripcion: localiza el archivo en el indice y lee sus posiciones. Es
-     *              lo que usara el planificador de trabajos para pasar un
-     *              programa del disco a la memoria principal.
+     *              lo que usa el sistema operativo para pasar un programa del
+     *              disco a la memoria principal.
      */
-    public List<Instruccion> leerPrograma(String nombre) throws DiscoException {
+    public List<String> leerPrograma(String nombre) throws DiscoException {
         EntradaIndice entrada = buscarObligatorio(nombre);
-        List<Instruccion> programa = new ArrayList<>();
+        List<String> lineas = new ArrayList<>();
         for (int i = entrada.getDireccionInicio(); i <= entrada.getDireccionFin(); i++) {
-            programa.add(celdas[i].getInstruccion());
+            lineas.add(celdas[i]);
         }
-        return programa;
+        return lineas;
     }
 
     /**
@@ -336,15 +330,8 @@ public class Disco {
      */
     public void eliminar(String nombre) throws DiscoException {
         EntradaIndice entrada = buscarObligatorio(nombre);
-        for (int i = entrada.getDireccionInicio(); i <= entrada.getDireccionFin(); i++) {
-            celdas[i].limpiar();
-        }
-        for (int i = 0; i < ENTRADAS_INDICE; i++) {
-            if (celdas[i].getEntrada() == entrada) {
-                celdas[i].limpiar();
-                return;
-            }
-        }
+        Arrays.fill(celdas, entrada.getDireccionInicio(), entrada.getDireccionFin() + 1, VACIA);
+        celdas[ranuraDe(nombre)] = VACIA;
     }
 
     /**
@@ -355,25 +342,34 @@ public class Disco {
      * Descripcion: deja el disco vacio sin cambiar su configuracion.
      */
     public void formatear() {
-        for (CeldaDisco celda : celdas) {
-            celda.limpiar();
-        }
+        Arrays.fill(celdas, VACIA);
     }
 
     /**
      * Nombre: leer
      * Entradas: direccion, posicion a leer
-     * Salidas: la celda correspondiente
+     * Salidas: el texto guardado en esa posicion, vacio si esta libre
      * Restricciones: lanza IndexOutOfBoundsException si la direccion no existe
      * Descripcion: acceso directo a una celda, pensado para la tabla del
      *              disco en la interfaz.
      */
-    public CeldaDisco leer(int direccion) {
+    public String leer(int direccion) {
         if (direccion < 0 || direccion >= tamano) {
             throw new IndexOutOfBoundsException("Direccion fuera del disco: " + direccion
                     + ", el rango valido es 0 a " + (tamano - 1));
         }
         return celdas[direccion];
+    }
+
+    /**
+     * Nombre: estaLibre
+     * Entradas: direccion, posicion a consultar
+     * Salidas: true si la posicion no guarda nada
+     * Restricciones: lanza IndexOutOfBoundsException si la direccion no existe
+     * Descripcion: una posicion esta libre cuando su texto es vacio.
+     */
+    public boolean estaLibre(int direccion) {
+        return leer(direccion).isEmpty();
     }
 
     /**
@@ -386,7 +382,7 @@ public class Disco {
     public int getPosicionesLibres() {
         int libres = 0;
         for (int i = getInicioArchivos(); i < getInicioMemoriaVirtual(); i++) {
-            if (celdas[i].estaLibre()) {
+            if (celdas[i].isEmpty()) {
                 libres++;
             }
         }
@@ -410,6 +406,27 @@ public class Disco {
     }
 
     /**
+     * Nombre: ranuraDe
+     * Entradas: nombre, nombre del archivo
+     * Salidas: la posicion de la celda del indice que lo describe, o -1
+     * Restricciones: un nombre nulo devuelve -1; ignora mayusculas
+     * Descripcion: recorre las celdas del indice leyendo el nombre de cada
+     *              entrada.
+     */
+    private int ranuraDe(String nombre) {
+        if (nombre == null) {
+            return -1;
+        }
+        for (int i = 0; i < ENTRADAS_INDICE; i++) {
+            EntradaIndice entrada = EntradaIndice.desdeTexto(celdas[i]);
+            if (entrada != null && entrada.getNombre().equalsIgnoreCase(nombre)) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    /**
      * Nombre: primeraRanuraLibreDelIndice
      * Entradas: ninguna
      * Salidas: la posicion de la primera celda libre del indice, o -1
@@ -419,7 +436,7 @@ public class Disco {
      */
     private int primeraRanuraLibreDelIndice() {
         for (int i = 0; i < ENTRADAS_INDICE; i++) {
-            if (celdas[i].estaLibre()) {
+            if (celdas[i].isEmpty()) {
                 return i;
             }
         }
@@ -438,7 +455,7 @@ public class Disco {
         int inicioTramo = -1;
         int largoTramo = 0;
         for (int i = getInicioArchivos(); i < getInicioMemoriaVirtual(); i++) {
-            if (celdas[i].estaLibre()) {
+            if (celdas[i].isEmpty()) {
                 if (largoTramo == 0) {
                     inicioTramo = i;
                 }
@@ -465,7 +482,7 @@ public class Disco {
         int mayor = 0;
         int actual = 0;
         for (int i = getInicioArchivos(); i < getInicioMemoriaVirtual(); i++) {
-            actual = celdas[i].estaLibre() ? actual + 1 : 0;
+            actual = celdas[i].isEmpty() ? actual + 1 : 0;
             mayor = Math.max(mayor, actual);
         }
         return mayor;

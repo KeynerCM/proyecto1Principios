@@ -6,9 +6,10 @@ import java.util.List;
 import com.mycompany.minipc.excepciones.DesbordamientoException;
 import com.mycompany.minipc.excepciones.EjecucionException;
 import com.mycompany.minipc.excepciones.MemoriaInsuficienteException;
+import com.mycompany.minipc.excepciones.SintaxisException;
+import com.mycompany.minipc.isa.Ensamblador;
 import com.mycompany.minipc.isa.Forma;
 import com.mycompany.minipc.isa.Instruccion;
-import com.mycompany.minipc.isa.OpCode;
 import com.mycompany.minipc.isa.RegistroID;
 
 /**
@@ -21,9 +22,9 @@ import com.mycompany.minipc.isa.RegistroID;
  * Descripcion: el procesador del Mini PC. Implementa el ciclo de instruccion:
  *              el procesador repite indefinidamente traer la instruccion que
  *              apunta el PC (etapa fetch) e interpretarla y ejecutarla (etapa
- *              execute). La memoria guarda la instruccion ya ensamblada, asi
- *              que el IR recibe el objeto directamente y la aritmetica se
- *              resuelve sobre enteros de Java.
+ *              execute). La memoria guarda cada instruccion como texto; el IR
+ *              recibe ese texto y la CPU lo decodifica antes de ejecutarlo.
+ *              La aritmetica se resuelve sobre enteros de Java.
  */
 public class Procesador {
 
@@ -32,12 +33,18 @@ public class Procesador {
     private final Estadisticas estadisticas;
     private final List<ObservadorCPU> observadores;
 
+    /** Decodificador: interpreta el texto que trae el fetch. */
+    private final Ensamblador decodificador;
+
     private BCP bcp;
 
     /** Program Counter: direccion de la proxima instruccion. */
     private int pc;
 
-    /** Instruction Register: la instruccion que se esta ejecutando. */
+    /** Instruction Register: el texto de la instruccion traida de memoria. */
+    private String irTexto;
+
+    /** La instruccion del IR ya decodificada, o nulo si no se pudo. */
     private Instruccion ir;
 
     /** Accumulator: almacenamiento temporal donde ocurre la aritmetica. */
@@ -79,6 +86,8 @@ public class Procesador {
         this.registros = new BancoRegistros();
         this.estadisticas = new Estadisticas();
         this.pila = new Pila();
+        this.decodificador = new Ensamblador();
+        this.irTexto = "";
         this.observadores = new ArrayList<>();
         this.siguientePid = 1;
         this.estado = EstadoProceso.NUEVO;
@@ -86,8 +95,8 @@ public class Procesador {
 
     /**
      * Nombre: cargar
-     * Entradas: programa, instrucciones ya ensambladas; nombreArchivo, nombre
-     *           del archivo de origen para el BCP
+     * Entradas: lineas, texto de cada instruccion del programa; nombreArchivo,
+     *           nombre del archivo de origen para el BCP
      * Salidas: ninguna; avisa a los observadores con la fase CARGA
      * Restricciones: lanza MemoriaInsuficienteException si el programa no cabe
      *                en la zona de usuario, y en ese caso nada cambia
@@ -96,10 +105,10 @@ public class Procesador {
      *              registros y los contadores en cero y crea un BCP nuevo con
      *              el siguiente identificador de proceso.
      */
-    public void cargar(List<Instruccion> programa, String nombreArchivo)
+    public void cargar(List<String> lineas, String nombreArchivo)
             throws MemoriaInsuficienteException {
-        direccionBase = memoria.cargarPrograma(programa);
-        cantidadInstrucciones = programa.size();
+        direccionBase = memoria.cargarPrograma(lineas);
+        cantidadInstrucciones = lineas.size();
         direccionFin = direccionBase + cantidadInstrucciones - 1;
 
         registros.reset();
@@ -107,6 +116,7 @@ public class Procesador {
         estadisticas.setPosicionesUsadas(memoria.getPosicionesUsadas());
 
         pc = direccionBase;
+        irTexto = "";
         ir = null;
         ac = 0;
         zf = false;
@@ -131,11 +141,13 @@ public class Procesador {
      *                instruccion provoca un error de ejecucion, dejando el
      *                proceso en BLOQUEADO_ERROR
      * Descripcion: ejecuta una sola instruccion, es decir un ciclo de fetch
-     *              mas execute completo. El PC se incrementa en la etapa de
-     *              fetch, igual que en el libro, de modo que durante la
-     *              ejecucion ya apunta a la instruccion siguiente. Avisa a los
-     *              observadores dos veces, una por etapa, para que la interfaz
-     *              pueda mostrar el ciclo separado.
+     *              mas execute completo. El fetch trae el texto de la celda
+     *              que apunta el PC al IR; el execute lo decodifica y lo
+     *              ejecuta. El PC se incrementa en la etapa de fetch, igual
+     *              que en el libro, de modo que durante la ejecucion ya apunta
+     *              a la instruccion siguiente. Avisa a los observadores dos
+     *              veces, una por etapa, para que la interfaz pueda mostrar el
+     *              ciclo separado.
      */
     public boolean paso() {
         if (!hayPrograma() || estado.esFinal()) {
@@ -144,17 +156,18 @@ public class Procesador {
         estado = EstadoProceso.EJECUCION;
 
         // ---------- ETAPA FETCH ----------
-        CeldaMemoria celda = memoria.leerComoUsuario(pc);
-        ir = celda.getInstruccion();
+        int direccion = pc;
+        irTexto = memoria.leerComoUsuario(direccion);
+        ir = null;
         pc++;
         ciclosReloj++;
         estadisticas.registrarLectura();
         bcp.actualizarDesde(this);
         notificar(Fase.FETCH);
 
-        // ---------- ETAPA EXECUTE ----------
-        OpCode opcode = ir.getOpcode();
+        // ---------- ETAPA EXECUTE (decodifica y ejecuta) ----------
         try {
+            ir = decodificar(direccion, irTexto);
             ejecutar(ir);
         } catch (EjecucionException e) {
             // El proceso no puede continuar, pero la interfaz tiene que
@@ -168,7 +181,7 @@ public class Procesador {
 
         ciclosReloj++;
         instruccionesEjecutadas++;
-        estadisticas.registrar(opcode);
+        estadisticas.registrar(ir.getOpcode());
 
         if (finSolicitado || pc > direccionFin) {
             estado = EstadoProceso.TERMINADO;
@@ -178,6 +191,28 @@ public class Procesador {
         notificar(Fase.EXECUTE);
 
         return !haTerminado();
+    }
+
+    /**
+     * Nombre: decodificar
+     * Entradas: direccion, posicion de donde se trajo el texto; texto,
+     *           contenido del IR
+     * Salidas: la instruccion lista para ejecutar
+     * Restricciones: lanza EjecucionException si el texto no es una
+     *                instruccion valida, por ejemplo si el PC llego a una
+     *                celda vacia o con un numero
+     * Descripcion: interpreta el texto con las mismas reglas del
+     *              ensamblador. Un fallo aqui es un error del proceso (trap),
+     *              no un error de sintaxis del archivo, que ya se valido al
+     *              cargarlo.
+     */
+    private Instruccion decodificar(int direccion, String texto) {
+        try {
+            return decodificador.decodificar(texto);
+        } catch (SintaxisException e) {
+            throw new EjecucionException("La posicion " + direccion
+                    + " no contiene una instruccion valida: \"" + texto + "\"");
+        }
     }
 
     /**
@@ -373,6 +408,7 @@ public class Procesador {
         estadisticas.setPosicionesUsadas(memoria.getPosicionesUsadas());
 
         pc = direccionBase;
+        irTexto = "";
         ir = null;
         ac = 0;
         zf = false;
@@ -401,6 +437,7 @@ public class Procesador {
         estadisticas.reset();
 
         pc = 0;
+        irTexto = "";
         ir = null;
         ac = 0;
         zf = false;
@@ -565,7 +602,8 @@ public class Procesador {
     /**
      * Nombre: getIr
      * Entradas: ninguna
-     * Salidas: la instruccion en curso, o nulo si no se ha ejecutado nada
+     * Salidas: la instruccion en curso ya decodificada, o nulo si no se ha
+     *          ejecutado nada o si el texto del IR no era una instruccion
      * Restricciones: ninguna
      * Descripcion: acceso de solo lectura al registro de instruccion.
      */
@@ -581,7 +619,7 @@ public class Procesador {
      * Descripcion: es lo que se muestra del IR en el panel del BCP.
      */
     public String getIrTexto() {
-        return ir == null ? "" : ir.getTextoFuente();
+        return irTexto;
     }
 
     /**

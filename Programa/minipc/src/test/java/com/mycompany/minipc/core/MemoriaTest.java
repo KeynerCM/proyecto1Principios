@@ -3,8 +3,6 @@ package com.mycompany.minipc.core;
 import com.mycompany.minipc.excepciones.MemoriaInsuficienteException;
 import com.mycompany.minipc.excepciones.SintaxisException;
 import com.mycompany.minipc.isa.Ensamblador;
-import com.mycompany.minipc.isa.Instruccion;
-import com.mycompany.minipc.isa.OpCode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -31,8 +29,8 @@ class MemoriaTest {
         ensamblador = new Ensamblador();
     }
 
-    private List<Instruccion> programaDeEjemplo() throws SintaxisException {
-        return ensamblador.ensamblar(List.of(
+    private List<String> programaDeEjemplo() throws SintaxisException {
+        return validas(List.of(
                 "MOV AX, 5",
                 "MOV BX, 3",
                 "LOAD AX",
@@ -42,12 +40,18 @@ class MemoriaTest {
                 "MOV BX, -8"));
     }
 
-    private List<Instruccion> programaDe(int lineas) throws SintaxisException {
+    private List<String> programaDe(int lineas) throws SintaxisException {
         List<String> texto = new ArrayList<>();
         for (int i = 0; i < lineas; i++) {
             texto.add("MOV AX, 1");
         }
-        return ensamblador.ensamblar(texto);
+        return validas(texto);
+    }
+
+    /** Comprueba con el ensamblador que las lineas son validas y las devuelve. */
+    private List<String> validas(List<String> lineas) throws SintaxisException {
+        ensamblador.ensamblar(lineas);
+        return lineas;
     }
 
     @Test
@@ -66,9 +70,8 @@ class MemoriaTest {
         assertFalse(memoria.esDireccionKernel(64));
         assertFalse(memoria.esDireccionKernel(255));
 
-        assertEquals(CeldaMemoria.Tipo.RESERVADA_KERNEL, memoria.leer(0).getTipo());
-        assertEquals(CeldaMemoria.Tipo.RESERVADA_KERNEL, memoria.leer(63).getTipo());
-        assertEquals(CeldaMemoria.Tipo.LIBRE, memoria.leer(64).getTipo());
+        assertTrue(memoria.estaLibre(0), "El kernel arranca vacio");
+        assertTrue(memoria.estaLibre(64));
     }
 
     @Test
@@ -77,19 +80,16 @@ class MemoriaTest {
         int base = memoria.cargarPrograma(programaDeEjemplo());
 
         assertEquals(64, base);
-        assertEquals(CeldaMemoria.Tipo.INSTRUCCION, memoria.leer(64).getTipo());
-        assertEquals("MOV AX, 5", memoria.leer(64).getEtiqueta());
-        assertEquals(OpCode.MOV, memoria.leer(64).getInstruccion().getOpcode());
-        assertEquals(5, memoria.leer(64).getInstruccion().getValor(1));
-        assertEquals("MOV BX, -8", memoria.leer(70).getEtiqueta());
-        assertTrue(memoria.leer(71).estaLibre(), "La celda siguiente debe quedar libre");
+        assertEquals("MOV AX, 5", memoria.leer(64), "La celda guarda el texto de la instruccion");
+        assertEquals("MOV BX, -8", memoria.leer(70));
+        assertTrue(memoria.estaLibre(71), "La celda siguiente debe quedar libre");
         assertEquals(7, memoria.getPosicionesUsadas());
     }
 
     @Test
     @DisplayName("Cada linea de programa ocupa exactamente una posicion")
     void unaLineaUnaPosicion() throws Exception {
-        List<Instruccion> programa = programaDeEjemplo();
+        List<String> programa = programaDeEjemplo();
         memoria.cargarPrograma(programa);
         assertEquals(programa.size(), memoria.getPosicionesUsadas());
     }
@@ -123,7 +123,8 @@ class MemoriaTest {
         assertThrows(IllegalArgumentException.class, () -> memoria.leerComoUsuario(0));
         assertThrows(IllegalArgumentException.class, () -> memoria.leerComoUsuario(63));
         // Desde fuera del modo usuario si se puede, para poder mostrarla en pantalla.
-        assertEquals(CeldaMemoria.Tipo.RESERVADA_KERNEL, memoria.leer(0).getTipo());
+        memoria.escribir(0, "7");
+        assertEquals("7", memoria.leer(0));
     }
 
     @Test
@@ -137,12 +138,31 @@ class MemoriaTest {
     @Test
     @DisplayName("Limpiar la zona de usuario no toca la del kernel")
     void limpiarRespetaElKernel() throws Exception {
+        memoria.escribirEntero(10, 42);
         memoria.cargarPrograma(programaDeEjemplo());
         memoria.limpiarZonaUsuario();
 
         assertEquals(0, memoria.getPosicionesUsadas());
-        assertTrue(memoria.leer(64).estaLibre());
-        assertEquals(CeldaMemoria.Tipo.RESERVADA_KERNEL, memoria.leer(0).getTipo());
+        assertTrue(memoria.estaLibre(64));
+        assertEquals("42", memoria.leer(10), "El kernel conserva lo que tenia");
+    }
+
+    @Test
+    @DisplayName("Los numeros se guardan como texto y se leen como int")
+    void numerosComoTexto() {
+        memoria.escribirEntero(100, -15);
+        assertEquals("-15", memoria.leer(100));
+        assertEquals(-15, memoria.leerEntero(100));
+        assertEquals(0, memoria.leerEntero(101), "Una celda vacia vale cero");
+    }
+
+    @Test
+    @DisplayName("Leer como numero una celda con una instruccion se informa")
+    void leerEnteroDeUnaInstruccion() throws Exception {
+        memoria.cargarPrograma(programaDeEjemplo());
+        IllegalStateException e = assertThrows(IllegalStateException.class,
+                () -> memoria.leerEntero(64));
+        assertTrue(e.getMessage().contains("MOV AX, 5"), e.getMessage());
     }
 
     @Test
@@ -176,7 +196,7 @@ class MemoriaTest {
         assertEquals(128, memoria.getLimiteKernel());
         assertEquals(384, memoria.getEspacioUsuario());
         assertEquals(0, memoria.getPosicionesUsadas());
-        assertEquals(CeldaMemoria.Tipo.RESERVADA_KERNEL, memoria.leer(127).getTipo());
-        assertEquals(CeldaMemoria.Tipo.LIBRE, memoria.leer(128).getTipo());
+        assertTrue(memoria.esDireccionKernel(127));
+        assertFalse(memoria.esDireccionKernel(128));
     }
 }

@@ -1,6 +1,5 @@
 package com.mycompany.minipc.gui.modelo;
 
-import com.mycompany.minipc.core.CeldaDisco;
 import com.mycompany.minipc.core.Disco;
 
 import javax.swing.JTable;
@@ -74,15 +73,15 @@ public class RenderZonaDisco extends DefaultTableCellRenderer {
         }
 
         celda.setForeground(tabla.getForeground());
-        CeldaDisco.Tipo tipo = disco.leer(fila).getTipo();
+        boolean ocupada = !disco.estaLibre(fila);
 
         if (disco.esDireccionIndice(fila)) {
-            celda.setBackground(tipo == CeldaDisco.Tipo.INDICE
+            celda.setBackground(ocupada
                     ? FONDO_INDICE : FONDO_INDICE_LIBRE);
         } else if (disco.esDireccionMemoriaVirtual(fila)) {
             celda.setBackground(FONDO_VIRTUAL);
             celda.setForeground(TEXTO_VIRTUAL);
-        } else if (tipo == CeldaDisco.Tipo.PROGRAMA) {
+        } else if (ocupada) {
             celda.setBackground(FONDO_PROGRAMA);
         } else {
             celda.setBackground(tabla.getBackground());

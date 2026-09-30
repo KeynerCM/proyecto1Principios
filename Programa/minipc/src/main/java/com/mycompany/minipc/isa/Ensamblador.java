@@ -72,6 +72,27 @@ public class Ensamblador {
     }
 
     /**
+     * Nombre: decodificar
+     * Entradas: linea, texto de una posicion de memoria
+     * Salidas: la instruccion que representa ese texto
+     * Restricciones: lanza SintaxisException si el texto esta vacio o no es
+     *                una instruccion valida, por ejemplo si es un numero
+     * Descripcion: es la etapa de decodificacion de la CPU. La memoria guarda
+     *              cada instruccion como texto; al traerla con el PC, la CPU
+     *              la interpreta con las mismas expresiones regulares que se
+     *              usaron al cargar el archivo. Como el programa ya se valido
+     *              al cargarlo, solo falla si el PC apunta a algo que no es
+     *              codigo.
+     */
+    public Instruccion decodificar(String linea) throws SintaxisException {
+        String util = linea == null ? "" : quitarComentario(linea).trim();
+        if (util.isEmpty()) {
+            throw new SintaxisException("La posicion esta vacia, no contiene una instruccion");
+        }
+        return ensamblarLinea(util, 0);
+    }
+
+    /**
      * Nombre: validarSaltos
      * Entradas: programa, instrucciones ya ensambladas; errores, lista donde
      *           anotar los saltos invalidos

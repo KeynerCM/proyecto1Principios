@@ -2,7 +2,6 @@ package com.mycompany.minipc.gui;
 
 import com.mycompany.minipc.config.LectorConfiguracion;
 import com.mycompany.minipc.core.BCP;
-import com.mycompany.minipc.isa.Instruccion;
 import com.mycompany.minipc.isa.RegistroID;
 
 import javax.swing.BorderFactory;
@@ -239,7 +238,7 @@ public class VentanaPrincipal extends javax.swing.JFrame implements VistaPrincip
  
     /**
      * Nombre: mostrarInstrucciones
-     * Entradas: programa, instrucciones traducidas en orden
+     * Entradas: programa, texto de cada instruccion en orden
      * Salidas: ninguna
      * Restricciones: no usa el parametro, porque el modelo de la tabla lo
      *                mantiene el controlador
@@ -248,7 +247,7 @@ public class VentanaPrincipal extends javax.swing.JFrame implements VistaPrincip
      *              hay un programa nuevo.
      */
     @Override
-    public void mostrarInstrucciones(List<Instruccion> programa) {
+    public void mostrarInstrucciones(List<String> programa) {
         tblInstrucciones.clearSelection();
         tblInstrucciones.scrollRectToVisible(tblInstrucciones.getCellRect(0, 0, true));
         tblInstrucciones.repaint();

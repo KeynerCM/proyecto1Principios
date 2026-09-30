@@ -1,7 +1,6 @@
 package com.mycompany.minipc.gui;
 
 import com.mycompany.minipc.core.BCP;
-import com.mycompany.minipc.isa.Instruccion;
 
 import java.io.File;
 import java.util.List;
@@ -22,14 +21,14 @@ public interface VistaPrincipal {
 
     /**
      * Nombre: mostrarInstrucciones
-     * Entradas: programa, instrucciones traducidas en orden
+     * Entradas: programa, texto de cada instruccion en orden
      * Salidas: ninguna
      * Restricciones: el modelo de la tabla lo mantiene el controlador, de modo
      *                que la vista solo debe ocuparse de la presentacion
      * Descripcion: avisa a la vista de que la tabla de instrucciones tiene
      *              contenido nuevo que mostrar.
      */
-    void mostrarInstrucciones(List<Instruccion> programa);
+    void mostrarInstrucciones(List<String> programa);
 
     /**
      * Nombre: resaltarInstruccion

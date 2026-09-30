@@ -2,11 +2,8 @@ package com.mycompany.minipc.core;
 
 import com.mycompany.minipc.excepciones.DesbordamientoException;
 import com.mycompany.minipc.excepciones.EjecucionException;
+import com.mycompany.minipc.excepciones.SintaxisException;
 import com.mycompany.minipc.isa.Ensamblador;
-import com.mycompany.minipc.isa.Forma;
-import com.mycompany.minipc.isa.Instruccion;
-import com.mycompany.minipc.isa.OpCode;
-import com.mycompany.minipc.isa.Operando;
 import com.mycompany.minipc.isa.RegistroID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -35,9 +32,15 @@ class EjecucionInstruccionesTest {
         ensamblador = new Ensamblador();
     }
 
+    /** Comprueba con el ensamblador que las lineas son validas y las devuelve. */
+    private List<String> validas(List<String> lineas) throws SintaxisException {
+        ensamblador.ensamblar(lineas);
+        return lineas;
+    }
+
     /** Carga el programa y lo ejecuta hasta el final, con un tope de pasos. */
     private void ejecutar(String... lineas) throws Exception {
-        cpu.cargar(ensamblador.ensamblar(List.of(lineas)), "prueba.asm");
+        cpu.cargar(validas(List.of(lineas)), "prueba.asm");
         for (int i = 0; i < 1000 && cpu.paso(); i++) {
             // cada paso ejecuta una instruccion
         }
@@ -84,7 +87,7 @@ class EjecucionInstruccionesTest {
     @Test
     @DisplayName("CMP deja la bandera de cero segun la igualdad")
     void cmp() throws Exception {
-        cpu.cargar(ensamblador.ensamblar(List.of(
+        cpu.cargar(validas(List.of(
                 "MOV AX, 3", "MOV BX, 3", "CMP AX, BX", "MOV BX, 4", "CMP AX, BX",
                 "INT 20H")), "cmp.asm");
         for (int i = 0; i < 3; i++) {
@@ -133,14 +136,25 @@ class EjecucionInstruccionesTest {
     @Test
     @DisplayName("Un salto fuera del programa se detiene como desbordamiento")
     void saltoFueraDelProgramaEnEjecucion() throws Exception {
-        // El ensamblador ya rechaza este salto; se arma a mano para probar
-        // que el procesador tambien protege la region del proceso.
-        Instruccion salto = new Instruccion(OpCode.JMP, Forma.DESPLAZAMIENTO,
-                List.of(Operando.desplazamiento(10)), "JMP +10", 1);
-        cpu.cargar(List.of(salto), "salto.asm");
+        // El ensamblador ya rechaza este salto; se carga sin validar para
+        // probar que el procesador tambien protege la region del proceso.
+        cpu.cargar(List.of("JMP +10"), "salto.asm");
 
         DesbordamientoException e = assertThrows(DesbordamientoException.class, cpu::paso);
         assertTrue(e.getMessage().contains("fuera del programa"), e.getMessage());
+        assertEquals(EstadoProceso.BLOQUEADO_ERROR, cpu.getEstado());
+    }
+
+    @Test
+    @DisplayName("Si el PC llega a una celda que no es una instruccion, el proceso se detiene")
+    void celdaQueNoEsInstruccion() throws Exception {
+        cpu.cargar(validas(List.of("MOV AX, 1", "INT 20H")), "dato.asm");
+        cpu.getMemoria().escribir(cpu.getDireccionBase() + 1, "163");
+
+        cpu.paso();
+        EjecucionException e = assertThrows(EjecucionException.class, cpu::paso);
+        assertTrue(e.getMessage().contains("no contiene una instruccion valida"), e.getMessage());
+        assertEquals("163", cpu.getIrTexto(), "El IR muestra lo que se trajo de memoria");
         assertEquals(EstadoProceso.BLOQUEADO_ERROR, cpu.getEstado());
     }
 
@@ -165,7 +179,7 @@ class EjecucionInstruccionesTest {
     @Test
     @DisplayName("El BCP guarda una copia de la pila")
     void bcpGuardaLaPila() throws Exception {
-        cpu.cargar(ensamblador.ensamblar(List.of("PARAM 4, 5", "INT 20H")), "p.asm");
+        cpu.cargar(validas(List.of("PARAM 4, 5", "INT 20H")), "p.asm");
         cpu.paso();
         assertEquals(List.of(4, 5), cpu.getBcp().getPila());
     }
@@ -173,7 +187,7 @@ class EjecucionInstruccionesTest {
     @Test
     @DisplayName("Un sexto valor desborda la pila de tamano 5")
     void desbordamientoDePila() throws Exception {
-        cpu.cargar(ensamblador.ensamblar(List.of(
+        cpu.cargar(validas(List.of(
                 "PUSH AX", "PUSH AX", "PUSH AX", "PUSH AX", "PUSH AX", "PUSH AX",
                 "INT 20H")), "llena.asm");
         for (int i = 0; i < 5; i++) {
@@ -188,7 +202,7 @@ class EjecucionInstruccionesTest {
     @Test
     @DisplayName("PARAM que no cabe no deja la pila a medio llenar")
     void paramQueNoCabe() throws Exception {
-        cpu.cargar(ensamblador.ensamblar(List.of(
+        cpu.cargar(validas(List.of(
                 "PARAM 1, 2, 3", "PARAM 4, 5, 6", "INT 20H")), "param.asm");
         cpu.paso();
         assertThrows(DesbordamientoException.class, cpu::paso);
@@ -198,7 +212,7 @@ class EjecucionInstruccionesTest {
     @Test
     @DisplayName("POP con la pila vacia es un error")
     void popConPilaVacia() throws Exception {
-        cpu.cargar(ensamblador.ensamblar(List.of("POP AX", "INT 20H")), "vacia.asm");
+        cpu.cargar(validas(List.of("POP AX", "INT 20H")), "vacia.asm");
         DesbordamientoException e = assertThrows(DesbordamientoException.class, cpu::paso);
         assertTrue(e.getMessage().contains("Pila vacia"), e.getMessage());
     }
@@ -215,7 +229,7 @@ class EjecucionInstruccionesTest {
     @Test
     @DisplayName("Las interrupciones de entrada y salida todavia no se ejecutan")
     void interrupcionesPendientes() throws Exception {
-        cpu.cargar(ensamblador.ensamblar(List.of("INT 10H", "INT 20H")), "pantalla.asm");
+        cpu.cargar(validas(List.of("INT 10H", "INT 20H")), "pantalla.asm");
         EjecucionException e = assertThrows(EjecucionException.class, cpu::paso);
         assertTrue(e.getMessage().contains("todavia no esta disponible"), e.getMessage());
     }
@@ -223,7 +237,7 @@ class EjecucionInstruccionesTest {
     @Test
     @DisplayName("Reiniciar vacia la pila y la bandera de cero")
     void reiniciarLimpiaElEstadoNuevo() throws Exception {
-        cpu.cargar(ensamblador.ensamblar(List.of(
+        cpu.cargar(validas(List.of(
                 "PARAM 1", "CMP AX, BX", "INT 20H")), "r.asm");
         cpu.paso();
         cpu.paso();

@@ -1,6 +1,5 @@
 package com.mycompany.minipc.gui.modelo;
 
-import com.mycompany.minipc.core.CeldaDisco;
 import com.mycompany.minipc.core.Disco;
 
 import javax.swing.table.AbstractTableModel;
@@ -97,14 +96,13 @@ public class ModeloTablaDisco extends AbstractTableModel {
      */
     @Override
     public Object getValueAt(int fila, int columna) {
-        CeldaDisco celda = disco.leer(fila);
         switch (columna) {
             case 0:
                 return fila;
             case 1:
                 return zonaDe(fila);
             case 2:
-                return celda.getEtiqueta();
+                return disco.leer(fila);
             default:
                 return "";
         }

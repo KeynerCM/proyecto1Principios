@@ -5,7 +5,6 @@ import java.util.List;
 
 import javax.swing.table.AbstractTableModel;
 
-import com.mycompany.minipc.isa.Instruccion;
 
 /**
  * Nombre: ModeloTablaInstrucciones
@@ -23,7 +22,7 @@ public class ModeloTablaInstrucciones extends AbstractTableModel {
 
     private static final String[] COLUMNAS = {"#", "Instruccion"};
 
-    private final List<Instruccion> programa = new ArrayList<>();
+    private final List<String> programa = new ArrayList<>();
 
     /**
      * Nombre: cargar
@@ -33,7 +32,7 @@ public class ModeloTablaInstrucciones extends AbstractTableModel {
      * Descripcion: sustituye el programa que muestra la tabla y dispara el
      *              evento que hace que Swing la vuelva a dibujar.
      */
-    public void cargar(List<Instruccion> nuevas) {
+    public void cargar(List<String> nuevas) {
         programa.clear();
         if (nuevas != null) {
             programa.addAll(nuevas);
@@ -114,12 +113,12 @@ public class ModeloTablaInstrucciones extends AbstractTableModel {
      */
     @Override
     public Object getValueAt(int fila, int columna) {
-        Instruccion instruccion = programa.get(fila);
+        String instruccion = programa.get(fila);
         switch (columna) {
             case 0:
                 return fila + 1;
             case 1:
-                return instruccion.getTextoFuente();
+                return instruccion;
             default:
                 return "";
         }

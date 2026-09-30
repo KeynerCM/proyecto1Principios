@@ -1,6 +1,5 @@
 package com.mycompany.minipc.gui.modelo;
 
-import com.mycompany.minipc.core.CeldaMemoria;
 import com.mycompany.minipc.core.Memoria;
 
 import javax.swing.table.AbstractTableModel;
@@ -97,14 +96,13 @@ public class ModeloTablaMemoria extends AbstractTableModel {
      */
     @Override
     public Object getValueAt(int fila, int columna) {
-        CeldaMemoria celda = memoria.leer(fila);
         switch (columna) {
             case 0:
                 return fila;
             case 1:
                 return memoria.esDireccionKernel(fila) ? "Kernel" : "Usuario";
             case 2:
-                return contenidoDe(celda, fila);
+                return contenidoDe(fila);
             default:
                 return "";
         }
@@ -112,19 +110,20 @@ public class ModeloTablaMemoria extends AbstractTableModel {
 
     /**
      * Nombre: contenidoDe
-     * Entradas: celda, posicion de memoria a describir; fila, su direccion
+     * Entradas: fila, direccion de memoria a describir
      * Salidas: el texto a mostrar en la columna de contenido
      * Restricciones: ninguna
-     * Descripcion: devuelve la etiqueta de la instruccion si la celda guarda
-     *              una, la marca "[reservada]" si pertenece al kernel, y texto
+     * Descripcion: devuelve el texto guardado en la posicion tal cual, la
+     *              marca "[reservada]" si es del kernel y esta vacia, y texto
      *              vacio si esta libre. Distinguir reservada de libre importa:
      *              una celda del kernel no esta disponible aunque no tenga
      *              nada escrito.
      */
-    private String contenidoDe(CeldaMemoria celda, int fila) {
-        if (!celda.estaLibre() && celda.getTipo() != CeldaMemoria.Tipo.RESERVADA_KERNEL) {
-            return celda.getEtiqueta();
+    private String contenidoDe(int fila) {
+        String texto = memoria.leer(fila);
+        if (texto.isEmpty() && memoria.esDireccionKernel(fila)) {
+            return "[reservada]";
         }
-        return memoria.esDireccionKernel(fila) ? "[reservada]" : "";
+        return texto;
     }
 }

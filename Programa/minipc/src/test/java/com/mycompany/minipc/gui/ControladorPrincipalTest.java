@@ -6,7 +6,6 @@ import com.mycompany.minipc.core.BCP;
 import com.mycompany.minipc.core.EntradaIndice;
 import com.mycompany.minipc.core.EstadoProceso;
 import com.mycompany.minipc.excepciones.ConfiguracionException;
-import com.mycompany.minipc.isa.Instruccion;
 import com.mycompany.minipc.isa.RegistroID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -45,7 +44,7 @@ class ControladorPrincipalTest {
 
         private List<File> archivosAEntregar = Collections.emptyList();
         private int refrescosDisco;
-        private List<Instruccion> instrucciones = Collections.emptyList();
+        private List<String> instrucciones = Collections.emptyList();
         private int filaResaltada = -1;
         private BCP ultimoBcp;
         private final List<String> consola = new ArrayList<>();
@@ -59,7 +58,7 @@ class ControladorPrincipalTest {
         private int usoMemoria = -1;
 
         @Override
-        public void mostrarInstrucciones(List<Instruccion> programa) {
+        public void mostrarInstrucciones(List<String> programa) {
             this.instrucciones = programa;
         }
 
@@ -195,7 +194,8 @@ class ControladorPrincipalTest {
         assertNotNull(entrada);
         assertEquals(20, entrada.getDireccionInicio());
         assertEquals(7, entrada.getTamano());
-        assertEquals("file.asm -> 20 (7)", controlador.getModeloDisco().getValueAt(0, 2));
+        assertEquals("file.asm|20|7", controlador.getModeloDisco().getValueAt(0, 2),
+                "La tabla muestra la celda del indice tal como esta guardada");
         assertEquals("Indice", controlador.getModeloDisco().getValueAt(0, 1));
         assertEquals("MOV AX, 5", controlador.getModeloDisco().getValueAt(20, 2));
         assertEquals("Virtual", controlador.getModeloDisco().getValueAt(448, 1));

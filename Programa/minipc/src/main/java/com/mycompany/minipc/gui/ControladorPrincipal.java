@@ -217,15 +217,21 @@ public class ControladorPrincipal implements ObservadorCPU {
      *                nombre del archivo
      * Descripcion: valida el archivo en el orden en que puede fallar: que se
      *              pueda leer y tenga extension .asm, que su sintaxis sea
-     *              correcta y que haya lugar en el disco. Si ya hay un archivo
-     *              con el mismo nombre, guarda una copia numerada.
+     *              correcta y que haya lugar en el disco. En el disco queda el
+     *              texto de cada instruccion, sin comentarios ni lineas
+     *              vacias. Si ya hay un archivo con el mismo nombre, guarda
+     *              una copia numerada.
      */
     private EntradaIndice guardarEnDisco(File archivo, List<String> errores) {
         String nombre = archivo.getName();
         try {
             List<Instruccion> programa = ensamblador.ensamblar(cargador.leer(archivo));
+            List<String> lineas = new ArrayList<>();
+            for (Instruccion instruccion : programa) {
+                lineas.add(instruccion.getTextoFuente());
+            }
             EntradaIndice entrada = disco.guardarPrograma(disco.nombreDisponible(nombre),
-                    programa);
+                    lineas);
             vista.escribirEnConsola("Guardado en disco: " + entrada.getNombre()
                     + ", posiciones " + entrada.getDireccionInicio() + " a "
                     + entrada.getDireccionFin() + ".");
@@ -269,7 +275,7 @@ public class ControladorPrincipal implements ObservadorCPU {
      */
     private void cargarEnMemoria(EntradaIndice entrada, List<String> errores) {
         try {
-            List<Instruccion> programa = disco.leerPrograma(entrada.getNombre());
+            List<String> programa = disco.leerPrograma(entrada.getNombre());
             cpu.cargar(programa, entrada.getNombre());
 
             nombreArchivo = entrada.getNombre();

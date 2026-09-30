@@ -1,6 +1,5 @@
 package com.mycompany.minipc.gui.modelo;
 
-import com.mycompany.minipc.core.CeldaMemoria;
 import com.mycompany.minipc.core.Memoria;
 
 import javax.swing.JTable;
@@ -100,7 +99,7 @@ public class RenderZonaMemoria extends DefaultTableCellRenderer {
         } else if (memoria.esDireccionKernel(fila)) {
             celda.setBackground(FONDO_KERNEL);
             celda.setForeground(TEXTO_KERNEL);
-        } else if (memoria.leer(fila).getTipo() == CeldaMemoria.Tipo.INSTRUCCION) {
+        } else if (!memoria.estaLibre(fila)) {
             celda.setBackground(FONDO_INSTRUCCION);
         } else {
             celda.setBackground(tabla.getBackground());

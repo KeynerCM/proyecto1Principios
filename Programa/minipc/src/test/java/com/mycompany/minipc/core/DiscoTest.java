@@ -1,11 +1,6 @@
 package com.mycompany.minipc.core;
 
 import com.mycompany.minipc.excepciones.DiscoException;
-import com.mycompany.minipc.isa.Forma;
-import com.mycompany.minipc.isa.Instruccion;
-import com.mycompany.minipc.isa.OpCode;
-import com.mycompany.minipc.isa.Operando;
-import com.mycompany.minipc.isa.RegistroID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -16,7 +11,6 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -33,12 +27,10 @@ class DiscoTest {
         disco = new Disco();
     }
 
-    private static List<Instruccion> programaDe(int lineas) {
-        List<Instruccion> programa = new ArrayList<>();
+    private static List<String> programaDe(int lineas) {
+        List<String> programa = new ArrayList<>();
         for (int i = 0; i < lineas; i++) {
-            programa.add(new Instruccion(OpCode.MOV, Forma.REGISTRO_NUMERO,
-                    List.of(Operando.registro(RegistroID.AX), Operando.numero(i)),
-                    "MOV AX, " + i, i + 1));
+            programa.add("MOV AX, " + i);
         }
         return programa;
     }
@@ -75,12 +67,11 @@ class DiscoTest {
         assertEquals(7, entrada.getTamano());
         assertEquals(26, entrada.getDireccionFin());
 
-        assertEquals(CeldaDisco.Tipo.INDICE, disco.leer(0).getTipo());
-        assertSame(entrada, disco.leer(0).getEntrada());
-        assertEquals("file.asm -> 20 (7)", disco.leer(0).getEtiqueta());
-        assertEquals(CeldaDisco.Tipo.PROGRAMA, disco.leer(20).getTipo());
-        assertEquals("MOV AX, 0", disco.leer(20).getEtiqueta());
-        assertTrue(disco.leer(27).estaLibre());
+        assertEquals("file.asm|20|7", disco.leer(0), "El indice guarda la entrada como texto");
+        assertEquals(entrada, EntradaIndice.desdeTexto(disco.leer(0)));
+        assertEquals("MOV AX, 0", disco.leer(20));
+        assertEquals("MOV AX, 6", disco.leer(26));
+        assertTrue(disco.estaLibre(27));
     }
 
     @Test
@@ -90,7 +81,7 @@ class DiscoTest {
         EntradaIndice b = disco.guardarPrograma("b.asm", programaDe(3));
 
         assertEquals(25, b.getDireccionInicio());
-        assertSame(b, disco.leer(1).getEntrada());
+        assertEquals(b, EntradaIndice.desdeTexto(disco.leer(1)));
         assertEquals(2, disco.getIndice().size());
         assertEquals(428 - 8, disco.getPosicionesLibres());
     }
@@ -98,7 +89,7 @@ class DiscoTest {
     @Test
     @DisplayName("Leer un programa devuelve sus instrucciones en orden")
     void leeElPrograma() throws DiscoException {
-        List<Instruccion> original = programaDe(4);
+        List<String> original = programaDe(4);
         disco.guardarPrograma("prog.asm", original);
 
         assertEquals(original, disco.leerPrograma("prog.asm"));
@@ -124,7 +115,7 @@ class DiscoTest {
         assertTrue(e.getMessage().contains("429"), e.getMessage());
         assertTrue(e.getMessage().contains("428"), e.getMessage());
         assertTrue(disco.getIndice().isEmpty());
-        assertTrue(disco.leer(20).estaLibre());
+        assertTrue(disco.estaLibre(20));
     }
 
     @Test
@@ -147,14 +138,14 @@ class DiscoTest {
         disco.eliminar("a.asm");
 
         assertNull(disco.buscar("a.asm"));
-        assertTrue(disco.leer(0).estaLibre());
-        assertTrue(disco.leer(20).estaLibre());
+        assertTrue(disco.estaLibre(0));
+        assertTrue(disco.estaLibre(20));
 
         // Un archivo que cabe en el hueco lo reutiliza (primer ajuste), y
         // tambien reutiliza la primera celda libre del indice.
         EntradaIndice c = disco.guardarPrograma("c.asm", programaDe(4));
         assertEquals(20, c.getDireccionInicio());
-        assertSame(c, disco.leer(0).getEntrada());
+        assertEquals(c, EntradaIndice.desdeTexto(disco.leer(0)));
     }
 
     @Test
@@ -181,7 +172,7 @@ class DiscoTest {
         Disco chico = new Disco(64, 20);
         assertEquals(24, chico.getEspacioArchivos());
         chico.guardarPrograma("justo.asm", programaDe(24));
-        assertTrue(chico.leer(44).estaLibre(), "La posicion 44 es la primera de memoria virtual");
+        assertTrue(chico.estaLibre(44), "La posicion 44 es la primera de memoria virtual");
         assertThrows(DiscoException.class, () -> chico.guardarPrograma("otro.asm", programaDe(1)));
     }
 
@@ -202,6 +193,27 @@ class DiscoTest {
         assertEquals(1, Disco.validar(512, -1).size());
         assertEquals(1, Disco.validar(100, 80).size(), "No deja espacio para archivos");
         assertThrows(IllegalArgumentException.class, () -> new Disco(100, 80));
+    }
+
+    @Test
+    @DisplayName("Un nombre con el separador del indice se rechaza sin tocar el disco")
+    void rechazaNombreConSeparador() {
+        assertThrows(IllegalArgumentException.class,
+                () -> disco.guardarPrograma("a|b.asm", programaDe(2)));
+        assertTrue(disco.getIndice().isEmpty());
+        assertTrue(disco.estaLibre(20), "La operacion debe ser atomica");
+    }
+
+    @Test
+    @DisplayName("La entrada del indice se lee y se escribe como texto")
+    void entradaComoTexto() {
+        EntradaIndice entrada = EntradaIndice.desdeTexto("datos (2).asm|40|3");
+        assertEquals("datos (2).asm", entrada.getNombre());
+        assertEquals(40, entrada.getDireccionInicio());
+        assertEquals(42, entrada.getDireccionFin());
+        assertEquals("datos (2).asm|40|3", entrada.aTexto());
+        assertNull(EntradaIndice.desdeTexto(""), "Una celda vacia no es una entrada");
+        assertThrows(IllegalArgumentException.class, () -> EntradaIndice.desdeTexto("MOV AX, 5"));
     }
 
     @Test

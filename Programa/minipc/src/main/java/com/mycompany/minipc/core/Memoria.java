@@ -1,10 +1,10 @@
 package com.mycompany.minipc.core;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import com.mycompany.minipc.excepciones.MemoriaInsuficienteException;
-import com.mycompany.minipc.isa.Instruccion;
 
 /**
  * Nombre: Memoria
@@ -13,9 +13,14 @@ import com.mycompany.minipc.isa.Instruccion;
  * Restricciones: el tamano minimo es 128 posiciones, el limite de kernel es
  *                de al menos 16 y siempre debe ser menor que el tamano total
  * Descripcion: memoria principal del Mini PC, dividida en zona de kernel y
- *              zona de usuario. Cada posicion guarda una instruccion completa
- *              o un valor, de modo que una linea de programa ocupa
- *              exactamente una celda.
+ *              zona de usuario. Es un arreglo de texto: cada posicion guarda
+ *              una palabra, que puede ser una instruccion ("MOV AX, 5"), un
+ *              numero ("163") o nada (cadena vacia). La memoria no sabe que
+ *              significa cada palabra; eso lo decide quien la lee, igual que
+ *              en una computadora real, donde la CPU interpreta como
+ *              instruccion lo que trae con el PC y como dato lo demas. Los
+ *              valores numericos se convierten a int al leerlos con
+ *              leerEntero y vuelven a texto al escribirlos con escribirEntero.
  */
 public class Memoria {
 
@@ -31,7 +36,10 @@ public class Memoria {
     /** Minimo de posiciones reservadas al sistema operativo. */
     public static final int LIMITE_KERNEL_MINIMO = 16;
 
-    private CeldaMemoria[] celdas;
+    /** Contenido de una posicion libre. */
+    public static final String VACIA = "";
+
+    private String[] celdas;
     private int tamano;
     private int limiteKernel;
 
@@ -83,9 +91,8 @@ public class Memoria {
      *                de al menos 16, y el limite debe ser menor que el tamano;
      *                si no, lanza IllegalArgumentException. Descarta todo el
      *                contenido anterior
-     * Descripcion: reconstruye el arreglo de celdas y marca como reservadas
-     *              las que caen en la zona del sistema operativo. Es final
-     *              porque el constructor la invoca.
+     * Descripcion: reconstruye el arreglo con todas las posiciones vacias. Es
+     *              final porque el constructor la invoca.
      */
     public final void redimensionar(int tamano, int limiteKernel) {
         List<String> errores = validar(tamano, limiteKernel);
@@ -95,13 +102,8 @@ public class Memoria {
 
         this.tamano = tamano;
         this.limiteKernel = limiteKernel;
-        this.celdas = new CeldaMemoria[tamano];
-        for (int i = 0; i < tamano; i++) {
-            celdas[i] = new CeldaMemoria();
-            if (i < limiteKernel) {
-                celdas[i].escribir(0, CeldaMemoria.Tipo.RESERVADA_KERNEL, "");
-            }
-        }
+        this.celdas = new String[tamano];
+        Arrays.fill(celdas, VACIA);
     }
 
     /**
@@ -168,22 +170,23 @@ public class Memoria {
 
     /**
      * Nombre: cargarPrograma
-     * Entradas: programa, instrucciones ya ensambladas
+     * Entradas: lineas, texto de cada instruccion del programa, en orden
      * Salidas: la direccion base donde quedo cargado
      * Restricciones: lanza MemoriaInsuficienteException si el programa no
      *                cabe, y en ese caso la memoria queda intacta
-     * Descripcion: carga el programa al inicio de la zona de usuario. La
-     *              operacion es atomica: primero valida el espacio y solo
-     *              entonces limpia y escribe, de modo que un programa
-     *              demasiado largo no destruye el que ya estaba.
+     * Descripcion: carga el programa al inicio de la zona de usuario, una
+     *              instruccion por posicion. La operacion es atomica: primero
+     *              valida el espacio y solo entonces limpia y escribe, de modo
+     *              que un programa demasiado largo no destruye el que ya
+     *              estaba.
      */
-    public int cargarPrograma(List<Instruccion> programa) throws MemoriaInsuficienteException {
-        validarEspacio(programa.size());
+    public int cargarPrograma(List<String> lineas) throws MemoriaInsuficienteException {
+        validarEspacio(lineas.size());
         limpiarZonaUsuario();
 
         int base = limiteKernel;
-        for (int i = 0; i < programa.size(); i++) {
-            celdas[base + i].escribir(programa.get(i));
+        for (int i = 0; i < lineas.size(); i++) {
+            escribir(base + i, lineas.get(i));
         }
         return base;
     }
@@ -191,14 +194,14 @@ public class Memoria {
     /**
      * Nombre: leer
      * Entradas: direccion, posicion a leer
-     * Salidas: la celda correspondiente
+     * Salidas: el texto guardado en esa posicion, vacio si esta libre
      * Restricciones: lanza IndexOutOfBoundsException si la direccion no existe
-     * Descripcion: lectura sin restriccion de zona. La usa la interfaz para
-     *              mostrar la tabla de memoria completa, incluida la parte del
-     *              kernel, que el usuario debe poder ver aunque el proceso no
-     *              pueda leerla.
+     * Descripcion: lectura sin restriccion de zona. La usan el sistema
+     *              operativo y la interfaz, que debe poder mostrar la memoria
+     *              completa, incluida la parte del kernel, aunque el proceso
+     *              no pueda leerla.
      */
-    public CeldaMemoria leer(int direccion) {
+    public String leer(int direccion) {
         validarDireccion(direccion);
         return celdas[direccion];
     }
@@ -206,7 +209,7 @@ public class Memoria {
     /**
      * Nombre: leerComoUsuario
      * Entradas: direccion, posicion a leer
-     * Salidas: la celda correspondiente
+     * Salidas: el texto guardado en esa posicion
      * Restricciones: lanza IndexOutOfBoundsException si la direccion no
      *                existe, e IllegalArgumentException si pertenece al kernel
      * Descripcion: lectura en nombre del proceso de usuario. Ademas de validar
@@ -214,7 +217,7 @@ public class Memoria {
      *              equivalente didactico de una violacion de segmento: el
      *              proceso no puede leer la memoria del sistema operativo.
      */
-    public CeldaMemoria leerComoUsuario(int direccion) {
+    public String leerComoUsuario(int direccion) {
         validarDireccion(direccion);
         if (esDireccionKernel(direccion)) {
             throw new IllegalArgumentException("Acceso denegado: la direccion " + direccion
@@ -224,17 +227,63 @@ public class Memoria {
     }
 
     /**
+     * Nombre: leerEntero
+     * Entradas: direccion, posicion a leer
+     * Salidas: el numero guardado en esa posicion, o cero si esta vacia
+     * Restricciones: lanza IndexOutOfBoundsException si la direccion no
+     *                existe, e IllegalStateException si la posicion guarda un
+     *                texto que no es un numero
+     * Descripcion: convierte a int el texto de la celda, para los valores que
+     *              se usan en calculos (PC, registros, direcciones). Una celda
+     *              vacia vale cero, como una palabra de memoria sin escribir.
+     */
+    public int leerEntero(int direccion) {
+        String texto = leer(direccion).trim();
+        if (texto.isEmpty()) {
+            return 0;
+        }
+        try {
+            return Integer.parseInt(texto);
+        } catch (NumberFormatException e) {
+            throw new IllegalStateException("La posicion " + direccion
+                    + " no guarda un numero: \"" + texto + "\"", e);
+        }
+    }
+
+    /**
      * Nombre: escribir
-     * Entradas: direccion, posicion a escribir; valor, el entero a guardar;
-     *           tipo, para que queda destinada la celda; etiqueta, texto
-     *           legible a mostrar
+     * Entradas: direccion, posicion a escribir; texto, contenido a guardar
      * Salidas: ninguna
-     * Restricciones: lanza IndexOutOfBoundsException si la direccion no existe
+     * Restricciones: lanza IndexOutOfBoundsException si la direccion no
+     *                existe; un texto nulo se guarda como posicion vacia
      * Descripcion: escribe en cualquier posicion, sin restriccion de zona.
      */
-    public void escribir(int direccion, int valor, CeldaMemoria.Tipo tipo, String etiqueta) {
+    public void escribir(int direccion, String texto) {
         validarDireccion(direccion);
-        celdas[direccion].escribir(valor, tipo, etiqueta);
+        celdas[direccion] = texto == null ? VACIA : texto;
+    }
+
+    /**
+     * Nombre: escribirEntero
+     * Entradas: direccion, posicion a escribir; valor, numero a guardar
+     * Salidas: ninguna
+     * Restricciones: lanza IndexOutOfBoundsException si la direccion no existe
+     * Descripcion: guarda el numero como texto, que es como la memoria guarda
+     *              todo.
+     */
+    public void escribirEntero(int direccion, int valor) {
+        escribir(direccion, String.valueOf(valor));
+    }
+
+    /**
+     * Nombre: estaLibre
+     * Entradas: direccion, posicion a consultar
+     * Salidas: true si la posicion no guarda nada
+     * Restricciones: lanza IndexOutOfBoundsException si la direccion no existe
+     * Descripcion: una posicion esta libre cuando su texto es vacio.
+     */
+    public boolean estaLibre(int direccion) {
+        return leer(direccion).isEmpty();
     }
 
     /**
@@ -247,9 +296,7 @@ public class Memoria {
      *              hasta el final de la memoria.
      */
     public final void limpiarZonaUsuario() {
-        for (int i = limiteKernel; i < tamano; i++) {
-            celdas[i].limpiar();
-        }
+        Arrays.fill(celdas, limiteKernel, tamano, VACIA);
     }
 
     /**
@@ -264,7 +311,7 @@ public class Memoria {
     public int getPosicionesUsadas() {
         int usadas = 0;
         for (int i = limiteKernel; i < tamano; i++) {
-            if (!celdas[i].estaLibre()) {
+            if (!celdas[i].isEmpty()) {
                 usadas++;
             }
         }
@@ -277,7 +324,7 @@ public class Memoria {
      * Salidas: porcentaje de la zona de usuario ocupado, de 0 a 100
      * Restricciones: devuelve cero si la zona de usuario no tiene posiciones
      * Descripcion: se calcula sobre la zona de usuario y no sobre la memoria
-     *              total, porque el kernel esta siempre ocupado y contarlo
+     *              total, porque el kernel esta siempre reservado y contarlo
      *              daria una cifra que nunca baja de cierto piso.
      */
     public int getPorcentajeUso() {

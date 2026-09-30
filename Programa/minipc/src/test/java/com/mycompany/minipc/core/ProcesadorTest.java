@@ -3,7 +3,6 @@ package com.mycompany.minipc.core;
 import com.mycompany.minipc.excepciones.MemoriaInsuficienteException;
 import com.mycompany.minipc.excepciones.SintaxisException;
 import com.mycompany.minipc.isa.Ensamblador;
-import com.mycompany.minipc.isa.Instruccion;
 import com.mycompany.minipc.isa.OpCode;
 import com.mycompany.minipc.isa.RegistroID;
 import org.junit.jupiter.api.BeforeEach;
@@ -37,8 +36,14 @@ class ProcesadorTest {
         ensamblador = new Ensamblador();
     }
 
+    /** Comprueba con el ensamblador que las lineas son validas y las devuelve. */
+    private List<String> validas(List<String> lineas) throws SintaxisException {
+        ensamblador.ensamblar(lineas);
+        return lineas;
+    }
+
     private void cargarEjemplo() throws SintaxisException, MemoriaInsuficienteException {
-        cpu.cargar(ensamblador.ensamblar(List.of(
+        cpu.cargar(validas(List.of(
                 "MOV AX, 5",
                 "MOV BX, 3",
                 "LOAD AX",
@@ -162,7 +167,7 @@ class ProcesadorTest {
     @Test
     @DisplayName("La aritmetica ya no esta limitada a ocho bits")
     void laAritmeticaNoDesborda() throws Exception {
-        cpu.cargar(ensamblador.ensamblar(List.of(
+        cpu.cargar(validas(List.of(
                 "MOV AX, 200",
                 "MOV BX, 100",
                 "LOAD AX",
@@ -273,10 +278,8 @@ class ProcesadorTest {
         for (int i = 0; i < 10; i++) {
             largo.add("MOV AX, 1");
         }
-        List<Instruccion> programa = ensamblador.ensamblar(largo);
-
         assertThrows(MemoriaInsuficienteException.class,
-                () -> cpu.cargar(programa, "largo.asm"));
+                () -> cpu.cargar(validas(largo), "largo.asm"));
         assertFalse(cpu.hayPrograma());
     }
 

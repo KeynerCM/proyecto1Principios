@@ -1,9 +1,5 @@
 package com.mycompany.minipc.core;
 
-import com.mycompany.minipc.isa.Forma;
-import com.mycompany.minipc.isa.Instruccion;
-import com.mycompany.minipc.isa.OpCode;
-import com.mycompany.minipc.isa.Operando;
 import com.mycompany.minipc.isa.RegistroID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -15,8 +11,6 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -92,57 +86,6 @@ class BancoRegistrosTest {
         banco.escribir(RegistroID.AX, 99);
         assertEquals(7, copia.get(RegistroID.AX), "La copia no debio seguir al banco");
         assertEquals(99, banco.leer(RegistroID.AX));
-    }
-
-    @Test
-    @DisplayName("La celda de memoria arranca libre y vacia")
-    void celdaArrancaLibre() {
-        CeldaMemoria celda = new CeldaMemoria();
-        assertTrue(celda.estaLibre());
-        assertEquals(CeldaMemoria.Tipo.LIBRE, celda.getTipo());
-        assertNull(celda.getInstruccion());
-        assertEquals(0, celda.getValor());
-    }
-
-    @Test
-    @DisplayName("La celda guarda la instruccion, el tipo y la etiqueta")
-    void celdaGuardaContenido() {
-        CeldaMemoria celda = new CeldaMemoria();
-        Instruccion mov = movAx5();
-        celda.escribir(mov);
-
-        assertFalse(celda.estaLibre());
-        assertEquals(CeldaMemoria.Tipo.INSTRUCCION, celda.getTipo());
-        assertEquals("MOV AX, 5", celda.getEtiqueta());
-        assertSame(mov, celda.getInstruccion());
-    }
-
-    @Test
-    @DisplayName("Escribir un valor descarta la instruccion anterior")
-    void celdaGuardaValor() {
-        CeldaMemoria celda = new CeldaMemoria();
-        celda.escribir(movAx5());
-        celda.escribir(42, CeldaMemoria.Tipo.DATO, "42");
-
-        assertEquals(CeldaMemoria.Tipo.DATO, celda.getTipo());
-        assertEquals(42, celda.getValor());
-        assertNull(celda.getInstruccion());
-    }
-
-    @Test
-    @DisplayName("La celda se puede volver a dejar libre")
-    void celdaSeLimpia() {
-        CeldaMemoria celda = new CeldaMemoria();
-        celda.escribir(movAx5());
-        celda.limpiar();
-        assertTrue(celda.estaLibre());
-        assertNull(celda.getInstruccion());
-        assertEquals("", celda.getEtiqueta());
-    }
-
-    private static Instruccion movAx5() {
-        return new Instruccion(OpCode.MOV, Forma.REGISTRO_NUMERO,
-                List.of(Operando.registro(RegistroID.AX), Operando.numero(5)), "MOV AX, 5", 1);
     }
 
     @Test
