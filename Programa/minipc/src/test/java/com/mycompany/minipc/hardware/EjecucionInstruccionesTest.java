@@ -5,7 +5,6 @@ import com.mycompany.minipc.excepciones.EjecucionException;
 import com.mycompany.minipc.excepciones.SintaxisException;
 import com.mycompany.minipc.isa.Ensamblador;
 import com.mycompany.minipc.isa.RegistroID;
-import com.mycompany.minipc.so.procesos.EstadoProceso;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -24,12 +23,16 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class EjecucionInstruccionesTest {
 
+    private static final int BASE = 128;
+
+    private Memoria memoria;
     private Procesador cpu;
     private Ensamblador ensamblador;
 
     @BeforeEach
     void preparar() {
-        cpu = new Procesador();
+        memoria = new Memoria(256, 128);
+        cpu = new Procesador(memoria);
         ensamblador = new Ensamblador();
     }
 
@@ -39,13 +42,27 @@ class EjecucionInstruccionesTest {
         return lineas;
     }
 
+    /** Escribe el programa en memoria desde BASE y le da el contexto a la CPU. */
+    private void cargar(List<String> lineas) {
+        for (int i = 0; i < lineas.size(); i++) {
+            memoria.escribir(BASE + i, lineas.get(i));
+        }
+        cpu.cargarLimites(BASE, lineas.size());
+        cpu.setPc(BASE);
+    }
+
     /** Carga el programa y lo ejecuta hasta el final, con un tope de pasos. */
     private void ejecutar(String... lineas) throws Exception {
-        cpu.cargar(validas(List.of(lineas)), "prueba.asm");
-        for (int i = 0; i < 1000 && cpu.paso(); i++) {
-            // cada paso ejecuta una instruccion
+        cargar(validas(List.of(lineas)));
+        boolean termino = false;
+        for (int i = 0; i < 1000 && !termino; i++) {
+            termino = cpu.paso() == Procesador.Resultado.TERMINO;
         }
-        assertTrue(cpu.haTerminado(), "El programa debio terminar");
+        assertTrue(termino, "El programa debio terminar");
+    }
+
+    private int ejecutadas() {
+        return cpu.getEstadisticas().getTotalInstrucciones();
     }
 
     private int reg(RegistroID id) {
@@ -88,14 +105,13 @@ class EjecucionInstruccionesTest {
     @Test
     @DisplayName("CMP deja la bandera de cero segun la igualdad")
     void cmp() throws Exception {
-        cpu.cargar(validas(List.of(
+        cargar(validas(List.of(
                 "MOV AX, 3", "MOV BX, 3", "CMP AX, BX", "MOV BX, 4", "CMP AX, BX",
-                "INT 20H")), "cmp.asm");
+                "INT 20H")));
         for (int i = 0; i < 3; i++) {
             cpu.paso();
         }
         assertTrue(cpu.getZf());
-        assertTrue(cpu.getBcp().getZf(), "El BCP guarda la bandera");
         cpu.paso();
         cpu.paso();
         assertFalse(cpu.getZf());
@@ -131,7 +147,7 @@ class EjecucionInstruccionesTest {
                 "INT 20H");
         assertEquals(5, reg(RegistroID.CX));
         // 2 MOV + 5 vueltas de (INC, CMP, JNE) + INT 20H
-        assertEquals(18, cpu.getInstruccionesEjecutadas());
+        assertEquals(18, ejecutadas());
     }
 
     @Test
@@ -139,24 +155,10 @@ class EjecucionInstruccionesTest {
     void saltoFueraDelProgramaEnEjecucion() throws Exception {
         // El ensamblador ya rechaza este salto; se carga sin validar para
         // probar que el procesador tambien protege la region del proceso.
-        cpu.cargar(List.of("JMP +10"), "salto.asm");
+        cargar(List.of("JMP +10"));
 
         DesbordamientoException e = assertThrows(DesbordamientoException.class, cpu::paso);
         assertTrue(e.getMessage().contains("fuera del programa"), e.getMessage());
-        assertEquals(EstadoProceso.BLOQUEADO_ERROR, cpu.getEstado());
-    }
-
-    @Test
-    @DisplayName("Si el PC llega a una celda que no es una instruccion, el proceso se detiene")
-    void celdaQueNoEsInstruccion() throws Exception {
-        cpu.cargar(validas(List.of("MOV AX, 1", "INT 20H")), "dato.asm");
-        cpu.getMemoria().escribir(cpu.getDireccionBase() + 1, "163");
-
-        cpu.paso();
-        EjecucionException e = assertThrows(EjecucionException.class, cpu::paso);
-        assertTrue(e.getMessage().contains("no contiene una instruccion valida"), e.getMessage());
-        assertEquals("163", cpu.getIrTexto(), "El IR muestra lo que se trajo de memoria");
-        assertEquals(EstadoProceso.BLOQUEADO_ERROR, cpu.getEstado());
     }
 
     @Test
@@ -178,33 +180,24 @@ class EjecucionInstruccionesTest {
     }
 
     @Test
-    @DisplayName("El BCP guarda una copia de la pila")
-    void bcpGuardaLaPila() throws Exception {
-        cpu.cargar(validas(List.of("PARAM 4, 5", "INT 20H")), "p.asm");
-        cpu.paso();
-        assertEquals(List.of(4, 5), cpu.getBcp().getPila());
-    }
-
-    @Test
     @DisplayName("Un sexto valor desborda la pila de tamano 5")
     void desbordamientoDePila() throws Exception {
-        cpu.cargar(validas(List.of(
+        cargar(validas(List.of(
                 "PUSH AX", "PUSH AX", "PUSH AX", "PUSH AX", "PUSH AX", "PUSH AX",
-                "INT 20H")), "llena.asm");
+                "INT 20H")));
         for (int i = 0; i < 5; i++) {
             cpu.paso();
         }
         DesbordamientoException e = assertThrows(DesbordamientoException.class, cpu::paso);
         assertTrue(e.getMessage().contains("Desbordamiento de pila"), e.getMessage());
-        assertEquals(EstadoProceso.BLOQUEADO_ERROR, cpu.getEstado());
         assertEquals(Pila.CAPACIDAD, cpu.getPila().getTamano());
     }
 
     @Test
     @DisplayName("PARAM que no cabe no deja la pila a medio llenar")
     void paramQueNoCabe() throws Exception {
-        cpu.cargar(validas(List.of(
-                "PARAM 1, 2, 3", "PARAM 4, 5, 6", "INT 20H")), "param.asm");
+        cargar(validas(List.of(
+                "PARAM 1, 2, 3", "PARAM 4, 5, 6", "INT 20H")));
         cpu.paso();
         assertThrows(DesbordamientoException.class, cpu::paso);
         assertEquals(3, cpu.getPila().getTamano(), "El segundo PARAM no apilo nada");
@@ -213,7 +206,7 @@ class EjecucionInstruccionesTest {
     @Test
     @DisplayName("POP con la pila vacia es un error")
     void popConPilaVacia() throws Exception {
-        cpu.cargar(validas(List.of("POP AX", "INT 20H")), "vacia.asm");
+        cargar(validas(List.of("POP AX", "INT 20H")));
         DesbordamientoException e = assertThrows(DesbordamientoException.class, cpu::paso);
         assertTrue(e.getMessage().contains("Pila vacia"), e.getMessage());
     }
@@ -223,27 +216,14 @@ class EjecucionInstruccionesTest {
     void int20Termina() throws Exception {
         ejecutar("MOV AX, 1", "INT 20H", "MOV AX, 99");
         assertEquals(1, reg(RegistroID.AX));
-        assertEquals(EstadoProceso.TERMINADO, cpu.getEstado());
-        assertEquals(2, cpu.getInstruccionesEjecutadas());
+        assertEquals(2, ejecutadas());
     }
 
     @Test
     @DisplayName("Las interrupciones de entrada y salida todavia no se ejecutan")
     void interrupcionesPendientes() throws Exception {
-        cpu.cargar(validas(List.of("INT 10H", "INT 20H")), "pantalla.asm");
+        cargar(validas(List.of("INT 10H", "INT 20H")));
         EjecucionException e = assertThrows(EjecucionException.class, cpu::paso);
         assertTrue(e.getMessage().contains("todavia no esta disponible"), e.getMessage());
-    }
-
-    @Test
-    @DisplayName("Reiniciar vacia la pila y la bandera de cero")
-    void reiniciarLimpiaElEstadoNuevo() throws Exception {
-        cpu.cargar(validas(List.of(
-                "PARAM 1", "CMP AX, BX", "INT 20H")), "r.asm");
-        cpu.paso();
-        cpu.paso();
-        cpu.reset();
-        assertEquals(0, cpu.getPila().getTamano());
-        assertFalse(cpu.getZf());
     }
 }

@@ -15,9 +15,11 @@ import java.awt.Font;
  * Restricciones: solo tiene sentido aplicado a la tabla de memoria, porque
  *                supone que la fila coincide con la direccion
  * Descripcion: pinta la tabla de memoria distinguiendo las zonas. La
- *              separacion entre kernel y usuario es uno de los requisitos del
- *              enunciado, y verla en colores la vuelve evidente sin tener que
- *              leer numeros de direccion.
+ *              cabecera del sistema operativo va en gris; cada ranura de BCP
+ *              tiene un color, y el programa del mismo proceso en la zona de
+ *              usuario va en una version mas clara de ese color. Asi se ve
+ *              donde y como quedo guardado cada proceso, como pide el
+ *              enunciado.
  */
 public class RenderZonaMemoria extends DefaultTableCellRenderer {
 
@@ -28,8 +30,17 @@ public class RenderZonaMemoria extends DefaultTableCellRenderer {
 
     private static final Color TEXTO_KERNEL = new Color(120, 120, 120);
 
-    /** Zona de usuario ocupada por instrucciones del programa. */
-    private static final Color FONDO_INSTRUCCION = new Color(214, 234, 248);
+    /** Un color por ranura de BCP (P en la ranura 0 a 4). */
+    private static final Color[] FONDO_BCP = {
+        new Color(173, 206, 240), new Color(178, 223, 178), new Color(247, 200, 160),
+        new Color(214, 188, 232), new Color(240, 180, 190)
+    };
+
+    /** Version clara de cada color, para el programa en la zona de usuario. */
+    private static final Color[] FONDO_PROGRAMA = {
+        new Color(222, 236, 250), new Color(224, 242, 224), new Color(252, 232, 214),
+        new Color(238, 228, 245), new Color(250, 222, 228)
+    };
 
     /** Posicion que apunta el PC en este momento. */
     private static final Color FONDO_ACTUAL = new Color(255, 235, 156);
@@ -37,11 +48,13 @@ public class RenderZonaMemoria extends DefaultTableCellRenderer {
     private static final Color TEXTO_ACTUAL = new Color(70, 50, 0);
 
     private final Memoria memoria;
+    private final MapaMemoria mapa;
     private int direccionActual = -1;
 
     /**
      * Nombre: RenderZonaMemoria
-     * Entradas: memoria, memoria que se esta dibujando
+     * Entradas: memoria, memoria que se esta dibujando; mapa, quien dice de
+     *           que proceso es cada celda
      * Salidas: el renderer construido
      * Restricciones: la memoria no debe ser nula, porque se consulta en cada
      *                celda para saber a que zona pertenece
@@ -49,8 +62,9 @@ public class RenderZonaMemoria extends DefaultTableCellRenderer {
      *              este renderer lo crea el controlador y no la ventana: la
      *              ventana no conoce el nucleo.
      */
-    public RenderZonaMemoria(Memoria memoria) {
+    public RenderZonaMemoria(Memoria memoria, MapaMemoria mapa) {
         this.memoria = memoria;
+        this.mapa = mapa;
     }
 
     /**
@@ -73,8 +87,9 @@ public class RenderZonaMemoria extends DefaultTableCellRenderer {
      * Restricciones: si la fila esta seleccionada se respeta el color de
      *                seleccion del sistema y no se pinta nada encima
      * Descripcion: restablece la fuente de la tabla y elige el color de fondo
-     *              en este orden de prioridad: la posicion actual, la zona de
-     *              kernel, una celda con instruccion, y por ultimo el fondo
+     *              en este orden de prioridad: la posicion actual, la
+     *              cabecera del sistema operativo, el color del proceso dueno
+     *              de la celda, una ranura de BCP libre, y por ultimo el fondo
      *              normal de la tabla.
      */
     @Override
@@ -96,14 +111,33 @@ public class RenderZonaMemoria extends DefaultTableCellRenderer {
             celda.setBackground(FONDO_ACTUAL);
             celda.setForeground(TEXTO_ACTUAL);
             celda.setFont(celda.getFont().deriveFont(Font.BOLD));
+        } else {
+            pintarZona(celda, tabla, fila);
+        }
+        return celda;
+    }
+
+    /**
+     * Nombre: pintarZona
+     * Entradas: celda, componente a pintar; tabla, tabla dibujada; fila,
+     *           direccion de memoria
+     * Salidas: ninguna
+     * Restricciones: ninguna
+     * Descripcion: elige el color segun la zona y el proceso dueno.
+     */
+    private void pintarZona(Component celda, JTable tabla, int fila) {
+        int ranura = mapa.ranuraDe(fila);
+        if (ranura == MapaMemoria.CABECERA) {
+            celda.setBackground(FONDO_KERNEL.darker());
+            celda.setForeground(Color.WHITE);
+        } else if (ranura >= 0) {
+            boolean esKernel = memoria.esDireccionKernel(fila);
+            celda.setBackground(esKernel ? FONDO_BCP[ranura] : FONDO_PROGRAMA[ranura]);
         } else if (memoria.esDireccionKernel(fila)) {
             celda.setBackground(FONDO_KERNEL);
             celda.setForeground(TEXTO_KERNEL);
-        } else if (!memoria.estaLibre(fila)) {
-            celda.setBackground(FONDO_INSTRUCCION);
         } else {
             celda.setBackground(tabla.getBackground());
         }
-        return celda;
     }
 }

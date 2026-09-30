@@ -1,8 +1,9 @@
 package com.mycompany.minipc.gui;
 
 import com.mycompany.minipc.config.LectorConfiguracion;
-import com.mycompany.minipc.so.procesos.BCP;
 import com.mycompany.minipc.isa.RegistroID;
+import com.mycompany.minipc.so.SistemaOperativo;
+import com.mycompany.minipc.so.procesos.Proceso;
 
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
@@ -79,6 +80,9 @@ public class VentanaPrincipal extends javax.swing.JFrame implements VistaPrincip
     /** Tabla del disco; se crea fuera del disenador (ver agregarPestanaDisco). */
     private JTable tblDisco;
 
+    /** Tabla de la lista de trabajos, agregada en una pestana junto al programa. */
+    private JTable tblTrabajos;
+
     /**
      * Nombre: VentanaPrincipal
      * Entradas: ninguna
@@ -100,12 +104,56 @@ public class VentanaPrincipal extends javax.swing.JFrame implements VistaPrincip
 
         tblMemoria.setModel(controlador.getModeloMemoria());
         tblMemoria.setDefaultRenderer(Object.class, controlador.getRenderMemoria());
-        ajustarAnchos(tblMemoria.getColumnModel(), new int[]{50, 70, 280});
+        ajustarAnchos(tblMemoria.getColumnModel(), new int[]{45, 120, 235});
 
         agregarPestanaDisco();
+        agregarPestanaTrabajos();
+        rotularContabilidad();
 
         pintarBotones();
         controlador.inicializarVista();
+    }
+
+    /**
+     * Nombre: agregarPestanaTrabajos
+     * Entradas: ninguna
+     * Salidas: ninguna
+     * Restricciones: debe llamarse despues de initComponents
+     * Descripcion: convierte el panel de instrucciones en dos pestanas: la
+     *              lista de trabajos con el estado de cada uno, que pide el
+     *              enunciado, y el programa del proceso en ejecucion. Igual que
+     *              el disco, se arma aqui para no tocar el codigo generado.
+     */
+    private void agregarPestanaTrabajos() {
+        tblTrabajos = new JTable(controlador.getModeloTrabajos());
+        tblTrabajos.setAutoResizeMode(JTable.AUTO_RESIZE_ALL_COLUMNS);
+        tblTrabajos.setRowHeight(tblInstrucciones.getRowHeight());
+        tblTrabajos.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        tblTrabajos.setShowVerticalLines(false);
+        ajustarAnchos(tblTrabajos.getColumnModel(), new int[]{40, 150, 170, 70, 70});
+
+        pnlInstrucciones.remove(scrInstrucciones);
+        JTabbedPane pestanas = new JTabbedPane();
+        pestanas.addTab("Lista de trabajos", new JScrollPane(tblTrabajos));
+        pestanas.addTab("Programa en ejecucion", scrInstrucciones);
+        pnlInstrucciones.add(pestanas, java.awt.BorderLayout.CENTER);
+        pnlInstrucciones.setBorder(BorderFactory.createTitledBorder("Procesos"));
+    }
+
+    /**
+     * Nombre: rotularContabilidad
+     * Entradas: ninguna
+     * Salidas: ninguna
+     * Restricciones: debe llamarse despues de initComponents
+     * Descripcion: cambia los rotulos del panel del BCP heredados de la tarea
+     *              por los campos del BCP de este proyecto. La interfaz nueva
+     *              del dia 5 reemplaza este panel.
+     */
+    private void rotularContabilidad() {
+        jLabel13.setText("Alcance:");
+        jLabel14.setText("Tiempo empleado:");
+        jLabel15.setText("CPU:");
+        jLabel16.setText("Inicio (reloj):");
     }
 
     /**
@@ -205,15 +253,15 @@ public class VentanaPrincipal extends javax.swing.JFrame implements VistaPrincip
      * Entradas: estado, nombre del estado del proceso
      * Salidas: el color con que debe mostrarse ese estado
      * Restricciones: ninguna
-     * Descripcion: rojo si el proceso quedo bloqueado por un error, gris si no
-     *              hay programa cargado, y verde en cualquier otro caso, que
-     *              son los estados en que el proceso avanza con normalidad.
+     * Descripcion: rojo si termino por un error, gris si no hay un proceso en
+     *              la CPU, y verde en cualquier otro caso.
      */
     private Color colorDelEstado(String estado) {
-        if ("BLOQUEADO_ERROR".equals(estado)) {
+        if (estado.endsWith("(error)")) {
             return ESTADO_ERROR;
         }
-        if ("SIN PROGRAMA".equals(estado) || "-".equals(estado)) {
+        if ("SIN PROGRAMA".equals(estado) || "CPU LIBRE".equals(estado)
+                || "FINALIZADO".equals(estado) || "-".equals(estado)) {
             return ESTADO_NEUTRO;
         }
         return ESTADO_ACTIVO;
@@ -284,9 +332,9 @@ public class VentanaPrincipal extends javax.swing.JFrame implements VistaPrincip
     @Override
     public void refrescarMemoria() {
         ((AbstractTableModel) tblMemoria.getModel()).fireTableDataChanged();
-        int direccion = controlador.getProcesador().getPc();
-        if (controlador.getProcesador().hayPrograma()
-                && direccion < tblMemoria.getRowCount()) {
+        Proceso actual = controlador.getSistemaOperativo().getEnEjecucion();
+        int direccion = actual == null ? -1 : actual.getPc();
+        if (direccion >= 0 && direccion < tblMemoria.getRowCount()) {
             tblMemoria.scrollRectToVisible(tblMemoria.getCellRect(direccion, 0, true));
         }
     }
@@ -308,35 +356,37 @@ public class VentanaPrincipal extends javax.swing.JFrame implements VistaPrincip
 
     /**
      * Nombre: mostrarBCP
-     * Entradas: bcp, bloque a mostrar, o nulo si no hay proceso
+     * Entradas: proceso, proceso en ejecucion, o nulo si la CPU esta libre
      * Salidas: ninguna
-     * Restricciones: tolera el valor nulo, que ocurre tras descargar el
-     *                programa
-     * Descripcion: vuelca los catorce atributos del bloque de control en las
-     *              etiquetas del panel correspondiente.
+     * Restricciones: tolera el valor nulo
+     * Descripcion: vuelca los campos del BCP en las etiquetas del panel.
+     *              Cada valor se lee de su celda en la memoria del kernel, y
+     *              el programa muestra en que celdas quedo guardado el BCP.
      */
     @Override
-    public void mostrarBCP(BCP bcp) {
-        if (bcp == null) {
+    public void mostrarBCP(Proceso proceso) {
+        if (proceso == null) {
             limpiarBCP();
             return;
         }
-        lblPidValor.setText(String.valueOf(bcp.getPid()));
-        lblProgramaValor.setText(bcp.getNombrePrograma());
-        lblEstadoBcpValor.setText(bcp.getEstado().name());
-        lblEstadoBcpValor.setForeground(colorDelEstado(bcp.getEstado().name()));
-        lblPcValor.setText(String.valueOf(bcp.getPc()));
-        lblIrTextoValor.setText(bcp.getIrTexto().isEmpty() ? "-" : bcp.getIrTexto());
-        lblAcValor.setText(String.valueOf(bcp.getAc()));
-        lblAxValor.setText(String.valueOf(bcp.getRegistro(RegistroID.AX)));
-        lblBxValor.setText(String.valueOf(bcp.getRegistro(RegistroID.BX)));
-        lblCxValor.setText(String.valueOf(bcp.getRegistro(RegistroID.CX)));
-        lblDxValor.setText(String.valueOf(bcp.getRegistro(RegistroID.DX)));
-        lblBaseValor.setText(String.valueOf(bcp.getDireccionBase()));
-        lblLimiteValor.setText(bcp.getLimite() + " posiciones");
-        lblEjecutadasValor.setText(String.valueOf(bcp.getInstruccionesEjecutadas()));
-        lblCiclosValor.setText(String.valueOf(bcp.getCiclosReloj()));
-        lblHoraCreacionValor.setText(bcp.getHoraCreacion().format(HORA));
+        lblPidValor.setText(String.valueOf(proceso.getPid()));
+        lblProgramaValor.setText(proceso.getPrograma() + "  (BCP en "
+                + proceso.getDireccionBCP() + ".." + proceso.getDireccionFinBCP() + ")");
+        lblEstadoBcpValor.setText(proceso.getEstado().name());
+        lblEstadoBcpValor.setForeground(colorDelEstado(proceso.getEstado().name()));
+        lblPcValor.setText(String.valueOf(proceso.getPc()));
+        String ir = proceso.getIr();
+        lblIrTextoValor.setText(ir.isEmpty() ? "-" : ir);
+        lblAcValor.setText(String.valueOf(proceso.getAc()));
+        lblAxValor.setText(String.valueOf(proceso.getRegistro(RegistroID.AX)));
+        lblBxValor.setText(String.valueOf(proceso.getRegistro(RegistroID.BX)));
+        lblCxValor.setText(String.valueOf(proceso.getRegistro(RegistroID.CX)));
+        lblDxValor.setText(String.valueOf(proceso.getRegistro(RegistroID.DX)));
+        lblBaseValor.setText(String.valueOf(proceso.getBase()));
+        lblLimiteValor.setText(proceso.getAlcance() + " posiciones");
+        lblEjecutadasValor.setText(proceso.getTiempoEmpleado() + " s");
+        lblCiclosValor.setText(proceso.getCpu());
+        lblHoraCreacionValor.setText(SistemaOperativo.formatearReloj(proceso.getTiempoInicio()));
     }
 
     /**
@@ -361,8 +411,8 @@ public class VentanaPrincipal extends javax.swing.JFrame implements VistaPrincip
         lblDxValor.setText("0");
         lblBaseValor.setText("-");
         lblLimiteValor.setText("-");
-        lblEjecutadasValor.setText("0");
-        lblCiclosValor.setText("0");
+        lblEjecutadasValor.setText("-");
+        lblCiclosValor.setText("-");
         lblHoraCreacionValor.setText("-");
     }
 

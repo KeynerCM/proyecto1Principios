@@ -10,43 +10,46 @@ import javax.swing.Timer;
 
 import com.mycompany.minipc.config.Configuracion;
 import com.mycompany.minipc.config.LectorConfiguracion;
-import com.mycompany.minipc.hardware.Disco;
-import com.mycompany.minipc.hardware.EntradaIndice;
-import com.mycompany.minipc.hardware.Estadisticas;
-import com.mycompany.minipc.hardware.Fase;
-import com.mycompany.minipc.hardware.ObservadorCPU;
-import com.mycompany.minipc.hardware.Procesador;
 import com.mycompany.minipc.excepciones.ConfiguracionException;
-import com.mycompany.minipc.excepciones.EjecucionException;
 import com.mycompany.minipc.excepciones.DiscoException;
-import com.mycompany.minipc.excepciones.MemoriaInsuficienteException;
 import com.mycompany.minipc.excepciones.SintaxisException;
+import com.mycompany.minipc.gui.modelo.MapaMemoria;
 import com.mycompany.minipc.gui.modelo.ModeloTablaDisco;
 import com.mycompany.minipc.gui.modelo.ModeloTablaInstrucciones;
 import com.mycompany.minipc.gui.modelo.ModeloTablaMemoria;
+import com.mycompany.minipc.gui.modelo.ModeloTablaTrabajos;
 import com.mycompany.minipc.gui.modelo.RenderInstruccionActual;
 import com.mycompany.minipc.gui.modelo.RenderZonaDisco;
 import com.mycompany.minipc.gui.modelo.RenderZonaMemoria;
+import com.mycompany.minipc.hardware.Disco;
+import com.mycompany.minipc.hardware.EntradaIndice;
+import com.mycompany.minipc.hardware.Estadisticas;
+import com.mycompany.minipc.hardware.Memoria;
+import com.mycompany.minipc.hardware.Procesador;
 import com.mycompany.minipc.io.CargadorASM;
 import com.mycompany.minipc.isa.Ensamblador;
 import com.mycompany.minipc.isa.Instruccion;
+import com.mycompany.minipc.so.SistemaOperativo;
+import com.mycompany.minipc.so.planificacion.FabricaAlgoritmos;
+import com.mycompany.minipc.so.procesos.Proceso;
+import com.mycompany.minipc.so.procesos.TablaBCP;
 
 /**
  * Nombre: ControladorPrincipal
  * Entradas: la vista a la que da servicio y las acciones que el usuario pulsa
  * Salidas: las actualizaciones que envia a la vista
- * Restricciones: es lo unico que conoce a los dos lados; el nucleo nunca sabe
- *                que existe Swing y la vista nunca conoce al procesador
- * Descripcion: coordina la ventana con el procesador. Recibe lo que el usuario
- *              pulsa, se lo pide al nucleo, y refresca la vista cuando el
- *              nucleo avisa que algo cambio. Implementa ObservadorCPU para
- *              enterarse de cada etapa del ciclo de instruccion.
+ * Restricciones: es lo unico que conoce a los dos lados; el sistema operativo
+ *                nunca sabe que existe Swing y la vista nunca conoce al
+ *                sistema operativo
+ * Descripcion: coordina la ventana con el sistema operativo. Recibe lo que el
+ *              usuario pulsa, se lo pide al sistema operativo y refresca la
+ *              vista. Cada "Siguiente" es un tick() del sistema operativo, es
+ *              decir un segundo de CPU.
  */
-public class ControladorPrincipal implements ObservadorCPU {
+public class ControladorPrincipal {
 
     private final VistaPrincipal vista;
-    private final Procesador cpu;
-    private final Disco disco;
+    private final SistemaOperativo so;
     private final CargadorASM cargador;
     private final Ensamblador ensamblador;
 
@@ -62,6 +65,7 @@ public class ControladorPrincipal implements ObservadorCPU {
     private final ModeloTablaInstrucciones modeloInstrucciones;
     private final ModeloTablaMemoria modeloMemoria;
     private final ModeloTablaDisco modeloDisco;
+    private final ModeloTablaTrabajos modeloTrabajos;
     private final RenderInstruccionActual renderInstrucciones;
     private final RenderZonaMemoria renderMemoria;
     private final RenderZonaDisco renderDisco;
@@ -70,13 +74,14 @@ public class ControladorPrincipal implements ObservadorCPU {
      * Temporizador de la ejecucion automatica.
      *
      * Se usa un javax.swing.Timer y no un bucle porque sus disparos ocurren
-     * en el hilo de despacho de eventos. Un while llamando a paso() dentro
+     * en el hilo de despacho de eventos. Un while llamando a tick() dentro
      * de ese hilo congelaria la ventana hasta terminar, y no se veria nada
      * de la ejecucion, que es justo lo que hay que mostrar.
      */
     private final Timer temporizador;
 
-    private String nombreArchivo;
+    /** Proceso cuyo programa muestra la tabla de instrucciones. */
+    private Proceso procesoMostrado;
 
     /**
      * Nombre: ControladorPrincipal
@@ -97,15 +102,14 @@ public class ControladorPrincipal implements ObservadorCPU {
      *           lectorConfiguracion, lector del archivo de configuracion, o
      *           nulo para usar los valores por defecto sin archivo
      * Salidas: el controlador construido
-     * Restricciones: la vista no debe ser nula; el controlador queda ya
-     *                registrado como observador del procesador. Si el archivo
-     *                tiene errores no falla: usa los valores por defecto y
-     *                guarda los problemas para informarlos en
-     *                inicializarVista, cuando la ventana ya existe
-     * Descripcion: lee la configuracion, crea el procesador y el disco con
-     *              esos tamanos, los modelos de tabla, los renderers y el
-     *              temporizador. Los renderers se crean aqui y no en la
-     *              ventana porque necesitan consultar la memoria y el disco.
+     * Restricciones: la vista no debe ser nula. Si el archivo tiene errores no
+     *                falla: usa los valores por defecto y guarda los problemas
+     *                para informarlos en inicializarVista, cuando la ventana
+     *                ya existe
+     * Descripcion: lee la configuracion, crea el sistema operativo con esos
+     *              tamanos y ese algoritmo, los modelos de tabla, los
+     *              renderers y el temporizador. Conecta la bitacora del
+     *              sistema operativo a la consola de la vista.
      */
     public ControladorPrincipal(VistaPrincipal vista, LectorConfiguracion lectorConfiguracion) {
         this.vista = vista;
@@ -113,25 +117,24 @@ public class ControladorPrincipal implements ObservadorCPU {
         this.erroresConfiguracion = new ArrayList<>();
         this.configuracion = leerConfiguracion();
 
-        this.cpu = new Procesador();
-        this.cpu.configurarMemoria(configuracion.getTamanoMemoria(),
-                configuracion.getLimiteKernel());
-        this.disco = new Disco(configuracion.getTamanoDisco(),
-                configuracion.getTamanoMemoriaVirtual());
+        this.so = new SistemaOperativo(configuracion.getTamanoMemoria(),
+                configuracion.getTamanoDisco(), configuracion.getTamanoMemoriaVirtual(),
+                FabricaAlgoritmos.crear(configuracion.getAlgoritmo()));
+        this.so.setBitacora(vista::escribirEnConsola);
         this.cargador = new CargadorASM();
         this.ensamblador = new Ensamblador();
-        this.nombreArchivo = "(ninguno)";
 
+        MapaMemoria mapa = new MapaMemoria(so.getMemoria(), so.getTablaBCP());
         this.modeloInstrucciones = new ModeloTablaInstrucciones();
-        this.modeloMemoria = new ModeloTablaMemoria(cpu.getMemoria());
-        this.modeloDisco = new ModeloTablaDisco(disco);
+        this.modeloMemoria = new ModeloTablaMemoria(so.getMemoria(), mapa);
+        this.modeloDisco = new ModeloTablaDisco(so.getDisco());
+        this.modeloTrabajos = new ModeloTablaTrabajos(so.getListaTrabajos());
         this.renderInstrucciones = new RenderInstruccionActual();
-        this.renderMemoria = new RenderZonaMemoria(cpu.getMemoria());
-        this.renderDisco = new RenderZonaDisco(disco);
+        this.renderMemoria = new RenderZonaMemoria(so.getMemoria(), mapa);
+        this.renderDisco = new RenderZonaDisco(so.getDisco());
 
         this.temporizador = new Timer(configuracion.getMsPorSegundo(),
                 e -> alTicDelTemporizador());
-        this.cpu.agregarObservador(this);
     }
 
     /**
@@ -166,18 +169,17 @@ public class ControladorPrincipal implements ObservadorCPU {
     /**
      * Nombre: alCargarArchivos
      * Entradas: ninguna; los archivos los pide a la vista
-     * Salidas: ninguna; deja los programas validos guardados en el disco y
-     *          la vista actualizada
+     * Salidas: ninguna; deja los programas validos en el disco y en la lista
+     *          de trabajos, y la vista actualizada
      * Restricciones: si el usuario cancela el dialogo no ocurre nada. Un
      *                archivo con problemas no se guarda, pero no impide que
      *                se guarden los demas
      * Descripcion: carga uno o varios archivos .asm. Por cada uno encadena
-     *              leerlo, ensamblarlo y guardarlo en el disco, que es donde
-     *              viven los programas antes de ejecutarse. Los problemas de
-     *              todos los archivos se juntan en un solo cuadro, cada uno
-     *              con el nombre de su archivo, para que el usuario los
-     *              corrija en una pasada. Despues pasa el primer programa
-     *              guardado del disco a la memoria para poder ejecutarlo.
+     *              leerlo, ensamblarlo, guardarlo en el disco y agregarlo a la
+     *              lista de trabajos. Los problemas de todos los archivos se
+     *              juntan en un solo cuadro, cada uno con el nombre de su
+     *              archivo. Al final el planificador de trabajos admite lo que
+     *              quepa, para que los programas se vean en memoria.
      */
     public void alCargarArchivos() {
         List<File> archivos = vista.seleccionarArchivosAsm();
@@ -186,22 +188,14 @@ public class ControladorPrincipal implements ObservadorCPU {
         }
 
         List<String> errores = new ArrayList<>();
-        List<EntradaIndice> guardados = new ArrayList<>();
         for (File archivo : archivos) {
             EntradaIndice entrada = guardarEnDisco(archivo, errores);
             if (entrada != null) {
-                guardados.add(entrada);
+                agregarALaListaDeTrabajos(entrada, errores);
             }
         }
+        so.admitir();
         vista.refrescarDisco();
-
-        if (!guardados.isEmpty()) {
-            cargarEnMemoria(guardados.get(0), errores);
-            if (guardados.size() > 1) {
-                vista.escribirEnConsola((guardados.size() - 1)
-                        + " programa(s) mas quedan guardados en el disco.");
-            }
-        }
         if (!errores.isEmpty()) {
             vista.mostrarErrores("Errores al cargar archivos", errores);
         }
@@ -217,10 +211,10 @@ public class ControladorPrincipal implements ObservadorCPU {
      *                nombre del archivo
      * Descripcion: valida el archivo en el orden en que puede fallar: que se
      *              pueda leer y tenga extension .asm, que su sintaxis sea
-     *              correcta y que haya lugar en el disco. En el disco queda el
-     *              texto de cada instruccion, sin comentarios ni lineas
-     *              vacias. Si ya hay un archivo con el mismo nombre, guarda
-     *              una copia numerada.
+     *              correcta, que quepa en la memoria de usuario y que haya
+     *              lugar en el disco. En el disco queda el texto de cada
+     *              instruccion, sin comentarios ni lineas vacias. Si ya hay un
+     *              archivo con el mismo nombre, guarda una copia numerada.
      */
     private EntradaIndice guardarEnDisco(File archivo, List<String> errores) {
         String nombre = archivo.getName();
@@ -230,8 +224,16 @@ public class ControladorPrincipal implements ObservadorCPU {
             for (Instruccion instruccion : programa) {
                 lineas.add(instruccion.getTextoFuente());
             }
-            EntradaIndice entrada = disco.guardarPrograma(disco.nombreDisponible(nombre),
-                    lineas);
+            int espacioUsuario = so.getMemoria().getEspacioUsuario();
+            if (lineas.size() > espacioUsuario) {
+                String mensaje = "el programa tiene " + lineas.size() + " instrucciones y la"
+                        + " memoria de usuario solo tiene " + espacioUsuario + " posiciones";
+                errores.add(nombre + ": " + mensaje);
+                vista.escribirEnConsola("No se cargo " + nombre + ": " + mensaje + ".");
+                return null;
+            }
+            EntradaIndice entrada = so.getDisco().guardarPrograma(
+                    so.getDisco().nombreDisponible(nombre), lineas);
             vista.escribirEnConsola("Guardado en disco: " + entrada.getNombre()
                     + ", posiciones " + entrada.getDireccionInicio() + " a "
                     + entrada.getDireccionFin() + ".");
@@ -262,37 +264,25 @@ public class ControladorPrincipal implements ObservadorCPU {
     }
 
     /**
-     * Nombre: cargarEnMemoria
-     * Entradas: entrada, archivo del disco a cargar; errores, lista donde
-     *           anotar el problema si no cabe
+     * Nombre: agregarALaListaDeTrabajos
+     * Entradas: entrada, archivo ya guardado en el disco; errores, lista donde
+     *           anotar el problema si no se puede agregar
      * Salidas: ninguna
-     * Restricciones: si el programa no cabe, queda en el disco y la memoria no
-     *                cambia
-     * Descripcion: lee el programa del disco y lo carga en la memoria
-     *              principal. Mientras no exista el planificador de trabajos,
-     *              esta es la forma de pasar un programa del disco a la
-     *              memoria.
+     * Restricciones: si la lista de trabajos esta llena, el archivo se borra
+     *                del disco para que ambos queden coherentes
+     * Descripcion: el programa entra a la lista de trabajos como NUEVO.
      */
-    private void cargarEnMemoria(EntradaIndice entrada, List<String> errores) {
+    private void agregarALaListaDeTrabajos(EntradaIndice entrada, List<String> errores) {
         try {
-            List<String> programa = disco.leerPrograma(entrada.getNombre());
-            cpu.cargar(programa, entrada.getNombre());
-
-            nombreArchivo = entrada.getNombre();
-            modeloInstrucciones.cargar(programa);
-            vista.mostrarInstrucciones(programa);
-            vista.escribirEnConsola("Programa " + entrada.getNombre()
-                    + " cargado en memoria en la posicion " + cpu.getDireccionBase()
-                    + ". " + programa.size() + " instrucciones.");
-
-        } catch (MemoriaInsuficienteException e) {
-            errores.add(entrada.getNombre() + ": se guardo en el disco, pero no cabe en la"
-                    + " memoria. " + e.getMessage());
+            so.agregarTrabajo(entrada.getNombre());
+        } catch (IllegalStateException | IllegalArgumentException e) {
+            errores.add(entrada.getNombre() + ": " + e.getMessage());
             vista.escribirEnConsola(e.getMessage());
-
-        } catch (DiscoException e) {
-            // El programa se acaba de guardar, asi que no puede faltar.
-            throw new IllegalStateException(e);
+            try {
+                so.getDisco().eliminar(entrada.getNombre());
+            } catch (DiscoException ignorada) {
+                // Se acaba de guardar, asi que existe.
+            }
         }
     }
 
@@ -300,12 +290,13 @@ public class ControladorPrincipal implements ObservadorCPU {
      * Nombre: alEjecutar
      * Entradas: ninguna
      * Salidas: ninguna; arranca el temporizador
-     * Restricciones: no hace nada si no hay programa, si ya termino, o si la
+     * Restricciones: no hace nada si no hay trabajos pendientes o si la
      *                ejecucion automatica ya esta en marcha
-     * Descripcion: arranca la ejecucion automatica hasta el final del programa.
+     * Descripcion: ejecuta todos los procesos cargados hasta su finalizacion,
+     *              un segundo de CPU por disparo del temporizador.
      */
     public void alEjecutar() {
-        if (!cpu.hayPrograma() || cpu.haTerminado() || temporizador.isRunning()) {
+        if (!so.hayPendientes() || temporizador.isRunning()) {
             return;
         }
         vista.escribirEnConsola("Ejecucion automatica iniciada.");
@@ -317,13 +308,12 @@ public class ControladorPrincipal implements ObservadorCPU {
      * Nombre: alPasoAPaso
      * Entradas: ninguna
      * Salidas: ninguna
-     * Restricciones: no hace nada si no hay programa, si ya termino, o si la
+     * Restricciones: no hace nada si no hay trabajos pendientes o si la
      *                ejecucion automatica esta en marcha
-     * Descripcion: ejecuta una sola instruccion, que es el modo de ejecucion
-     *              que el enunciado exige.
+     * Descripcion: el boton "Siguiente": un segundo de CPU.
      */
     public void alPasoAPaso() {
-        if (!cpu.hayPrograma() || cpu.haTerminado() || temporizador.isRunning()) {
+        if (!so.hayPendientes() || temporizador.isRunning()) {
             return;
         }
         ejecutarUnPaso();
@@ -334,16 +324,17 @@ public class ControladorPrincipal implements ObservadorCPU {
      * Entradas: ninguna
      * Salidas: ninguna
      * Restricciones: detiene antes la ejecucion automatica si estaba corriendo
-     * Descripcion: vuelve al inicio del programa sin descargarlo de memoria.
+     * Descripcion: vuelve todos los trabajos a NUEVO y el reloj a cero, sin
+     *              borrar el disco, y admite de nuevo los que quepan.
      */
     public void alReiniciar() {
         detener();
-        if (!cpu.hayPrograma()) {
+        if (so.getListaTrabajos().getTrabajos().isEmpty()) {
             return;
         }
-        cpu.reset();
-        vista.escribirEnConsola("Procesador reiniciado en la posicion "
-                + cpu.getDireccionBase() + ".");
+        so.reiniciar();
+        so.admitir();
+        actualizarVista();
     }
 
     /**
@@ -351,20 +342,16 @@ public class ControladorPrincipal implements ObservadorCPU {
      * Entradas: ninguna
      * Salidas: ninguna
      * Restricciones: detiene antes la ejecucion automatica si estaba corriendo
-     * Descripcion: descarga el programa, borra los archivos del disco y deja
-     *              la memoria de usuario, los registros, las tablas y la
-     *              consola en blanco.
+     * Descripcion: descarga los procesos, vacia la lista de trabajos, borra
+     *              los archivos del disco y deja la consola en blanco.
      */
     public void alLimpiar() {
         detener();
-        cpu.limpiar();
-        disco.formatear();
-        nombreArchivo = "(ninguno)";
-        modeloInstrucciones.limpiar();
-        vista.mostrarInstrucciones(Collections.emptyList());
+        so.limpiar();
+        so.getDisco().formatear();
         vista.refrescarDisco();
         vista.limpiarConsola();
-        vista.escribirEnConsola("Memoria de usuario, disco, registros y tablas vaciados.");
+        vista.escribirEnConsola("Memoria, disco, lista de trabajos y registros vaciados.");
         actualizarVista();
     }
 
@@ -372,24 +359,21 @@ public class ControladorPrincipal implements ObservadorCPU {
      * Nombre: alConfigurar
      * Entradas: nueva, configuracion ya validada
      * Salidas: ninguna
-     * Restricciones: descarga el programa actual y borra el disco, porque
+     * Restricciones: descarta los procesos, los trabajos y el disco, porque
      *                redimensionarlos invalida las direcciones ya asignadas.
      *                Si el archivo no se puede escribir, la configuracion se
      *                aplica igual y se informa el problema
-     * Descripcion: aplica la configuracion a la memoria, al disco y al
+     * Descripcion: aplica la configuracion al sistema operativo y al
      *              temporizador, y la guarda en el archivo de configuracion
      *              para que se conserve la proxima vez que se abra el programa.
      */
     public void alConfigurar(Configuracion nueva) {
         detener();
-        cpu.configurarMemoria(nueva.getTamanoMemoria(), nueva.getLimiteKernel());
-        disco.redimensionar(nueva.getTamanoDisco(), nueva.getTamanoMemoriaVirtual());
+        so.reconfigurar(nueva.getTamanoMemoria(), nueva.getTamanoDisco(),
+                nueva.getTamanoMemoriaVirtual(), FabricaAlgoritmos.crear(nueva.getAlgoritmo()));
         temporizador.setDelay(nueva.getMsPorSegundo());
         configuracion = nueva;
 
-        nombreArchivo = "(ninguno)";
-        modeloInstrucciones.limpiar();
-        vista.mostrarInstrucciones(Collections.emptyList());
         vista.refrescarDisco();
         vista.escribirEnConsola("Configuracion aplicada. " + describirConfiguracion());
 
@@ -414,14 +398,17 @@ public class ControladorPrincipal implements ObservadorCPU {
      * Descripcion: se usa en la consola al arrancar y al reconfigurar.
      */
     private String describirConfiguracion() {
-        int limite = configuracion.getLimiteKernel();
-        int tamano = configuracion.getTamanoMemoria();
-        return "Memoria de " + tamano + " posiciones (kernel de 0 a " + (limite - 1)
-                + ", usuario de " + limite + " a " + (tamano - 1) + "). Disco de "
-                + disco.getTamano() + " posiciones (indice de 0 a "
-                + (Disco.ENTRADAS_INDICE - 1) + ", archivos de " + disco.getInicioArchivos()
-                + " a " + (disco.getInicioMemoriaVirtual() - 1) + ", memoria virtual: "
-                + disco.getTamanoMemoriaVirtual() + "). Segundo de CPU: "
+        Memoria memoria = so.getMemoria();
+        Disco disco = so.getDisco();
+        return "Memoria de " + memoria.getTamano() + " posiciones: kernel de 0 a "
+                + (memoria.getLimiteKernel() - 1) + " (" + TablaBCP.describirFormula()
+                + "), usuario de " + memoria.getLimiteKernel() + " a "
+                + (memoria.getTamano() - 1) + ". Disco de " + disco.getTamano()
+                + " posiciones (indice de 0 a " + (Disco.ENTRADAS_INDICE - 1)
+                + ", archivos de " + disco.getInicioArchivos() + " a "
+                + (disco.getInicioMemoriaVirtual() - 1) + ", memoria virtual: "
+                + disco.getTamanoMemoriaVirtual() + "). Planificacion: "
+                + so.getAlgoritmo().getNombre() + ". Segundo de CPU: "
                 + configuracion.getMsPorSegundo() + " ms.";
     }
 
@@ -434,8 +421,8 @@ public class ControladorPrincipal implements ObservadorCPU {
      * Entradas: ninguna
      * Salidas: ninguna
      * Restricciones: se ejecuta en el hilo de despacho de eventos
-     * Descripcion: cada disparo del temporizador ejecuta una instruccion y, si
-     *              ya no quedan, detiene la ejecucion automatica.
+     * Descripcion: cada disparo del temporizador es un segundo de CPU; si ya
+     *              no quedan trabajos, detiene la ejecucion automatica.
      */
     private void alTicDelTemporizador() {
         if (!ejecutarUnPaso()) {
@@ -446,36 +433,25 @@ public class ControladorPrincipal implements ObservadorCPU {
     /**
      * Nombre: ejecutarUnPaso
      * Entradas: ninguna
-     * Salidas: true si queda alguna instruccion por ejecutar
-     * Restricciones: atrapa EjecucionException, de modo que el error no
-     *                se propaga hacia Swing
-     * Descripcion: ejecuta una instruccion y atiende los dos finales posibles:
-     *              que el programa termine normalmente o que se detenga por un
-     *              error de ejecucion. En el segundo caso el procesador ya dejo el
-     *              proceso en BLOQUEADO_ERROR y aviso a los observadores, asi
-     *              que la pantalla ya refleja el estado y aqui solo falta
-     *              informar al usuario.
+     * Salidas: true si quedan trabajos sin finalizar
+     * Restricciones: si un proceso falla, detiene la ejecucion automatica y
+     *                muestra el error; los demas procesos siguen pendientes
+     * Descripcion: un tick del sistema operativo. Los mensajes del despachador
+     *              y de los planificadores llegan a la consola por la bitacora.
      */
     private boolean ejecutarUnPaso() {
-        try {
-            boolean quedan = cpu.paso();
-            if (!quedan) {
-                vista.escribirEnConsola("Ejecucion terminada. "
-                        + cpu.getInstruccionesEjecutadas() + " instrucciones ejecutadas.");
-                actualizarVista();
-            }
-            return quedan;
-
-        } catch (EjecucionException e) {
-            // El procesador ya dejo el proceso en BLOQUEADO_ERROR y aviso a
-            // los observadores, asi que la pantalla ya refleja el estado.
+        boolean quedan = so.tick();
+        List<String> errores = so.tomarErrores();
+        if (!errores.isEmpty()) {
             detener();
-            vista.escribirEnConsola("ERROR: " + e.getMessage());
-            vista.mostrarErrores("Error de ejecucion",
-                    Collections.singletonList(e.getMessage()));
-            actualizarVista();
-            return false;
+            vista.mostrarErrores("Error de ejecucion", errores);
         }
+        if (!quedan) {
+            vista.escribirEnConsola("Todos los trabajos finalizaron. Tiempo total: "
+                    + SistemaOperativo.formatearReloj(so.getReloj()) + ".");
+        }
+        actualizarVista();
+        return quedan;
     }
 
     /**
@@ -483,13 +459,8 @@ public class ControladorPrincipal implements ObservadorCPU {
      * Entradas: ninguna
      * Salidas: ninguna
      * Restricciones: no hace nada si el temporizador no estaba corriendo
-     * Descripcion: detiene la ejecucion automatica y refresca la vista. El
-     *              refresco final no es opcional: mientras el temporizador
-     *              corre, el procesador notifica a los observadores antes de
-     *              que este metodo lo detenga, de modo que esas notificaciones
-     *              ven todavia isRunning() en true y dejan los botones
-     *              deshabilitados. Sin este ultimo refresco la ventana se
-     *              queda bloqueada al terminar el programa.
+     * Descripcion: detiene la ejecucion automatica y refresca la vista para
+     *              que los botones vuelvan a habilitarse.
      */
     private void detener() {
         if (temporizador.isRunning()) {
@@ -498,61 +469,81 @@ public class ControladorPrincipal implements ObservadorCPU {
         }
     }
 
-    // ------------------------------------------------------------------
-    // Observador del procesador
-    // ------------------------------------------------------------------
-
-    /**
-     * Nombre: alCambiarEstado
-     * Entradas: procesador, el que cambio de estado; fase, momento del ciclo
-     * Salidas: ninguna
-     * Restricciones: se invoca desde el hilo que ejecuta la instruccion
-     * Descripcion: el procesador avisa que algo cambio y el controlador se
-     *              limita a refrescar la vista completa. No distingue la fase
-     *              porque el refresco es el mismo en todas.
-     */
-    @Override
-    public void alCambiarEstado(Procesador procesador, Fase fase) {
-        actualizarVista();
-    }
-
     /**
      * Nombre: actualizarVista
      * Entradas: ninguna
      * Salidas: ninguna
      * Restricciones: ninguna
-     * Descripcion: vuelca el estado actual del procesador sobre la ventana:
-     *              resaltado, tabla de memoria, panel del BCP, barra de
-     *              contexto, ocupacion de memoria y estado de los botones.
-     *              Antes actualiza los renderers, que necesitan saber que fila
-     *              y que direccion destacar.
+     * Descripcion: vuelca el estado del sistema operativo sobre la ventana.
+     *              Todo lo que se muestra del proceso en ejecucion se lee de su
+     *              BCP en memoria. La tabla de instrucciones muestra el
+     *              programa del proceso en ejecucion, leido de su region de
+     *              memoria.
      */
     private void actualizarVista() {
-        int indice = cpu.getIndiceInstruccionActual();
+        Proceso actual = so.getEnEjecucion();
+        mostrarPrograma(actual);
+        int indice = -1;
+        int direccionActual = -1;
+        if (actual != null) {
+            direccionActual = actual.getPc();
+            int relativo = direccionActual - actual.getBase();
+            indice = relativo >= 0 && relativo < actual.getAlcance() ? relativo : -1;
+        }
         renderInstrucciones.setFilaActual(indice);
-        renderMemoria.setDireccionActual(cpu.hayPrograma() && indice >= 0
-                ? cpu.getPc() : -1);
+        renderMemoria.setDireccionActual(indice >= 0 ? direccionActual : -1);
 
         vista.resaltarInstruccion(indice);
         vista.refrescarMemoria();
-        vista.mostrarBCP(cpu.getBcp());
-        vista.actualizarBarraContexto(nombreArchivo, textoDelEstado());
-        vista.actualizarUsoMemoria(cpu.getMemoria().getPorcentajeUso());
-        vista.actualizarBotones(cpu.hayPrograma(), temporizador.isRunning(),
-                cpu.haTerminado());
+        modeloTrabajos.refrescar();
+        vista.mostrarBCP(actual);
+        vista.actualizarBarraContexto(actual != null ? actual.getPrograma() : "(CPU libre)",
+                textoDelEstado());
+        vista.actualizarUsoMemoria(so.getMemoria().getPorcentajeUso());
+        boolean hayTrabajos = !so.getListaTrabajos().getTrabajos().isEmpty();
+        vista.actualizarBotones(hayTrabajos, temporizador.isRunning(), !so.hayPendientes());
+    }
+
+    /**
+     * Nombre: mostrarPrograma
+     * Entradas: actual, proceso en ejecucion, o nulo
+     * Salidas: ninguna
+     * Restricciones: solo recarga la tabla si cambio el proceso
+     * Descripcion: lee de la memoria las instrucciones de la region del
+     *              proceso (de la base a base + alcance - 1).
+     */
+    private void mostrarPrograma(Proceso actual) {
+        if (actual == null ? procesoMostrado == null : actual.equals(procesoMostrado)) {
+            return;
+        }
+        procesoMostrado = actual;
+        List<String> lineas = new ArrayList<>();
+        if (actual != null) {
+            for (int i = 0; i < actual.getAlcance(); i++) {
+                lineas.add(so.getMemoria().leer(actual.getBase() + i));
+            }
+        }
+        modeloInstrucciones.cargar(lineas);
+        vista.mostrarInstrucciones(lineas);
     }
 
     /**
      * Nombre: textoDelEstado
      * Entradas: ninguna
-     * Salidas: el estado del proceso en texto
+     * Salidas: el estado del sistema en texto
      * Restricciones: ninguna
-     * Descripcion: devuelve el nombre del estado, o la leyenda SIN PROGRAMA
-     *              cuando no hay nada cargado, que no es un estado del proceso
-     *              sino la ausencia de proceso.
+     * Descripcion: el estado del proceso en ejecucion, o si todo termino, o
+     *              si no hay trabajos.
      */
     private String textoDelEstado() {
-        return cpu.hayPrograma() ? cpu.getEstado().name() : "SIN PROGRAMA";
+        Proceso actual = so.getEnEjecucion();
+        if (actual != null) {
+            return actual.getEstado().name();
+        }
+        if (so.getListaTrabajos().getTrabajos().isEmpty()) {
+            return "SIN PROGRAMA";
+        }
+        return so.hayPendientes() ? "CPU LIBRE" : "FINALIZADO";
     }
 
     // ------------------------------------------------------------------
@@ -593,6 +584,17 @@ public class ControladorPrincipal implements ObservadorCPU {
     }
 
     /**
+     * Nombre: getModeloTrabajos
+     * Entradas: ninguna
+     * Salidas: el modelo de la tabla de la lista de trabajos
+     * Restricciones: ninguna
+     * Descripcion: la ventana se lo asigna a su tabla al construirse.
+     */
+    public ModeloTablaTrabajos getModeloTrabajos() {
+        return modeloTrabajos;
+    }
+
+    /**
      * Nombre: getRenderDisco
      * Entradas: ninguna
      * Salidas: el renderer que colorea las zonas del disco
@@ -601,29 +603,6 @@ public class ControladorPrincipal implements ObservadorCPU {
      */
     public RenderZonaDisco getRenderDisco() {
         return renderDisco;
-    }
-
-    /**
-     * Nombre: getDisco
-     * Entradas: ninguna
-     * Salidas: el disco de la minicomputadora
-     * Restricciones: ninguna
-     * Descripcion: lo necesitan las pruebas para verificar lo que se guardo.
-     */
-    public Disco getDisco() {
-        return disco;
-    }
-
-    /**
-     * Nombre: getConfiguracion
-     * Entradas: ninguna
-     * Salidas: la configuracion aplicada en este momento
-     * Restricciones: ninguna
-     * Descripcion: el dialogo de configuracion la usa para mostrar los
-     *              valores actuales al abrirse.
-     */
-    public Configuracion getConfiguracion() {
-        return configuracion;
     }
 
     /**
@@ -649,26 +628,59 @@ public class ControladorPrincipal implements ObservadorCPU {
     }
 
     /**
+     * Nombre: getDisco
+     * Entradas: ninguna
+     * Salidas: el disco de la minicomputadora
+     * Restricciones: ninguna
+     * Descripcion: lo necesitan las pruebas para verificar lo que se guardo.
+     */
+    public Disco getDisco() {
+        return so.getDisco();
+    }
+
+    /**
+     * Nombre: getConfiguracion
+     * Entradas: ninguna
+     * Salidas: la configuracion aplicada en este momento
+     * Restricciones: ninguna
+     * Descripcion: el dialogo de configuracion la usa para mostrar los
+     *              valores actuales al abrirse.
+     */
+    public Configuracion getConfiguracion() {
+        return configuracion;
+    }
+
+    /**
      * Nombre: obtenerEstadisticas
      * Entradas: ninguna
-     * Salidas: la contabilidad de la ejecucion
+     * Salidas: los contadores de la CPU
      * Restricciones: ninguna
      * Descripcion: la consulta el dialogo de estadisticas.
      */
     public Estadisticas obtenerEstadisticas() {
-        return cpu.getEstadisticas();
+        return so.getCpu().getEstadisticas();
+    }
+
+    /**
+     * Nombre: getSistemaOperativo
+     * Entradas: ninguna
+     * Salidas: el sistema operativo que el controlador coordina
+     * Restricciones: ninguna
+     * Descripcion: lo necesitan los dialogos y las pruebas.
+     */
+    public SistemaOperativo getSistemaOperativo() {
+        return so;
     }
 
     /**
      * Nombre: getProcesador
      * Entradas: ninguna
-     * Salidas: el procesador que el controlador coordina
+     * Salidas: la CPU
      * Restricciones: ninguna
-     * Descripcion: lo necesitan los dialogos para leer la memoria y el BCP,
-     *              y las pruebas para verificar el resultado de la ejecucion.
+     * Descripcion: acceso comodo para la ventana y las pruebas.
      */
     public Procesador getProcesador() {
-        return cpu;
+        return so.getCpu();
     }
 
     /**

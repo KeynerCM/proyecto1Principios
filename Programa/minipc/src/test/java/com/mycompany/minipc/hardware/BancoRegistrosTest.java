@@ -92,10 +92,12 @@ class BancoRegistrosTest {
     @Test
     @DisplayName("Los estados finales se distinguen de los demas")
     void estadosFinales() {
-        assertTrue(EstadoProceso.TERMINADO.esFinal());
-        assertTrue(EstadoProceso.BLOQUEADO_ERROR.esFinal());
-        assertFalse(EstadoProceso.NUEVO.esFinal());
-        assertFalse(EstadoProceso.LISTO.esFinal());
-        assertFalse(EstadoProceso.EJECUCION.esFinal());
+        assertEquals(7, EstadoProceso.values().length, "Modelo de siete estados");
+        assertTrue(EstadoProceso.FINALIZADO.esFinal());
+        for (EstadoProceso estado : EstadoProceso.values()) {
+            if (estado != EstadoProceso.FINALIZADO) {
+                assertFalse(estado.esFinal(), estado.name());
+            }
+        }
     }
 }

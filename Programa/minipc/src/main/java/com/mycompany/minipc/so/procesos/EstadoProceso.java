@@ -4,44 +4,52 @@ package com.mycompany.minipc.so.procesos;
  * Nombre: EstadoProceso
  * Entradas: no aplica, es una enumeracion de valores fijos
  * Salidas: no aplica
- * Restricciones: el simulador no multiprograma, asi que no existen los
- *                estados suspendidos ni una cola de listos con varios
- *                procesos
- * Descripcion: estados por los que pasa el proceso cargado en el Mini PC.
- *              Corresponden al modelo de cinco estados. Las transiciones que ocurren son:
- *              NUEVO a LISTO al terminar de cargarse en memoria;
- *              LISTO a EJECUCION al ejecutarse la primera instruccion;
- *              EJECUCION a TERMINADO al pasar el PC la ultima instruccion;
- *              EJECUCION a BLOQUEADO_ERROR ante un error de ejecucion.
+ * Restricciones: el BCP guarda el nombre del estado como texto en su celda,
+ *                asi que los nombres no deben cambiar
+ * Descripcion: los siete estados del enunciado, que son los del modelo de
+ *              siete estados de Stallings (seccion 3.2, figura 3.9b). El
+ *              "suspendido" del enunciado se parte en dos, segun el proceso
+ *              este esperando un evento o no:
+ *
+ *                NUEVO                 New
+ *                PREPARADO             Ready
+ *                EJECUCION             Running
+ *                EN_ESPERA             Blocked
+ *                SUSPENDIDO_PREPARADO  Ready/Suspend
+ *                SUSPENDIDO_EN_ESPERA  Blocked/Suspend
+ *                FINALIZADO            Exit
  */
 public enum EstadoProceso {
 
-    /** Cargado en memoria, todavia sin admitir. */
+    /** En la lista de trabajos, todavia sin admitir. */
     NUEVO,
 
-    /** Listo para ejecutar, esperando el procesador. */
-    LISTO,
+    /** En memoria, esperando el procesador. */
+    PREPARADO,
 
     /** Ejecutandose en el procesador. */
     EJECUCION,
 
-    /** Termino normalmente. */
-    TERMINADO,
+    /** Esperando un evento de entrada o salida. */
+    EN_ESPERA,
 
-    /** Detenido por un error de ejecucion, como un desbordamiento. */
-    BLOQUEADO_ERROR;
+    /** En la memoria virtual, listo para volver a memoria principal. */
+    SUSPENDIDO_PREPARADO,
+
+    /** En la memoria virtual y ademas esperando un evento. */
+    SUSPENDIDO_EN_ESPERA,
+
+    /** Termino, normalmente o por un error. */
+    FINALIZADO;
 
     /**
      * Nombre: esFinal
      * Entradas: ninguna
      * Salidas: true si el proceso ya no puede seguir ejecutando
      * Restricciones: ninguna
-     * Descripcion: agrupa TERMINADO y BLOQUEADO_ERROR, que son distintos para
-     *              el usuario pero equivalentes para el procesador: en ambos
-     *              casos paso() deja de avanzar. Tenerlo en un metodo evita
-     *              repetir la comparacion doble por todo el codigo.
+     * Descripcion: evita comparar contra FINALIZADO por todo el codigo.
      */
     public boolean esFinal() {
-        return this == TERMINADO || this == BLOQUEADO_ERROR;
+        return this == FINALIZADO;
     }
 }

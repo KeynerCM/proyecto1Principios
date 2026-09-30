@@ -11,6 +11,9 @@ import java.util.List;
 import java.util.Properties;
 
 import com.mycompany.minipc.excepciones.ConfiguracionException;
+import com.mycompany.minipc.hardware.Memoria;
+import com.mycompany.minipc.so.planificacion.FabricaAlgoritmos;
+import com.mycompany.minipc.so.procesos.TablaBCP;
 
 /**
  * Nombre: LectorConfiguracion
@@ -34,9 +37,6 @@ public class LectorConfiguracion {
     /** Clave del tamano de la memoria principal. */
     public static final String CLAVE_MEMORIA = "memoria.tamano";
 
-    /** Clave del limite entre la zona del kernel y la de usuario. */
-    public static final String CLAVE_KERNEL = "memoria.kernel";
-
     /** Clave del tamano del disco. */
     public static final String CLAVE_DISCO = "disco.tamano";
 
@@ -45,6 +45,9 @@ public class LectorConfiguracion {
 
     /** Clave de la duracion real de cada segundo de CPU en automatico. */
     public static final String CLAVE_MS_POR_SEGUNDO = "ejecucion.msPorSegundo";
+
+    /** Clave del algoritmo de planificacion de procesos. */
+    public static final String CLAVE_ALGORITMO = "planificacion.algoritmo";
 
     private final Path archivo;
 
@@ -111,14 +114,13 @@ public class LectorConfiguracion {
         List<String> errores = new ArrayList<>();
         int memoria = leerEntero(propiedades, CLAVE_MEMORIA,
                 porDefecto.getTamanoMemoria(), errores);
-        int kernel = leerEntero(propiedades, CLAVE_KERNEL,
-                porDefecto.getLimiteKernel(), errores);
         int disco = leerEntero(propiedades, CLAVE_DISCO,
                 porDefecto.getTamanoDisco(), errores);
         int memoriaVirtual = leerEntero(propiedades, CLAVE_MEMORIA_VIRTUAL,
                 porDefecto.getTamanoMemoriaVirtual(), errores);
         int msPorSegundo = leerEntero(propiedades, CLAVE_MS_POR_SEGUNDO,
                 porDefecto.getMsPorSegundo(), errores);
+        String algoritmo = propiedades.getProperty(CLAVE_ALGORITMO, porDefecto.getAlgoritmo());
 
         // Los valores que no son numeros se reportan antes de revisar rangos,
         // porque sin un numero no tiene sentido decir si esta fuera de rango.
@@ -126,7 +128,7 @@ public class LectorConfiguracion {
             throw new ConfiguracionException(prefijarArchivo(errores));
         }
         try {
-            return new Configuracion(memoria, kernel, disco, memoriaVirtual, msPorSegundo);
+            return new Configuracion(memoria, disco, memoriaVirtual, msPorSegundo, algoritmo);
         } catch (ConfiguracionException e) {
             throw new ConfiguracionException(prefijarArchivo(e.getErrores()));
         }
@@ -147,10 +149,10 @@ public class LectorConfiguracion {
                 "# Configuracion de la minicomputadora",
                 "# Se puede editar a mano; los cambios se aplican al reiniciar el programa.",
                 "",
-                "# Memoria principal: posiciones totales (minimo 128)",
+                "# Memoria principal: posiciones totales. El kernel no se configura: ocupa "
+                        + TablaBCP.describirFormula() + ", y a los programas les deben"
+                        + " quedar al menos " + Memoria.ESPACIO_USUARIO_MINIMO,
                 CLAVE_MEMORIA + "=" + configuracion.getTamanoMemoria(),
-                "# Primera direccion de la zona de usuario (minimo 16, menor que el tamano)",
-                CLAVE_KERNEL + "=" + configuracion.getLimiteKernel(),
                 "",
                 "# Disco: posiciones totales (minimo 64); las primeras 20 son el indice",
                 CLAVE_DISCO + "=" + configuracion.getTamanoDisco(),
@@ -160,7 +162,11 @@ public class LectorConfiguracion {
                 "# Milisegundos reales por cada segundo de CPU en la ejecucion automatica"
                         + " (" + Configuracion.MS_POR_SEGUNDO_MINIMO + " a "
                         + Configuracion.MS_POR_SEGUNDO_MAXIMO + ")",
-                CLAVE_MS_POR_SEGUNDO + "=" + configuracion.getMsPorSegundo());
+                CLAVE_MS_POR_SEGUNDO + "=" + configuracion.getMsPorSegundo(),
+                "",
+                "# Algoritmo de planificacion de procesos. Disponibles: "
+                        + String.join(", ", FabricaAlgoritmos.disponibles()),
+                CLAVE_ALGORITMO + "=" + configuracion.getAlgoritmo());
         Path carpeta = archivo.toAbsolutePath().getParent();
         if (carpeta != null) {
             Files.createDirectories(carpeta);

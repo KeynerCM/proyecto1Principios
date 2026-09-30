@@ -1,9 +1,10 @@
 package com.mycompany.minipc.gui;
 
 import com.mycompany.minipc.config.Configuracion;
+import com.mycompany.minipc.excepciones.ConfiguracionException;
 import com.mycompany.minipc.hardware.Disco;
 import com.mycompany.minipc.hardware.Memoria;
-import com.mycompany.minipc.excepciones.ConfiguracionException;
+import com.mycompany.minipc.so.procesos.TablaBCP;
 
 import javax.swing.SpinnerNumberModel;
 
@@ -14,9 +15,10 @@ import javax.swing.SpinnerNumberModel;
  * Restricciones: aplicar la configuracion vacia la memoria y el disco, porque
  *                redimensionarlos invalida las direcciones ya asignadas
  * Descripcion: dialogo de configuracion de la maquina. Permite cambiar el
- *              tamano de la memoria principal y su limite de kernel, el
- *              tamano del disco y de su memoria virtual, y la duracion de cada
- *              segundo de CPU en la ejecucion automatica. Muestra en vivo como
+ *              tamano de la memoria principal, el tamano del disco y de su
+ *              memoria virtual, y la duracion de cada segundo de CPU en la
+ *              ejecucion automatica. El kernel se muestra calculado y no se
+ *              puede editar: ocupa K = C + P x B posiciones (tabla de BCP). Muestra en vivo como
  *              quedan repartidas la memoria y el disco, y deshabilita el boton
  *              Aceptar mientras la combinacion no sea valida, en lugar de
  *              dejar equivocarse y reclamar despues. Al aceptar, el
@@ -49,10 +51,15 @@ public class DialogoConfiguracion extends javax.swing.JDialog {
         initComponents();
 
         Configuracion actual = controlador.getConfiguracion();
+        int minimo = TablaBCP.TAMANO_KERNEL + Memoria.ESPACIO_USUARIO_MINIMO;
         spnTamano.setModel(new SpinnerNumberModel(
-                actual.getTamanoMemoria(), Memoria.TAMANO_MINIMO, 1024, 32));
-        spnKernel.setModel(new SpinnerNumberModel(
-                actual.getLimiteKernel(), Memoria.LIMITE_KERNEL_MINIMO, 512, 8));
+                Math.max(actual.getTamanoMemoria(), minimo), minimo, 1024, 32));
+        // El kernel no se configura: se muestra el valor calculado.
+        lblKernel.setText("Kernel (calculado):");
+        spnKernel.setModel(new SpinnerNumberModel(TablaBCP.TAMANO_KERNEL,
+                TablaBCP.TAMANO_KERNEL, TablaBCP.TAMANO_KERNEL, 1));
+        spnKernel.setEnabled(false);
+        spnKernel.setToolTipText("K = " + TablaBCP.describirFormula());
         spnDisco.setModel(new SpinnerNumberModel(
                 actual.getTamanoDisco(), Disco.TAMANO_MINIMO, 4096, 64));
         spnMemoriaVirtual.setModel(new SpinnerNumberModel(
@@ -88,8 +95,9 @@ public class DialogoConfiguracion extends javax.swing.JDialog {
      *              reglas que la memoria y el disco, para no repetirlas aqui.
      */
     private Configuracion configuracionElegida() throws ConfiguracionException {
-        return new Configuracion(valor(spnTamano), valor(spnKernel), valor(spnDisco),
-                valor(spnMemoriaVirtual), valor(spnVelocidad));
+        return new Configuracion(valor(spnTamano), valor(spnDisco),
+                valor(spnMemoriaVirtual), valor(spnVelocidad),
+                controlador.getConfiguracion().getAlgoritmo());
     }
 
     /**
@@ -119,7 +127,7 @@ public class DialogoConfiguracion extends javax.swing.JDialog {
         }
 
         int tamano = elegida.getTamanoMemoria();
-        int kernel = elegida.getLimiteKernel();
+        int kernel = TablaBCP.TAMANO_KERNEL;
         int disco = elegida.getTamanoDisco();
         int inicioVirtual = disco - elegida.getTamanoMemoriaVirtual();
 
@@ -389,7 +397,6 @@ public class DialogoConfiguracion extends javax.swing.JDialog {
     private void btnRestaurarActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnRestaurarActionPerformed
         Configuracion porDefecto = Configuracion.porDefecto();
         spnTamano.setValue(porDefecto.getTamanoMemoria());
-        spnKernel.setValue(porDefecto.getLimiteKernel());
         spnDisco.setValue(porDefecto.getTamanoDisco());
         spnMemoriaVirtual.setValue(porDefecto.getTamanoMemoriaVirtual());
         spnVelocidad.setValue(porDefecto.getMsPorSegundo());

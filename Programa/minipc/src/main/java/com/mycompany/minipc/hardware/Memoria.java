@@ -4,14 +4,12 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-import com.mycompany.minipc.excepciones.MemoriaInsuficienteException;
-
 /**
  * Nombre: Memoria
  * Entradas: el tamano total y el limite entre zonas
  * Salidas: no aplica
- * Restricciones: el tamano minimo es 128 posiciones, el limite de kernel es
- *                de al menos 16 y siempre debe ser menor que el tamano total
+ * Restricciones: el kernel ocupa al menos una posicion y a los programas
+ *                les deben quedar al menos 32
  * Descripcion: memoria principal del Mini PC, dividida en zona de kernel y
  *              zona de usuario. Es un arreglo de texto: cada posicion guarda
  *              una palabra, que puede ser una instruccion ("MOV AX, 5"), un
@@ -24,17 +22,11 @@ import com.mycompany.minipc.excepciones.MemoriaInsuficienteException;
  */
 public class Memoria {
 
-    /** Tamano minimo exigido por el enunciado. */
-    public static final int TAMANO_MINIMO = 128;
-
-    /** Tamano con el que arranca la aplicacion. */
+    /** Tamano con el que arranca la aplicacion, el que fija el enunciado. */
     public static final int TAMANO_POR_DEFECTO = 256;
 
-    /** Limite de kernel con el que arranca la aplicacion. */
-    public static final int LIMITE_KERNEL_POR_DEFECTO = 64;
-
-    /** Minimo de posiciones reservadas al sistema operativo. */
-    public static final int LIMITE_KERNEL_MINIMO = 16;
+    /** Minimo de posiciones que deben quedar para los programas. */
+    public static final int ESPACIO_USUARIO_MINIMO = 32;
 
     /** Contenido de una posicion libre. */
     public static final String VACIA = "";
@@ -45,14 +37,16 @@ public class Memoria {
 
     /**
      * Nombre: Memoria
-     * Entradas: ninguna
-     * Salidas: la memoria construida con la configuracion por defecto
-     * Restricciones: ninguna
-     * Descripcion: crea la memoria con 256 posiciones y kernel de 0 a 63, que
-     *              es el supuesto de la lamina 6 del enunciado.
+     * Entradas: tamano, cantidad total de posiciones; limiteKernel, cuantas
+     *           posiciones del inicio pertenecen al sistema operativo
+     * Salidas: la memoria construida, con todas las posiciones vacias
+     * Restricciones: lanza IllegalArgumentException si la combinacion no es
+     *                valida (ver validar)
+     * Descripcion: el tamano del kernel no se configura: lo calcula el
+     *              sistema operativo segun cuantos BCP necesita guardar.
      */
-    public Memoria() {
-        redimensionar(TAMANO_POR_DEFECTO, LIMITE_KERNEL_POR_DEFECTO);
+    public Memoria(int tamano, int limiteKernel) {
+        redimensionar(tamano, limiteKernel);
     }
 
     /**
@@ -62,22 +56,21 @@ public class Memoria {
      * Salidas: la lista de problemas encontrados, vacia si todo es valido
      * Restricciones: ninguna, no lanza excepciones
      * Descripcion: concentra las reglas de tamano de la memoria en un solo
-     *              lugar. La usa redimensionar y tambien la configuracion,
-     *              que necesita reportar los errores sin construir la memoria.
+     *              lugar: el kernel ocupa al menos una posicion y a los
+     *              programas les deben quedar al menos 32. La usa
+     *              redimensionar y tambien la configuracion, que necesita
+     *              reportar los errores sin construir la memoria.
      */
     public static List<String> validar(int tamano, int limiteKernel) {
         List<String> errores = new ArrayList<>();
-        if (tamano < TAMANO_MINIMO) {
-            errores.add("El tamano de memoria debe ser de al menos " + TAMANO_MINIMO
-                    + ", se recibio " + tamano);
-        }
-        if (limiteKernel < LIMITE_KERNEL_MINIMO) {
-            errores.add("El limite de kernel debe ser de al menos " + LIMITE_KERNEL_MINIMO
-                    + ", se recibio " + limiteKernel);
-        }
-        if (limiteKernel >= tamano) {
-            errores.add("El limite de kernel (" + limiteKernel
-                    + ") debe ser menor que el tamano total (" + tamano + ")");
+        if (limiteKernel < 1) {
+            errores.add("El kernel debe ocupar al menos una posicion, se recibio "
+                    + limiteKernel);
+        } else if (tamano - limiteKernel < ESPACIO_USUARIO_MINIMO) {
+            errores.add("El tamano de memoria debe ser de al menos "
+                    + (limiteKernel + ESPACIO_USUARIO_MINIMO) + " (" + limiteKernel
+                    + " para el kernel y " + ESPACIO_USUARIO_MINIMO
+                    + " para los programas), se recibio " + tamano);
         }
         return errores;
     }
@@ -87,10 +80,8 @@ public class Memoria {
      * Entradas: tamano, cantidad total de posiciones; limiteKernel, primera
      *           direccion de la zona de usuario
      * Salidas: ninguna
-     * Restricciones: el tamano debe ser de al menos 128, el limite de kernel
-     *                de al menos 16, y el limite debe ser menor que el tamano;
-     *                si no, lanza IllegalArgumentException. Descarta todo el
-     *                contenido anterior
+     * Restricciones: lanza IllegalArgumentException si la combinacion no es
+     *                valida (ver validar). Descarta todo el contenido anterior
      * Descripcion: reconstruye el arreglo con todas las posiciones vacias. Es
      *              final porque el constructor la invoca.
      */
@@ -150,45 +141,6 @@ public class Memoria {
      */
     public boolean esDireccionKernel(int direccion) {
         return direccion >= 0 && direccion < limiteKernel;
-    }
-
-    /**
-     * Nombre: validarEspacio
-     * Entradas: lineasRequeridas, cantidad de posiciones que ocupa el programa
-     * Salidas: ninguna si hay espacio
-     * Restricciones: lanza MemoriaInsuficienteException si el programa no cabe
-     * Descripcion: comprueba contra el espacio de la zona de usuario. Es el
-     *              requisito del enunciado de validar que exista el espacio
-     *              requerido antes de cargar.
-     */
-    public void validarEspacio(int lineasRequeridas) throws MemoriaInsuficienteException {
-        int disponibles = getEspacioUsuario();
-        if (lineasRequeridas > disponibles) {
-            throw new MemoriaInsuficienteException(lineasRequeridas, disponibles);
-        }
-    }
-
-    /**
-     * Nombre: cargarPrograma
-     * Entradas: lineas, texto de cada instruccion del programa, en orden
-     * Salidas: la direccion base donde quedo cargado
-     * Restricciones: lanza MemoriaInsuficienteException si el programa no
-     *                cabe, y en ese caso la memoria queda intacta
-     * Descripcion: carga el programa al inicio de la zona de usuario, una
-     *              instruccion por posicion. La operacion es atomica: primero
-     *              valida el espacio y solo entonces limpia y escribe, de modo
-     *              que un programa demasiado largo no destruye el que ya
-     *              estaba.
-     */
-    public int cargarPrograma(List<String> lineas) throws MemoriaInsuficienteException {
-        validarEspacio(lineas.size());
-        limpiarZonaUsuario();
-
-        int base = limiteKernel;
-        for (int i = 0; i < lineas.size(); i++) {
-            escribir(base + i, lineas.get(i));
-        }
-        return base;
     }
 
     /**

@@ -1,44 +1,53 @@
 package com.mycompany.minipc.hardware;
 
-import java.util.ArrayList;
-import java.util.List;
-
 import com.mycompany.minipc.excepciones.DesbordamientoException;
 import com.mycompany.minipc.excepciones.EjecucionException;
-import com.mycompany.minipc.excepciones.MemoriaInsuficienteException;
 import com.mycompany.minipc.excepciones.SintaxisException;
 import com.mycompany.minipc.isa.Ensamblador;
 import com.mycompany.minipc.isa.Forma;
 import com.mycompany.minipc.isa.Instruccion;
 import com.mycompany.minipc.isa.RegistroID;
-import com.mycompany.minipc.so.procesos.BCP;
-import com.mycompany.minipc.so.procesos.EstadoProceso;
 
 /**
  * Nombre: Procesador
- * Entradas: el programa a ejecutar y el nombre del archivo de origen
- * Salidas: el estado del proceso tras cada instruccion, comunicado a los
- *          observadores registrados
- * Restricciones: ejecuta un solo proceso a la vez; no hay multiprogramacion
- *                ni cambio de contexto entre procesos
- * Descripcion: el procesador del Mini PC. Implementa el ciclo de instruccion:
- *              el procesador repite indefinidamente traer la instruccion que
- *              apunta el PC (etapa fetch) e interpretarla y ejecutarla (etapa
- *              execute). La memoria guarda cada instruccion como texto; el IR
- *              recibe ese texto y la CPU lo decodifica antes de ejecutarlo.
- *              La aritmetica se resuelve sobre enteros de Java.
+ * Entradas: la memoria principal de la que trae las instrucciones
+ * Salidas: el resultado de cada ciclo de instruccion
+ * Restricciones: es solo hardware: no conoce procesos, BCP ni estados. El
+ *                sistema operativo le carga un contexto (registros, base y
+ *                alcance) antes de ejecutar y se lo lleva al BCP despues
+ * Descripcion: la CPU del Mini PC. Implementa el ciclo de instruccion: traer
+ *              la instruccion que apunta el PC (fetch) e interpretarla y
+ *              ejecutarla (execute). La memoria guarda cada instruccion como
+ *              texto; el IR recibe ese texto y la CPU lo decodifica antes de
+ *              ejecutarlo. Los registros base y alcance delimitan la region
+ *              del proceso en ejecucion: un salto fuera de ella es una
+ *              interrupcion de programa (Stallings, figura 7.8).
  */
 public class Procesador {
+
+    /**
+     * Nombre: Resultado
+     * Entradas: no aplica, es una enumeracion de valores fijos
+     * Salidas: no aplica
+     * Restricciones: ninguna
+     * Descripcion: lo que informa la CPU al terminar un ciclo.
+     */
+    public enum Resultado {
+
+        /** El proceso puede seguir ejecutando. */
+        CONTINUA,
+
+        /** Ejecuto INT 20H o paso su ultima instruccion. */
+        TERMINO
+    }
 
     private final Memoria memoria;
     private final BancoRegistros registros;
     private final Estadisticas estadisticas;
-    private final List<ObservadorCPU> observadores;
+    private final Pila pila;
 
     /** Decodificador: interpreta el texto que trae el fetch. */
     private final Ensamblador decodificador;
-
-    private BCP bcp;
 
     /** Program Counter: direccion de la proxima instruccion. */
     private int pc;
@@ -59,140 +68,68 @@ public class Procesador {
      */
     private boolean zf;
 
-    /** Pila del proceso, de capacidad 5. */
-    private final Pila pila;
-
     /** Se activa al ejecutar INT 20H, para terminar el proceso. */
     private boolean finSolicitado;
 
-    private int direccionBase;
-    private int direccionFin;
-    private int cantidadInstrucciones;
-    private int instruccionesEjecutadas;
-    private int ciclosReloj;
+    /** Registro base: primera direccion del proceso en ejecucion. */
+    private int base;
 
-    private EstadoProceso estado;
-    private int siguientePid;
+    /** Registro de alcance (limite): cuantas posiciones ocupa el proceso. */
+    private int alcance;
 
     /**
      * Nombre: Procesador
-     * Entradas: ninguna
-     * Salidas: el procesador construido, sin programa cargado
-     * Restricciones: la memoria arranca con la configuracion por defecto
-     * Descripcion: crea el procesador con su memoria, sus registros y sus
-     *              contadores. Queda en estado NUEVO hasta que se le cargue
-     *              un programa.
+     * Entradas: memoria, memoria principal compartida con el sistema operativo
+     * Salidas: el procesador construido, sin contexto cargado
+     * Restricciones: la memoria no debe ser nula
+     * Descripcion: crea la CPU con sus registros, su pila y sus contadores.
      */
-    public Procesador() {
-        this.memoria = new Memoria();
+    public Procesador(Memoria memoria) {
+        this.memoria = memoria;
         this.registros = new BancoRegistros();
         this.estadisticas = new Estadisticas();
         this.pila = new Pila();
         this.decodificador = new Ensamblador();
-        this.irTexto = "";
-        this.observadores = new ArrayList<>();
-        this.siguientePid = 1;
-        this.estado = EstadoProceso.NUEVO;
-    }
-
-    /**
-     * Nombre: cargar
-     * Entradas: lineas, texto de cada instruccion del programa; nombreArchivo,
-     *           nombre del archivo de origen para el BCP
-     * Salidas: ninguna; avisa a los observadores con la fase CARGA
-     * Restricciones: lanza MemoriaInsuficienteException si el programa no cabe
-     *                en la zona de usuario, y en ese caso nada cambia
-     * Descripcion: carga un programa en memoria y deja el procesador listo
-     *              para ejecutarlo desde la primera instruccion. Pone los
-     *              registros y los contadores en cero y crea un BCP nuevo con
-     *              el siguiente identificador de proceso.
-     */
-    public void cargar(List<String> lineas, String nombreArchivo)
-            throws MemoriaInsuficienteException {
-        direccionBase = memoria.cargarPrograma(lineas);
-        cantidadInstrucciones = lineas.size();
-        direccionFin = direccionBase + cantidadInstrucciones - 1;
-
-        registros.reset();
-        estadisticas.reset();
-        estadisticas.setPosicionesUsadas(memoria.getPosicionesUsadas());
-
-        pc = direccionBase;
-        irTexto = "";
-        ir = null;
-        ac = 0;
-        zf = false;
-        pila.vaciar();
-        finSolicitado = false;
-        instruccionesEjecutadas = 0;
-        ciclosReloj = 0;
-
-        bcp = new BCP(siguientePid++, nombreArchivo);
-        estado = EstadoProceso.LISTO;
-        bcp.actualizarDesde(this);
-
-        notificar(Fase.CARGA);
+        limpiar();
     }
 
     /**
      * Nombre: paso
-     * Entradas: ninguna, opera sobre el estado interno del procesador
-     * Salidas: true si queda al menos una instruccion por ejecutar
-     * Restricciones: devuelve false sin hacer nada si no hay programa o si el
-     *                proceso ya termino; lanza EjecucionException si la
-     *                instruccion provoca un error de ejecucion, dejando el
-     *                proceso en BLOQUEADO_ERROR
+     * Entradas: ninguna, opera sobre el contexto cargado
+     * Salidas: CONTINUA si el proceso puede seguir, TERMINO si ejecuto INT 20H
+     *          o paso su ultima instruccion
+     * Restricciones: lanza IllegalStateException si no hay contexto cargado
+     *                (alcance cero); lanza EjecucionException si la
+     *                instruccion provoca un error, que es una interrupcion de
+     *                programa que atiende el sistema operativo
      * Descripcion: ejecuta una sola instruccion, es decir un ciclo de fetch
      *              mas execute completo. El fetch trae el texto de la celda
      *              que apunta el PC al IR; el execute lo decodifica y lo
      *              ejecuta. El PC se incrementa en la etapa de fetch, igual
      *              que en el libro, de modo que durante la ejecucion ya apunta
-     *              a la instruccion siguiente. Avisa a los observadores dos
-     *              veces, una por etapa, para que la interfaz pueda mostrar el
-     *              ciclo separado.
+     *              a la instruccion siguiente.
      */
-    public boolean paso() {
-        if (!hayPrograma() || estado.esFinal()) {
-            return false;
+    public Resultado paso() {
+        if (alcance <= 0) {
+            throw new IllegalStateException("La CPU no tiene un proceso cargado");
         }
-        estado = EstadoProceso.EJECUCION;
 
         // ---------- ETAPA FETCH ----------
         int direccion = pc;
         irTexto = memoria.leerComoUsuario(direccion);
         ir = null;
         pc++;
-        ciclosReloj++;
         estadisticas.registrarLectura();
-        bcp.actualizarDesde(this);
-        notificar(Fase.FETCH);
 
         // ---------- ETAPA EXECUTE (decodifica y ejecuta) ----------
-        try {
-            ir = decodificar(direccion, irTexto);
-            ejecutar(ir);
-        } catch (EjecucionException e) {
-            // El proceso no puede continuar, pero la interfaz tiene que
-            // poder mostrar en que estado quedo antes de ver el error.
-            estado = EstadoProceso.BLOQUEADO_ERROR;
-            ciclosReloj++;
-            bcp.actualizarDesde(this);
-            notificar(Fase.EXECUTE);
-            throw e;
-        }
-
-        ciclosReloj++;
-        instruccionesEjecutadas++;
+        ir = decodificar(direccion, irTexto);
+        ejecutar(ir);
         estadisticas.registrar(ir.getOpcode());
 
-        if (finSolicitado || pc > direccionFin) {
-            estado = EstadoProceso.TERMINADO;
+        if (finSolicitado || pc >= base + alcance) {
+            return Resultado.TERMINO;
         }
-
-        bcp.actualizarDesde(this);
-        notificar(Fase.EXECUTE);
-
-        return !haTerminado();
+        return Resultado.CONTINUA;
     }
 
     /**
@@ -343,10 +280,10 @@ public class Procesador {
      */
     private void saltar(Instruccion instruccion) {
         int destino = pc + instruccion.getValor(0);
-        if (destino < direccionBase || destino > direccionFin) {
+        if (destino < base || destino >= base + alcance) {
             throw new DesbordamientoException("Desbordamiento: el salto \"" + instruccion
                     + "\" lleva a la direccion " + destino + ", fuera del programa (direcciones "
-                    + direccionBase + " a " + direccionFin + ")");
+                    + base + " a " + (base + alcance - 1) + ")");
         }
         pc = destino;
     }
@@ -392,155 +329,65 @@ public class Procesador {
                 + "\" todavia no esta disponible en esta version del simulador");
     }
 
-    /**
-     * Nombre: reset
-     * Entradas: ninguna
-     * Salidas: ninguna; avisa a los observadores con la fase REINICIO
-     * Restricciones: no hace nada si no hay programa cargado
-     * Descripcion: vuelve al inicio del programa sin descargarlo de memoria.
-     *              Los registros, el acumulador y los contadores quedan en
-     *              cero y el proceso vuelve al estado LISTO.
-     */
-    public void reset() {
-        if (!hayPrograma()) {
-            return;
-        }
-        registros.reset();
-        estadisticas.reset();
-        estadisticas.setPosicionesUsadas(memoria.getPosicionesUsadas());
-
-        pc = direccionBase;
-        irTexto = "";
-        ir = null;
-        ac = 0;
-        zf = false;
-        pila.vaciar();
-        finSolicitado = false;
-        instruccionesEjecutadas = 0;
-        ciclosReloj = 0;
-        estado = EstadoProceso.LISTO;
-
-        bcp.actualizarDesde(this);
-        notificar(Fase.REINICIO);
-    }
 
     /**
      * Nombre: limpiar
      * Entradas: ninguna
-     * Salidas: ninguna; avisa a los observadores con la fase REINICIO
-     * Restricciones: descarta el BCP, de modo que despues de llamarla
-     *                getBcp() devuelve nulo
-     * Descripcion: descarga el programa de la memoria y deja el procesador
-     *              como recien arrancado.
+     * Salidas: ninguna
+     * Restricciones: no toca la memoria ni las estadisticas
+     * Descripcion: pone todos los registros en cero y deja la CPU sin
+     *              contexto, como cuando el despachador ya guardo el contexto
+     *              del proceso en su BCP y todavia no carga otro.
      */
-    public void limpiar() {
-        memoria.limpiarZonaUsuario();
+    public final void limpiar() {
         registros.reset();
-        estadisticas.reset();
-
+        pila.vaciar();
         pc = 0;
         irTexto = "";
         ir = null;
         ac = 0;
         zf = false;
-        pila.vaciar();
         finSolicitado = false;
-        direccionBase = 0;
-        direccionFin = -1;
-        cantidadInstrucciones = 0;
-        instruccionesEjecutadas = 0;
-        ciclosReloj = 0;
-        bcp = null;
-        estado = EstadoProceso.NUEVO;
-
-        notificar(Fase.REINICIO);
+        base = 0;
+        alcance = 0;
     }
 
     /**
-     * Nombre: configurarMemoria
-     * Entradas: tamano, cantidad total de posiciones; limiteKernel, primera
-     *           direccion de la zona de usuario
+     * Nombre: cargarLimites
+     * Entradas: base, primera direccion del proceso; alcance, cuantas
+     *           posiciones ocupa
      * Salidas: ninguna
-     * Restricciones: lanza IllegalArgumentException si los valores no son
-     *                coherentes; descarga siempre el programa actual
-     * Descripcion: cambia la configuracion de la memoria. El programa se
-     *              descarga porque redimensionar invalida las direcciones ya
-     *              asignadas.
+     * Restricciones: el alcance debe ser positivo
+     * Descripcion: carga los registros base y limite, que es lo que hace el
+     *              despachador al darle la CPU a un proceso. Tambien olvida
+     *              un INT 20H pendiente del proceso anterior.
      */
-    public void configurarMemoria(int tamano, int limiteKernel) {
-        memoria.redimensionar(tamano, limiteKernel);
-        limpiar();
-    }
-
-    /**
-     * Nombre: haTerminado
-     * Entradas: ninguna
-     * Salidas: true si el programa llego al final o quedo bloqueado
-     * Restricciones: ninguna
-     * Descripcion: agrupa los dos estados finales para que quien consulte no
-     *              tenga que distinguirlos cuando no le importa la causa.
-     */
-    public boolean haTerminado() {
-        return estado.esFinal();
-    }
-
-    /**
-     * Nombre: hayPrograma
-     * Entradas: ninguna
-     * Salidas: true si hay un programa cargado en memoria
-     * Restricciones: ninguna
-     * Descripcion: exige que haya instrucciones y BCP, que son las dos cosas
-     *              que limpiar() deshace, de modo que no puede dar un falso
-     *              positivo tras descargar.
-     */
-    public boolean hayPrograma() {
-        return cantidadInstrucciones > 0 && bcp != null;
-    }
-
-    /**
-     * Nombre: agregarObservador
-     * Entradas: observador, interesado en los cambios del procesador
-     * Salidas: ninguna
-     * Restricciones: ignora los nulos y los duplicados
-     * Descripcion: registra a quien quiera enterarse de cada etapa del ciclo.
-     */
-    public void agregarObservador(ObservadorCPU observador) {
-        if (observador != null && !observadores.contains(observador)) {
-            observadores.add(observador);
+    public void cargarLimites(int base, int alcance) {
+        if (alcance <= 0) {
+            throw new IllegalArgumentException("El alcance debe ser positivo: " + alcance);
         }
+        this.base = base;
+        this.alcance = alcance;
+        this.finSolicitado = false;
     }
 
     /**
-     * Nombre: quitarObservador
-     * Entradas: observador, a dar de baja
-     * Salidas: ninguna
-     * Restricciones: no falla si el observador no estaba registrado
-     * Descripcion: deja de avisar al observador indicado.
+     * Nombre: tieneContexto
+     * Entradas: ninguna
+     * Salidas: true si hay un proceso cargado en la CPU
+     * Restricciones: ninguna
+     * Descripcion: la CPU esta libre cuando no tiene limites cargados.
      */
-    public void quitarObservador(ObservadorCPU observador) {
-        observadores.remove(observador);
-    }
-
-    /**
-     * Nombre: notificar
-     * Entradas: fase, momento del ciclo del que se avisa
-     * Salidas: ninguna
-     * Restricciones: se ejecuta en el mismo hilo que llamo a paso(), asi que
-     *                los observadores deben responder rapido
-     * Descripcion: recorre la lista de observadores avisandoles del cambio.
-     */
-    private void notificar(Fase fase) {
-        for (ObservadorCPU observador : observadores) {
-            observador.alCambiarEstado(this, fase);
-        }
+    public boolean tieneContexto() {
+        return alcance > 0;
     }
 
     /**
      * Nombre: getMemoria
      * Entradas: ninguna
-     * Salidas: la memoria del procesador
+     * Salidas: la memoria de la que lee la CPU
      * Restricciones: ninguna
-     * Descripcion: la interfaz la necesita para dibujar la tabla de memoria.
+     * Descripcion: acceso de solo lectura al campo correspondiente.
      */
     public Memoria getMemoria() {
         return memoria;
@@ -549,9 +396,9 @@ public class Procesador {
     /**
      * Nombre: getRegistros
      * Entradas: ninguna
-     * Salidas: el banco de registros
+     * Salidas: el banco de registros AX a DX
      * Restricciones: ninguna
-     * Descripcion: lo usa el BCP para tomar la instantanea del contexto.
+     * Descripcion: el cambio de contexto lo lee y lo escribe.
      */
     public BancoRegistros getRegistros() {
         return registros;
@@ -560,7 +407,7 @@ public class Procesador {
     /**
      * Nombre: getEstadisticas
      * Entradas: ninguna
-     * Salidas: la contabilidad de la ejecucion
+     * Salidas: los contadores de la CPU
      * Restricciones: ninguna
      * Descripcion: alimenta el dialogo de estadisticas.
      */
@@ -569,25 +416,14 @@ public class Procesador {
     }
 
     /**
-     * Nombre: getBcp
+     * Nombre: getPila
      * Entradas: ninguna
-     * Salidas: el bloque de control del proceso actual, o nulo si no hay
-     * Restricciones: devuelve nulo tras limpiar(), asi que hay que comprobarlo
-     * Descripcion: da acceso al BCP para que la interfaz muestre sus atributos.
-     */
-    public BCP getBcp() {
-        return bcp;
-    }
-
-    /**
-     * Nombre: getEstado
-     * Entradas: ninguna
-     * Salidas: el estado actual del proceso
+     * Salidas: la pila del proceso cargado
      * Restricciones: ninguna
-     * Descripcion: acceso de solo lectura al estado.
+     * Descripcion: el cambio de contexto la copia al BCP y la restaura.
      */
-    public EstadoProceso getEstado() {
-        return estado;
+    public Pila getPila() {
+        return pila;
     }
 
     /**
@@ -599,6 +435,17 @@ public class Procesador {
      */
     public int getPc() {
         return pc;
+    }
+
+    /**
+     * Nombre: setPc
+     * Entradas: pc, nueva direccion
+     * Salidas: ninguna
+     * Restricciones: ninguna
+     * Descripcion: lo usa el cambio de contexto al restaurar un proceso.
+     */
+    public void setPc(int pc) {
+        this.pc = pc;
     }
 
     /**
@@ -616,12 +463,24 @@ public class Procesador {
     /**
      * Nombre: getIrTexto
      * Entradas: ninguna
-     * Salidas: el texto legible de la instruccion en curso
+     * Salidas: el texto de la instruccion en curso
      * Restricciones: es cadena vacia mientras no se haya ejecutado nada
-     * Descripcion: es lo que se muestra del IR en el panel del BCP.
+     * Descripcion: es lo que se guarda del IR en el BCP.
      */
     public String getIrTexto() {
         return irTexto;
+    }
+
+    /**
+     * Nombre: setIrTexto
+     * Entradas: texto, contenido del IR
+     * Salidas: ninguna
+     * Restricciones: ninguna
+     * Descripcion: lo usa el cambio de contexto al restaurar un proceso.
+     */
+    public void setIrTexto(String texto) {
+        this.irTexto = texto == null ? "" : texto;
+        this.ir = null;
     }
 
     /**
@@ -636,6 +495,17 @@ public class Procesador {
     }
 
     /**
+     * Nombre: setAc
+     * Entradas: ac, nuevo valor
+     * Salidas: ninguna
+     * Restricciones: ninguna
+     * Descripcion: lo usa el cambio de contexto al restaurar un proceso.
+     */
+    public void setAc(int ac) {
+        this.ac = ac;
+    }
+
+    /**
      * Nombre: getZf
      * Entradas: ninguna
      * Salidas: true si la ultima comparacion CMP dio igual
@@ -647,75 +517,35 @@ public class Procesador {
     }
 
     /**
-     * Nombre: getPila
-     * Entradas: ninguna
-     * Salidas: la pila del proceso
+     * Nombre: setZf
+     * Entradas: zf, nuevo valor de la bandera
+     * Salidas: ninguna
      * Restricciones: ninguna
-     * Descripcion: el BCP la copia para guardar el contexto; las pruebas la
-     *              consultan para verificar PUSH, POP y PARAM.
+     * Descripcion: lo usa el cambio de contexto al restaurar un proceso.
      */
-    public Pila getPila() {
-        return pila;
+    public void setZf(boolean zf) {
+        this.zf = zf;
     }
 
     /**
-     * Nombre: getDireccionBase
+     * Nombre: getBase
      * Entradas: ninguna
-     * Salidas: la direccion donde arranca el programa
+     * Salidas: el registro base
      * Restricciones: ninguna
      * Descripcion: acceso de solo lectura al campo correspondiente.
      */
-    public int getDireccionBase() {
-        return direccionBase;
+    public int getBase() {
+        return base;
     }
 
     /**
-     * Nombre: getLimite
+     * Nombre: getAlcance
      * Entradas: ninguna
-     * Salidas: cuantas posiciones de memoria ocupa el programa cargado
+     * Salidas: el registro de alcance
      * Restricciones: ninguna
-     * Descripcion: junto con la direccion base delimita la region del proceso.
+     * Descripcion: acceso de solo lectura al campo correspondiente.
      */
-    public int getLimite() {
-        return cantidadInstrucciones;
-    }
-
-    /**
-     * Nombre: getInstruccionesEjecutadas
-     * Entradas: ninguna
-     * Salidas: cuantas instrucciones lleva ejecutadas
-     * Restricciones: ninguna
-     * Descripcion: acceso de solo lectura al contador correspondiente.
-     */
-    public int getInstruccionesEjecutadas() {
-        return instruccionesEjecutadas;
-    }
-
-    /**
-     * Nombre: getCiclosReloj
-     * Entradas: ninguna
-     * Salidas: cuantos ciclos consumio la ejecucion
-     * Restricciones: cada instruccion consume dos, uno por etapa
-     * Descripcion: acceso de solo lectura al contador correspondiente.
-     */
-    public int getCiclosReloj() {
-        return ciclosReloj;
-    }
-
-    /**
-     * Nombre: getIndiceInstruccionActual
-     * Entradas: ninguna
-     * Salidas: indice dentro del programa contando desde cero, o -1 si ya no
-     *          queda ninguna instruccion pendiente
-     * Restricciones: ninguna
-     * Descripcion: traduce la direccion absoluta del PC a la posicion relativa
-     *              dentro del programa, que es lo que la interfaz necesita
-     *              para resaltar la fila correspondiente de la tabla.
-     */
-    public int getIndiceInstruccionActual() {
-        if (!hayPrograma() || pc > direccionFin) {
-            return -1;
-        }
-        return pc - direccionBase;
+    public int getAlcance() {
+        return alcance;
     }
 }

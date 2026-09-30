@@ -1,6 +1,6 @@
 package com.mycompany.minipc.gui;
 
-import com.mycompany.minipc.so.procesos.BCP;
+import com.mycompany.minipc.so.procesos.Proceso;
 
 import java.io.File;
 import java.util.List;
@@ -64,14 +64,14 @@ public interface VistaPrincipal {
 
     /**
      * Nombre: mostrarBCP
-     * Entradas: bcp, bloque a mostrar, o nulo para dejar el panel en blanco
+     * Entradas: proceso, proceso en ejecucion, o nulo si la CPU esta libre
      * Salidas: ninguna
-     * Restricciones: debe tolerar el valor nulo, que ocurre tras descargar el
-     *                programa
-     * Descripcion: vuelca los atributos del bloque de control de proceso en el
-     *              panel correspondiente.
+     * Restricciones: debe tolerar el valor nulo
+     * Descripcion: vuelca los campos del BCP en el panel correspondiente. El
+     *              proceso no guarda datos: cada valor se lee de las celdas
+     *              de su BCP en la memoria del kernel.
      */
-    void mostrarBCP(BCP bcp);
+    void mostrarBCP(Proceso proceso);
 
     /**
      * Nombre: escribirEnConsola

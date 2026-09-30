@@ -1,10 +1,11 @@
 package com.mycompany.minipc.gui;
 
-import com.mycompany.minipc.hardware.Estadisticas;
-import com.mycompany.minipc.hardware.Procesador;
 import com.mycompany.minipc.gui.modelo.ModeloTablaEstadisticas;
+import com.mycompany.minipc.hardware.Estadisticas;
+import com.mycompany.minipc.hardware.Memoria;
 import com.mycompany.minipc.isa.OpCode;
-import com.mycompany.minipc.so.procesos.BCP;
+import com.mycompany.minipc.so.SistemaOperativo;
+import com.mycompany.minipc.so.trabajos.Trabajo;
 
 import javax.swing.JProgressBar;
 
@@ -32,10 +33,9 @@ public class DialogoEstadisticas extends javax.swing.JDialog {
      *           bloquear la ventana de atras; controlador, del que se toman
      *           los datos
      * Salidas: el dialogo construido y ya poblado
-     * Restricciones: el controlador no debe ser nulo; el BCP si puede serlo, y
-     *                en ese caso el encabezado muestra guiones
+     * Restricciones: el controlador no debe ser nulo
      * Descripcion: arma los componentes y llena de una vez las tres secciones
-     *              con los datos actuales del procesador.
+     *              con los datos actuales del sistema operativo.
      */
     public DialogoEstadisticas(java.awt.Frame padre, boolean modal,
             ControladorPrincipal controlador) {
@@ -45,12 +45,12 @@ public class DialogoEstadisticas extends javax.swing.JDialog {
         this.modelo = new ModeloTablaEstadisticas();
         tblEstadisticas.setModel(modelo);
 
-        Procesador cpu = controlador.getProcesador();
+        SistemaOperativo so = controlador.getSistemaOperativo();
         Estadisticas datos = controlador.obtenerEstadisticas();
 
-        llenarEncabezado(cpu);
+        llenarEncabezado(so);
         llenarOperaciones(datos);
-        llenarDetalle(cpu, datos);
+        llenarDetalle(so, datos);
 
         getRootPane().setDefaultButton(btnCerrar);
         pack();
@@ -59,23 +59,30 @@ public class DialogoEstadisticas extends javax.swing.JDialog {
 
     /**
      * Nombre: llenarEncabezado
-     * Entradas: cpu, procesador del que se leen el BCP y la memoria
+     * Entradas: so, sistema operativo del que se leen trabajos y memoria
      * Salidas: ninguna; actualiza las etiquetas y la barra del resumen
-     * Restricciones: tolera que el BCP sea nulo
-     * Descripcion: muestra el programa, el estado final del proceso y la
-     *              ocupacion de la zona de usuario, esta ultima con el
-     *              porcentaje y las cifras absolutas a la vez.
+     * Restricciones: ninguna
+     * Descripcion: muestra cuantos trabajos hay y cuantos finalizaron, el
+     *              reloj simulado y la ocupacion de la zona de usuario.
      */
-    private void llenarEncabezado(Procesador cpu) {
-        BCP bcp = cpu.getBcp();
-        lblProgramaValor.setText(bcp != null ? bcp.getNombrePrograma() : "-");
-        lblEstadoFinalValor.setText(bcp != null ? bcp.getEstado().name() : "-");
+    private void llenarEncabezado(SistemaOperativo so) {
+        int total = so.getListaTrabajos().getTrabajos().size();
+        int finalizados = 0;
+        for (Trabajo trabajo : so.getListaTrabajos().getTrabajos()) {
+            if (trabajo.getEstado().esFinal()) {
+                finalizados++;
+            }
+        }
+        lblPrograma.setText("Trabajos:");
+        lblProgramaValor.setText(total + " (" + finalizados + " finalizados)");
+        lblEstadoFinal.setText("Reloj simulado:");
+        lblEstadoFinalValor.setText(SistemaOperativo.formatearReloj(so.getReloj()));
 
-        int porcentaje = cpu.getMemoria().getPorcentajeUso();
+        Memoria memoria = so.getMemoria();
+        int porcentaje = memoria.getPorcentajeUso();
         pbUsoMemoria.setValue(porcentaje);
-        pbUsoMemoria.setString(porcentaje + " %  ("
-                + cpu.getMemoria().getPosicionesUsadas() + " de "
-                + cpu.getMemoria().getEspacioUsuario() + " posiciones)");
+        pbUsoMemoria.setString(porcentaje + " %  (" + memoria.getPosicionesUsadas() + " de "
+                + memoria.getEspacioUsuario() + " posiciones)");
     }
 
     /**
@@ -117,30 +124,35 @@ public class DialogoEstadisticas extends javax.swing.JDialog {
 
     /**
      * Nombre: llenarDetalle
-     * Entradas: cpu, procesador del que se leen memoria y ciclos; datos,
-     *           contabilidad de la ejecucion
+     * Entradas: so, sistema operativo; datos, contadores de la CPU
      * Salidas: ninguna; llena la tabla de metricas
      * Restricciones: llama a refrescar una sola vez al final, para no
      *                redibujar la tabla por cada fila agregada
-     * Descripcion: agrega las diez metricas del detalle. La fila de escrituras
-     *              dice "en registros" y no "en memoria" porque en este juego
-     *              de instrucciones ninguna operacion escribe datos en una
-     *              direccion: STORE copia el acumulador a un registro.
+     * Descripcion: primero una fila por trabajo con su inicio, fin y duracion
+     *              en el reloj simulado (lo que pide el enunciado); despues
+     *              los contadores de la CPU y el mapa de la memoria. La vista
+     *              definitiva de estadisticas es del dia 6.
      */
-    private void llenarDetalle(Procesador cpu, Estadisticas datos) {
+    private void llenarDetalle(SistemaOperativo so, Estadisticas datos) {
+        for (Trabajo trabajo : so.getListaTrabajos().getTrabajos()) {
+            String detalle = trabajo.getEstado().name();
+            if (trabajo.getFin() >= 0) {
+                detalle = "inicio " + SistemaOperativo.formatearReloj(trabajo.getInicio())
+                        + ", fin " + SistemaOperativo.formatearReloj(trabajo.getFin())
+                        + ", duracion " + (trabajo.getFin() - trabajo.getInicio()) + " s"
+                        + (trabajo.getError() == null ? "" : " (error)");
+            }
+            modelo.agregar("P" + trabajo.getPid() + " " + trabajo.getPrograma(), detalle);
+        }
+        Memoria memoria = so.getMemoria();
         modelo.agregar("Instrucciones ejecutadas", datos.getTotalInstrucciones());
-        modelo.agregar("Ciclos de reloj", cpu.getCiclosReloj());
         modelo.agregar("Lecturas de memoria", datos.getAccesosLectura());
         modelo.agregar("Escrituras en registros", datos.getAccesosEscritura());
-        modelo.agregar("Posiciones de memoria ocupadas",
-                cpu.getMemoria().getPosicionesUsadas());
-        modelo.agregar("Tamano total de la memoria",
-                cpu.getMemoria().getTamano() + " posiciones");
-        modelo.agregar("Zona de kernel",
-                "0 a " + (cpu.getMemoria().getLimiteKernel() - 1));
-        modelo.agregar("Zona de usuario", cpu.getMemoria().getLimiteKernel()
-                + " a " + (cpu.getMemoria().getTamano() - 1));
-        modelo.agregar("Direccion base del programa", cpu.getDireccionBase());
+        modelo.agregar("Posiciones de memoria ocupadas", memoria.getPosicionesUsadas());
+        modelo.agregar("Tamano total de la memoria", memoria.getTamano() + " posiciones");
+        modelo.agregar("Zona de kernel", "0 a " + (memoria.getLimiteKernel() - 1));
+        modelo.agregar("Zona de usuario", memoria.getLimiteKernel() + " a "
+                + (memoria.getTamano() - 1));
         modelo.agregar("Tiempo de ejecucion", datos.getTiempoTotalMs() + " ms");
         modelo.refrescar();
     }

@@ -9,7 +9,9 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -30,10 +32,10 @@ class ConfiguracionTest {
     void valoresPorDefecto() {
         Configuracion c = Configuracion.porDefecto();
         assertEquals(256, c.getTamanoMemoria());
-        assertEquals(64, c.getLimiteKernel());
         assertEquals(512, c.getTamanoDisco());
         assertEquals(64, c.getTamanoMemoriaVirtual());
         assertEquals(1000, c.getMsPorSegundo());
+        assertEquals("FCFS", c.getAlgoritmo());
     }
 
     @Test
@@ -49,18 +51,20 @@ class ConfiguracionTest {
         String texto = Files.readString(archivo, StandardCharsets.UTF_8);
         assertTrue(texto.contains("memoria.tamano=256"), texto);
         assertTrue(texto.contains("disco.memoriaVirtual=64"), texto);
+        assertTrue(texto.contains("planificacion.algoritmo=FCFS"), texto);
+        assertFalse(texto.contains("memoria.kernel"), "El kernel ya no se configura");
     }
 
     @Test
     @DisplayName("Lo que se guarda se vuelve a leer igual")
     void guardarYCargar(@TempDir Path carpeta) throws Exception {
         LectorConfiguracion lector = new LectorConfiguracion(carpeta.resolve("config.properties"));
-        lector.guardar(new Configuracion(512, 128, 1024, 128, 250));
+        lector.guardar(new Configuracion(512, 1024, 128, 250, "fcfs"));
 
         Configuracion c = lector.cargar();
 
         assertEquals(512, c.getTamanoMemoria());
-        assertEquals(128, c.getLimiteKernel());
+        assertEquals("FCFS", c.getAlgoritmo(), "El nombre se guarda en mayusculas");
         assertEquals(1024, c.getTamanoDisco());
         assertEquals(128, c.getTamanoMemoriaVirtual());
         assertEquals(250, c.getMsPorSegundo());
@@ -74,7 +78,7 @@ class ConfiguracionTest {
         Configuracion c = new LectorConfiguracion(archivo).cargar();
 
         assertEquals(300, c.getTamanoMemoria());
-        assertEquals(64, c.getLimiteKernel());
+        assertEquals("FCFS", c.getAlgoritmo());
         assertEquals(512, c.getTamanoDisco());
     }
 
@@ -103,15 +107,34 @@ class ConfiguracionTest {
                 () -> new LectorConfiguracion(archivo).cargar());
 
         String mensaje = e.getMessage();
-        assertTrue(mensaje.contains("al menos 128"), mensaje);
+        assertTrue(mensaje.contains("al menos 160"), mensaje);
         assertTrue(mensaje.contains("memoria virtual"), mensaje);
         assertTrue(mensaje.contains("50 y 2000"), mensaje);
     }
 
     @Test
-    @DisplayName("El constructor rechaza un kernel que no deja zona de usuario")
-    void rechazaKernelMayorQueMemoria() {
-        assertThrows(ConfiguracionException.class,
-                () -> new Configuracion(256, 256, 512, 64, 1000));
+    @DisplayName("La memoria debe alcanzar para el kernel calculado mas 32 posiciones")
+    void rechazaMemoriaMenorQueElKernel() {
+        ConfiguracionException e = assertThrows(ConfiguracionException.class,
+                () -> new Configuracion(159, 512, 64, 1000, "FCFS"));
+        assertTrue(e.getMessage().contains("128 para el kernel"), e.getMessage());
+        assertDoesNotThrow(() -> new Configuracion(160, 512, 64, 1000, "FCFS"));
+    }
+
+    @Test
+    @DisplayName("Un algoritmo que no existe se rechaza con los disponibles")
+    void rechazaAlgoritmoDesconocido(@TempDir Path carpeta) throws Exception {
+        Path archivo = escribir(carpeta, "planificacion.algoritmo=RR\n");
+        ConfiguracionException e = assertThrows(ConfiguracionException.class,
+                () -> new LectorConfiguracion(archivo).cargar());
+        assertTrue(e.getMessage().contains("no disponible"), e.getMessage());
+        assertTrue(e.getMessage().contains("FCFS"), e.getMessage());
+    }
+
+    @Test
+    @DisplayName("Un archivo viejo con memoria.kernel se sigue leyendo")
+    void ignoraLaClaveViejaDelKernel(@TempDir Path carpeta) throws Exception {
+        Path archivo = escribir(carpeta, "memoria.tamano=256\nmemoria.kernel=64\n");
+        assertEquals(256, new LectorConfiguracion(archivo).cargar().getTamanoMemoria());
     }
 }

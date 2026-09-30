@@ -1,17 +1,14 @@
 package com.mycompany.minipc.hardware;
 
-import com.mycompany.minipc.excepciones.MemoriaInsuficienteException;
+import com.mycompany.minipc.excepciones.EjecucionException;
 import com.mycompany.minipc.excepciones.SintaxisException;
 import com.mycompany.minipc.isa.Ensamblador;
 import com.mycompany.minipc.isa.OpCode;
 import com.mycompany.minipc.isa.RegistroID;
-import com.mycompany.minipc.so.procesos.BCP;
-import com.mycompany.minipc.so.procesos.EstadoProceso;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -21,38 +18,46 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Pruebas del ciclo de instruccion.
+ * Pruebas del ciclo de instruccion de la CPU como hardware: se le carga un
+ * programa en memoria y sus registros base y alcance, sin sistema operativo.
  *
  * La prueba central recorre el programa de ejemplo del enunciado paso a
- * paso y compara AC, AX y BX contra la tabla de la lamina 6. Si los siete
- * estados coinciden, el nucleo del simulador es correcto.
+ * paso y compara AC, AX y BX contra la tabla de la lamina 6.
  */
 class ProcesadorTest {
 
+    private static final int BASE = 128;
+
+    private Memoria memoria;
     private Procesador cpu;
     private Ensamblador ensamblador;
 
     @BeforeEach
     void preparar() {
-        cpu = new Procesador();
+        memoria = new Memoria(256, 128);
+        cpu = new Procesador(memoria);
         ensamblador = new Ensamblador();
     }
 
-    /** Comprueba con el ensamblador que las lineas son validas y las devuelve. */
-    private List<String> validas(List<String> lineas) throws SintaxisException {
+    /** Escribe el programa en memoria desde BASE y le da el contexto a la CPU. */
+    private void cargar(List<String> lineas) throws SintaxisException {
         ensamblador.ensamblar(lineas);
-        return lineas;
+        for (int i = 0; i < lineas.size(); i++) {
+            memoria.escribir(BASE + i, lineas.get(i));
+        }
+        cpu.cargarLimites(BASE, lineas.size());
+        cpu.setPc(BASE);
     }
 
-    private void cargarEjemplo() throws SintaxisException, MemoriaInsuficienteException {
-        cpu.cargar(validas(List.of(
+    private void cargarEjemplo() throws SintaxisException {
+        cargar(List.of(
                 "MOV AX, 5",
                 "MOV BX, 3",
                 "LOAD AX",
                 "ADD BX",
                 "SUB AX",
                 "STORE AX",
-                "MOV BX, -8")), "file.asm");
+                "MOV BX, -8"));
     }
 
     private int ax() {
@@ -64,18 +69,10 @@ class ProcesadorTest {
     }
 
     @Test
-    @DisplayName("Al cargar, el procesador queda listo en la base del usuario")
-    void estadoInicialTrasCargar() throws Exception {
-        cargarEjemplo();
-
-        assertEquals(EstadoProceso.LISTO, cpu.getEstado());
-        assertEquals(64, cpu.getDireccionBase());
-        assertEquals(64, cpu.getPc());
-        assertEquals(7, cpu.getLimite());
-        assertEquals(0, cpu.getAc());
-        assertEquals(0, cpu.getInstruccionesEjecutadas());
-        assertTrue(cpu.hayPrograma());
-        assertFalse(cpu.haTerminado());
+    @DisplayName("Sin contexto cargado la CPU esta libre y no ejecuta")
+    void sinContexto() {
+        assertFalse(cpu.tieneContexto());
+        assertThrows(IllegalStateException.class, cpu::paso);
     }
 
     @Test
@@ -95,15 +92,13 @@ class ProcesadorTest {
         };
 
         for (int i = 0; i < esperados.length; i++) {
-            cpu.paso();
+            Procesador.Resultado resultado = cpu.paso();
             assertEquals(esperados[i][0], cpu.getAc(), "AC tras la instruccion " + (i + 1));
             assertEquals(esperados[i][1], ax(), "AX tras la instruccion " + (i + 1));
             assertEquals(esperados[i][2], bx(), "BX tras la instruccion " + (i + 1));
+            assertEquals(i < 6 ? Procesador.Resultado.CONTINUA : Procesador.Resultado.TERMINO,
+                    resultado, "Resultado de la instruccion " + (i + 1));
         }
-
-        assertEquals(EstadoProceso.TERMINADO, cpu.getEstado());
-        assertTrue(cpu.haTerminado());
-        assertEquals(7, cpu.getInstruccionesEjecutadas());
     }
 
     @Test
@@ -111,121 +106,81 @@ class ProcesadorTest {
     void elPcAvanzaDeUnoEnUno() throws Exception {
         cargarEjemplo();
         for (int i = 0; i < 7; i++) {
-            assertEquals(64 + i, cpu.getPc(), "Antes de la instruccion " + (i + 1));
+            assertEquals(BASE + i, cpu.getPc(), "Antes de la instruccion " + (i + 1));
             cpu.paso();
         }
-        assertEquals(71, cpu.getPc());
+        assertEquals(BASE + 7, cpu.getPc());
     }
 
     @Test
-    @DisplayName("El IR guarda la instruccion en curso")
+    @DisplayName("El IR recibe el texto de la celda y la CPU lo decodifica")
     void elIrGuardaLaInstruccion() throws Exception {
         cargarEjemplo();
         assertNull(cpu.getIr());
         assertEquals("", cpu.getIrTexto());
 
         cpu.paso();
+        assertEquals("MOV AX, 5", cpu.getIrTexto());
         assertEquals(OpCode.MOV, cpu.getIr().getOpcode());
         assertEquals(RegistroID.AX, cpu.getIr().getRegistro(0));
         assertEquals(5, cpu.getIr().getValor(1));
-        assertEquals("MOV AX, 5", cpu.getIrTexto());
-        assertEquals("MOV AX, 5", cpu.getBcp().getIrTexto());
     }
 
     @Test
-    @DisplayName("Paso devuelve false cuando ya no queda nada por ejecutar")
-    void pasoAvisaElFinal() throws Exception {
-        cargarEjemplo();
-        for (int i = 0; i < 6; i++) {
-            assertTrue(cpu.paso(), "Todavia quedaban instrucciones");
-        }
-        assertFalse(cpu.paso(), "La septima instruccion es la ultima");
-        assertFalse(cpu.paso(), "Ya no debe ejecutar nada mas");
-        assertEquals(7, cpu.getInstruccionesEjecutadas());
-    }
-
-    @Test
-    @DisplayName("El BCP refleja el contexto despues de cada instruccion")
-    void elBcpSigueAlProcesador() throws Exception {
-        cargarEjemplo();
-        assertEquals(1, cpu.getBcp().getPid());
-        assertEquals("file.asm", cpu.getBcp().getNombrePrograma());
-        assertEquals(64, cpu.getBcp().getDireccionBase());
-        assertEquals(7, cpu.getBcp().getLimite());
-
-        cpu.paso();
-        cpu.paso();
-        cpu.paso();
-
-        assertEquals(5, cpu.getBcp().getAc());
-        assertEquals(5, cpu.getBcp().getRegistro(RegistroID.AX));
-        assertEquals(3, cpu.getBcp().getRegistro(RegistroID.BX));
-        assertEquals(0, cpu.getBcp().getRegistro(RegistroID.CX));
-        assertEquals(67, cpu.getBcp().getPc());
-        assertEquals(3, cpu.getBcp().getInstruccionesEjecutadas());
-        assertEquals(EstadoProceso.EJECUCION, cpu.getBcp().getEstado());
-    }
-
-    @Test
-    @DisplayName("La aritmetica ya no esta limitada a ocho bits")
+    @DisplayName("La aritmetica no esta limitada a ocho bits")
     void laAritmeticaNoDesborda() throws Exception {
-        cpu.cargar(validas(List.of(
-                "MOV AX, 200",
-                "MOV BX, 100",
-                "LOAD AX",
-                "ADD BX",
-                "SUB AX",
-                "SUB AX")), "grande.asm");
-
-        cpu.paso();
-        cpu.paso();
-        cpu.paso();
-        cpu.paso();
+        cargar(List.of("MOV AX, 200", "MOV BX, 100", "LOAD AX", "ADD BX", "SUB AX",
+                "SUB AX"));
+        for (int i = 0; i < 4; i++) {
+            cpu.paso();
+        }
         assertEquals(300, cpu.getAc());
-
         cpu.paso();
         cpu.paso();
         assertEquals(-100, cpu.getAc());
-        assertEquals(EstadoProceso.TERMINADO, cpu.getEstado());
     }
 
     @Test
-    @DisplayName("Reiniciar vuelve al inicio sin descargar el programa")
-    void reiniciarConservaElPrograma() throws Exception {
-        cargarEjemplo();
-        cpu.paso();
-        cpu.paso();
-        cpu.paso();
-
-        cpu.reset();
-
-        assertEquals(64, cpu.getPc());
-        assertEquals(0, cpu.getAc());
-        assertEquals(0, ax());
-        assertEquals(0, cpu.getInstruccionesEjecutadas());
-        assertEquals(EstadoProceso.LISTO, cpu.getEstado());
-        assertTrue(cpu.hayPrograma(), "El programa sigue en memoria");
-        assertEquals(7, cpu.getMemoria().getPosicionesUsadas());
+    @DisplayName("La CPU no puede traer instrucciones de la zona del kernel")
+    void noEjecutaElKernel() {
+        memoria.escribir(10, "INC");
+        cpu.cargarLimites(10, 1);
+        cpu.setPc(10);
+        assertThrows(IllegalArgumentException.class, cpu::paso);
     }
 
     @Test
-    @DisplayName("Limpiar descarga el programa de la memoria")
-    void limpiarDescargaElPrograma() throws Exception {
+    @DisplayName("Si el PC llega a una celda que no es una instruccion, es un error")
+    void celdaQueNoEsInstruccion() throws Exception {
+        cargar(List.of("MOV AX, 1", "INT 20H"));
+        memoria.escribir(BASE + 1, "163");
+
+        cpu.paso();
+        EjecucionException e = assertThrows(EjecucionException.class, cpu::paso);
+        assertTrue(e.getMessage().contains("no contiene una instruccion valida"), e.getMessage());
+        assertEquals("163", cpu.getIrTexto(), "El IR muestra lo que se trajo de memoria");
+    }
+
+    @Test
+    @DisplayName("Limpiar deja la CPU sin contexto y con los registros en cero")
+    void limpiar() throws Exception {
         cargarEjemplo();
+        cpu.paso();
         cpu.paso();
         cpu.limpiar();
 
-        assertFalse(cpu.hayPrograma());
-        assertEquals(0, cpu.getMemoria().getPosicionesUsadas());
-        assertEquals(EstadoProceso.NUEVO, cpu.getEstado());
-        assertFalse(cpu.paso(), "Sin programa no hay nada que ejecutar");
+        assertFalse(cpu.tieneContexto());
+        assertEquals(0, cpu.getPc());
+        assertEquals(0, ax());
+        assertEquals("", cpu.getIrTexto());
+        assertEquals(0, cpu.getPila().getTamano());
     }
 
     @Test
     @DisplayName("Las estadisticas cuentan las instrucciones por tipo")
     void estadisticasPorOperacion() throws Exception {
         cargarEjemplo();
-        while (cpu.paso()) {
+        while (cpu.paso() == Procesador.Resultado.CONTINUA) {
             // ejecuta hasta el final
         }
 
@@ -238,59 +193,5 @@ class ProcesadorTest {
         assertEquals(1, e.getConteo(OpCode.SUB));
         assertEquals(7, e.getAccesosLectura(), "Una lectura de memoria por instruccion");
         assertEquals(4, e.getAccesosEscritura(), "Tres MOV mas un STORE");
-    }
-
-    @Test
-    @DisplayName("Los observadores reciben las fases fetch y execute")
-    void notificaALosObservadores() throws Exception {
-        List<Fase> recibidas = new ArrayList<>();
-        cpu.agregarObservador((procesador, fase) -> recibidas.add(fase));
-
-        cargarEjemplo();
-        assertEquals(List.of(Fase.CARGA), recibidas);
-
-        recibidas.clear();
-        cpu.paso();
-        assertEquals(List.of(Fase.FETCH, Fase.EXECUTE), recibidas);
-
-        recibidas.clear();
-        cpu.reset();
-        assertEquals(List.of(Fase.REINICIO), recibidas);
-    }
-
-    @Test
-    @DisplayName("El indice de la instruccion actual sigue al PC")
-    void indiceDeLaInstruccionActual() throws Exception {
-        cargarEjemplo();
-        assertEquals(0, cpu.getIndiceInstruccionActual());
-        cpu.paso();
-        assertEquals(1, cpu.getIndiceInstruccionActual());
-        while (cpu.paso()) {
-            // ejecuta hasta el final
-        }
-        assertEquals(-1, cpu.getIndiceInstruccionActual(), "Ya no hay instruccion pendiente");
-    }
-
-    @Test
-    @DisplayName("Un programa que no cabe en memoria no se carga")
-    void rechazaProgramaQueNoCabe() throws Exception {
-        cpu.configurarMemoria(128, 120);
-
-        List<String> largo = new ArrayList<>();
-        for (int i = 0; i < 10; i++) {
-            largo.add("MOV AX, 1");
-        }
-        assertThrows(MemoriaInsuficienteException.class,
-                () -> cpu.cargar(validas(largo), "largo.asm"));
-        assertFalse(cpu.hayPrograma());
-    }
-
-    @Test
-    @DisplayName("Cada programa cargado recibe un PID nuevo")
-    void pidIncremental() throws Exception {
-        cargarEjemplo();
-        assertEquals(1, cpu.getBcp().getPid());
-        cargarEjemplo();
-        assertEquals(2, cpu.getBcp().getPid());
     }
 }
