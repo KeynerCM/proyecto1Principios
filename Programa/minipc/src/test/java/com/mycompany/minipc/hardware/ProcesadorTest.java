@@ -1,10 +1,12 @@
-package com.mycompany.minipc.core;
+package com.mycompany.minipc.hardware;
 
 import com.mycompany.minipc.excepciones.MemoriaInsuficienteException;
 import com.mycompany.minipc.excepciones.SintaxisException;
 import com.mycompany.minipc.isa.Ensamblador;
 import com.mycompany.minipc.isa.OpCode;
 import com.mycompany.minipc.isa.RegistroID;
+import com.mycompany.minipc.so.procesos.BCP;
+import com.mycompany.minipc.so.procesos.EstadoProceso;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

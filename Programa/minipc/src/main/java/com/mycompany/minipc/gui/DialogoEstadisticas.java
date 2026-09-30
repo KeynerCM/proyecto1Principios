@@ -1,10 +1,10 @@
 package com.mycompany.minipc.gui;
 
-import com.mycompany.minipc.core.BCP;
-import com.mycompany.minipc.core.Estadisticas;
-import com.mycompany.minipc.core.Procesador;
+import com.mycompany.minipc.hardware.Estadisticas;
+import com.mycompany.minipc.hardware.Procesador;
 import com.mycompany.minipc.gui.modelo.ModeloTablaEstadisticas;
 import com.mycompany.minipc.isa.OpCode;
+import com.mycompany.minipc.so.procesos.BCP;
 
 import javax.swing.JProgressBar;
 

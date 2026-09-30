@@ -2,11 +2,11 @@ package com.mycompany.minipc.gui;
 
 import com.mycompany.minipc.config.Configuracion;
 import com.mycompany.minipc.config.LectorConfiguracion;
-import com.mycompany.minipc.core.BCP;
-import com.mycompany.minipc.core.EntradaIndice;
-import com.mycompany.minipc.core.EstadoProceso;
+import com.mycompany.minipc.hardware.EntradaIndice;
 import com.mycompany.minipc.excepciones.ConfiguracionException;
 import com.mycompany.minipc.isa.RegistroID;
+import com.mycompany.minipc.so.procesos.BCP;
+import com.mycompany.minipc.so.procesos.EstadoProceso;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

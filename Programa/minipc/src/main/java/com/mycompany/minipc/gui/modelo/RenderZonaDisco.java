@@ -1,6 +1,6 @@
 package com.mycompany.minipc.gui.modelo;
 
-import com.mycompany.minipc.core.Disco;
+import com.mycompany.minipc.hardware.Disco;
 
 import javax.swing.JTable;
 import javax.swing.table.DefaultTableCellRenderer;

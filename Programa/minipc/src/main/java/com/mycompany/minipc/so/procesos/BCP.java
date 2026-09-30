@@ -1,5 +1,6 @@
-package com.mycompany.minipc.core;
+package com.mycompany.minipc.so.procesos;
 
+import com.mycompany.minipc.hardware.Procesador;
 import com.mycompany.minipc.isa.RegistroID;
 
 import java.time.LocalDateTime;

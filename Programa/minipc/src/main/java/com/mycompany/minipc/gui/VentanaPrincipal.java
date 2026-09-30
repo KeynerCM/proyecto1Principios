@@ -1,7 +1,7 @@
 package com.mycompany.minipc.gui;
 
 import com.mycompany.minipc.config.LectorConfiguracion;
-import com.mycompany.minipc.core.BCP;
+import com.mycompany.minipc.so.procesos.BCP;
 import com.mycompany.minipc.isa.RegistroID;
 
 import javax.swing.BorderFactory;

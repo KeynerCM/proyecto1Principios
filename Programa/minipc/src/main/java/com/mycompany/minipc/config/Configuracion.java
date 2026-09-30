@@ -3,8 +3,8 @@ package com.mycompany.minipc.config;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.mycompany.minipc.core.Disco;
-import com.mycompany.minipc.core.Memoria;
+import com.mycompany.minipc.hardware.Disco;
+import com.mycompany.minipc.hardware.Memoria;
 import com.mycompany.minipc.excepciones.ConfiguracionException;
 
 /**

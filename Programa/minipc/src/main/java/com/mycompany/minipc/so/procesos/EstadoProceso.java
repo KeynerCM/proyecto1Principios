@@ -1,4 +1,4 @@
-package com.mycompany.minipc.core;
+package com.mycompany.minipc.so.procesos;
 
 /**
  * Nombre: EstadoProceso

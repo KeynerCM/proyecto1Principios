@@ -10,12 +10,12 @@ import javax.swing.Timer;
 
 import com.mycompany.minipc.config.Configuracion;
 import com.mycompany.minipc.config.LectorConfiguracion;
-import com.mycompany.minipc.core.Disco;
-import com.mycompany.minipc.core.EntradaIndice;
-import com.mycompany.minipc.core.Estadisticas;
-import com.mycompany.minipc.core.Fase;
-import com.mycompany.minipc.core.ObservadorCPU;
-import com.mycompany.minipc.core.Procesador;
+import com.mycompany.minipc.hardware.Disco;
+import com.mycompany.minipc.hardware.EntradaIndice;
+import com.mycompany.minipc.hardware.Estadisticas;
+import com.mycompany.minipc.hardware.Fase;
+import com.mycompany.minipc.hardware.ObservadorCPU;
+import com.mycompany.minipc.hardware.Procesador;
 import com.mycompany.minipc.excepciones.ConfiguracionException;
 import com.mycompany.minipc.excepciones.EjecucionException;
 import com.mycompany.minipc.excepciones.DiscoException;

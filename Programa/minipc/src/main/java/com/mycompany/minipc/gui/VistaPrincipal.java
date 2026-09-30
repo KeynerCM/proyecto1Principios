@@ -1,6 +1,6 @@
 package com.mycompany.minipc.gui;
 
-import com.mycompany.minipc.core.BCP;
+import com.mycompany.minipc.so.procesos.BCP;
 
 import java.io.File;
 import java.util.List;

@@ -1,8 +1,8 @@
 package com.mycompany.minipc.gui;
 
 import com.mycompany.minipc.config.Configuracion;
-import com.mycompany.minipc.core.Disco;
-import com.mycompany.minipc.core.Memoria;
+import com.mycompany.minipc.hardware.Disco;
+import com.mycompany.minipc.hardware.Memoria;
 import com.mycompany.minipc.excepciones.ConfiguracionException;
 
 import javax.swing.SpinnerNumberModel;

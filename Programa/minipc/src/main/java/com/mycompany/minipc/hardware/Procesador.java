@@ -1,4 +1,4 @@
-package com.mycompany.minipc.core;
+package com.mycompany.minipc.hardware;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -11,6 +11,8 @@ import com.mycompany.minipc.isa.Ensamblador;
 import com.mycompany.minipc.isa.Forma;
 import com.mycompany.minipc.isa.Instruccion;
 import com.mycompany.minipc.isa.RegistroID;
+import com.mycompany.minipc.so.procesos.BCP;
+import com.mycompany.minipc.so.procesos.EstadoProceso;
 
 /**
  * Nombre: Procesador

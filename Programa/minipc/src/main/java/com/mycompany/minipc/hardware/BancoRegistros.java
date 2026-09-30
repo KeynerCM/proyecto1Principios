@@ -1,4 +1,4 @@
-package com.mycompany.minipc.core;
+package com.mycompany.minipc.hardware;
 
 import com.mycompany.minipc.isa.RegistroID;
 

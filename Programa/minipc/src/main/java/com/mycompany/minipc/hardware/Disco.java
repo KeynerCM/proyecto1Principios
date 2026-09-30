@@ -1,4 +1,4 @@
-package com.mycompany.minipc.core;
+package com.mycompany.minipc.hardware;
 
 import java.util.ArrayList;
 import java.util.Arrays;
