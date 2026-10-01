@@ -57,6 +57,9 @@ class ControladorPrincipalTest {
         private String archivoEnBarra = "";
         private String estadoEnBarra = "";
         private int usoMemoria = -1;
+        private List<String> pantalla = Collections.emptyList();
+        private boolean tecladoHabilitado;
+        private String reloj = "";
 
         @Override
         public void mostrarInstrucciones(List<String> programa) {
@@ -121,6 +124,21 @@ class ControladorPrincipalTest {
         @Override
         public List<File> seleccionarArchivosAsm() {
             return archivosAEntregar;
+        }
+
+        @Override
+        public void mostrarPantalla(List<String> lineas) {
+            this.pantalla = new ArrayList<>(lineas);
+        }
+
+        @Override
+        public void habilitarTeclado(boolean habilitado) {
+            this.tecladoHabilitado = habilitado;
+        }
+
+        @Override
+        public void mostrarReloj(String reloj) {
+            this.reloj = reloj;
         }
 
         /** Fija los archivos que "elegira" el usuario; sin argumentos, cancela. */
@@ -355,7 +373,8 @@ class ControladorPrincipalTest {
         vista.entregar(ejemploDelEnunciado(carpeta));
         controlador.alCargarArchivos();
 
-        for (int i = 0; i < 6; i++) {
+        // Pesos: MOV 1, MOV 1, LOAD 2, ADD 3, SUB 3, STORE 2 = 12 s; MOV BX, -8 = 1 s.
+        for (int i = 0; i < 12; i++) {
             controlador.alPasoAPaso();
         }
         Proceso p = enEjecucion();
@@ -367,7 +386,7 @@ class ControladorPrincipalTest {
         assertEquals(-1, vista.filaResaltada, "Ya no hay instruccion pendiente");
         assertEquals("FINALIZADO", vista.estadoEnBarra);
         assertEquals(EstadoProceso.FINALIZADO, trabajos().get(0).getEstado());
-        assertEquals(7, trabajos().get(0).getTiempoCpu());
+        assertEquals(13, trabajos().get(0).getTiempoCpu(), "Suma de los pesos");
         assertTrue(vista.consolaContiene("Todos los trabajos finalizaron"));
     }
 
@@ -383,7 +402,9 @@ class ControladorPrincipalTest {
         assertEquals("a.asm", vista.archivoEnBarra);
         assertEquals("PREPARADO", controlador.getModeloTrabajos().getValueAt(1, 2));
         controlador.alPasoAPaso();
-        assertEquals("FINALIZADO", controlador.getModeloTrabajos().getValueAt(0, 2));
+        controlador.alPasoAPaso();
+        assertEquals("FINALIZADO", controlador.getModeloTrabajos().getValueAt(0, 2),
+                "MOV (1 s) + INT 20H (2 s)");
 
         controlador.alPasoAPaso();
         assertEquals("b.asm", vista.archivoEnBarra, "Cambio de contexto al segundo");
@@ -566,13 +587,40 @@ class ControladorPrincipalTest {
     void estadisticasDisponibles(@TempDir Path carpeta) throws Exception {
         vista.entregar(ejemploDelEnunciado(carpeta));
         controlador.alCargarArchivos();
-        for (int i = 0; i < 7; i++) {
+        for (int i = 0; i < 13; i++) {
             controlador.alPasoAPaso();
         }
 
         assertEquals(7, controlador.obtenerEstadisticas().getTotalInstrucciones());
         Trabajo t = trabajos().get(0);
         assertEquals(0, t.getInicio());
-        assertEquals(7, t.getFin());
+        assertEquals(13, t.getFin(), "El reloj avanza segun los pesos");
+        assertEquals("00:00:13", vista.reloj);
+    }
+
+    @Test
+    @DisplayName("INT 09H habilita el teclado; el valor llega al proceso y se ve en la pantalla")
+    void tecladoYPantalla(@TempDir Path carpeta) throws Exception {
+        vista.entregar(crearAsm(carpeta, "teclado.asm", "INT 09H\nINT 10H\nINT 20H\n"));
+        controlador.alCargarArchivos();
+        assertFalse(vista.tecladoHabilitado);
+
+        controlador.alPasoAPaso();
+        assertTrue(vista.tecladoHabilitado, "El proceso espera el teclado");
+        assertEquals(List.of(">> Ingresar valor:"), vista.pantalla);
+        assertEquals("EN_ESPERA", controlador.getModeloTrabajos().getValueAt(0, 2));
+
+        controlador.alEnviarTeclado("300");
+        assertEquals("Teclado", vista.tituloError);
+        assertTrue(vista.tecladoHabilitado, "Un valor invalido no se acepta");
+
+        controlador.alEnviarTeclado("42");
+        assertFalse(vista.tecladoHabilitado);
+        assertEquals("PREPARADO", controlador.getModeloTrabajos().getValueAt(0, 2));
+
+        controlador.alPasoAPaso();
+        controlador.alPasoAPaso();
+        assertEquals(List.of(">> Ingresar valor:", "42", "42"), vista.pantalla,
+                "Eco del teclado y luego INT 10H imprime DX");
     }
 }

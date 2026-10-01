@@ -8,9 +8,12 @@ import com.mycompany.minipc.excepciones.EjecucionException;
 import com.mycompany.minipc.hardware.Disco;
 import com.mycompany.minipc.hardware.EntradaIndice;
 import com.mycompany.minipc.hardware.Memoria;
+import com.mycompany.minipc.hardware.Pantalla;
 import com.mycompany.minipc.hardware.Procesador;
+import com.mycompany.minipc.so.archivos.SistemaArchivos;
 import com.mycompany.minipc.so.despacho.CambioContexto;
 import com.mycompany.minipc.so.despacho.Despachador;
+import com.mycompany.minipc.so.interrupciones.ManejadorInterrupciones;
 import com.mycompany.minipc.so.memoria.GestorMemoria;
 import com.mycompany.minipc.so.planificacion.AlgoritmoPlanificacion;
 import com.mycompany.minipc.so.planificacion.PlanificadorProcesos;
@@ -37,10 +40,17 @@ import com.mycompany.minipc.so.trabajos.Trabajo;
  *                2. si la CPU esta libre, el planificador de procesos elige
  *                   un proceso PREPARADO y el despachador se lo da a la CPU
  *                   (cambio de contexto);
- *                3. la CPU ejecuta un segundo;
- *                4. si el proceso termina o falla, el despachador guarda su
+ *                3. la CPU ejecuta un segundo; una instruccion dura tantos
+ *                   segundos como su peso;
+ *                4. si termino un INT, el manejador de interrupciones atiende
+ *                   la llamada al sistema (INT 09H deja al proceso EN_ESPERA
+ *                   hasta el ENTER del teclado);
+ *                5. si el proceso termina o falla, el despachador guarda su
  *                   contexto, se libera su memoria y su BCP, y en el
  *                   siguiente segundo se despacha otro.
+ *
+ *              Si ningun proceso esta PREPARADO pero alguno espera el
+ *              teclado, la CPU queda ociosa y el reloj sigue avanzando.
  */
 public class SistemaOperativo {
 
@@ -54,8 +64,11 @@ public class SistemaOperativo {
     private final PlanificadorTrabajos planificadorTrabajos;
     private final PlanificadorProcesos planificadorProcesos;
     private final Despachador despachador;
+    private final Pantalla pantalla;
+    private final ManejadorInterrupciones interrupciones;
 
     private final List<String> errores;
+    private boolean ociosaAnunciada;
     private Consumer<String> bitacora;
     private int reloj;
     private int siguientePid;
@@ -91,6 +104,9 @@ public class SistemaOperativo {
         this.planificadorProcesos = new PlanificadorProcesos(listaProcesos, algoritmo);
         this.despachador = new Despachador(cpu, tabla, listaProcesos, new CambioContexto(),
                 conHora);
+        this.pantalla = new Pantalla();
+        this.interrupciones = new ManejadorInterrupciones(cpu, despachador, listaProcesos,
+                pantalla, new SistemaArchivos(disco, memoria), conHora);
         this.siguientePid = 1;
     }
 
@@ -179,8 +195,9 @@ public class SistemaOperativo {
         if (actual == null) {
             actual = planificadorProcesos.elegir();
             if (actual == null) {
-                return listaTrabajos.hayPendientes();
+                return tickOcioso();
             }
+            ociosaAnunciada = false;
             despachador.despachar(actual);
         }
 
@@ -188,9 +205,14 @@ public class SistemaOperativo {
         try {
             Procesador.Resultado resultado = cpu.paso();
             actual.sumarTiempoEmpleado(1);
-            despachador.actualizarBCP();
-            if (resultado == Procesador.Resultado.TERMINO) {
+            boolean termina = resultado == Procesador.Resultado.TERMINO;
+            if (resultado == Procesador.Resultado.LLAMADA_SISTEMA) {
+                termina = interrupciones.atenderLlamada(actual, cpu.getInterrupcionPendiente());
+            }
+            if (termina) {
                 terminar(actual, null);
+            } else {
+                despachador.actualizarBCP();
             }
         } catch (EjecucionException e) {
             actual.sumarTiempoEmpleado(1);
@@ -201,6 +223,55 @@ public class SistemaOperativo {
         }
         planificadorTrabajos.admitir(reloj);
         return listaTrabajos.hayPendientes();
+    }
+
+    /**
+     * Nombre: tickOcioso
+     * Entradas: ninguna
+     * Salidas: true si todavia quedan trabajos sin finalizar
+     * Restricciones: solo se llama cuando no hay ningun proceso PREPARADO
+     * Descripcion: si algun proceso espera el teclado, el tiempo pasa aunque
+     *              la CPU no tenga nada que hacer: el reloj avanza y la CPU
+     *              queda ociosa. El aviso se escribe una sola vez.
+     */
+    private boolean tickOcioso() {
+        if (!listaTrabajos.hayPendientes()) {
+            return false;
+        }
+        if (interrupciones.hayEsperaTeclado()) {
+            reloj++;
+            if (!ociosaAnunciada) {
+                anotar("CPU ociosa: no hay procesos PREPARADO; se espera un valor del"
+                        + " teclado.");
+                ociosaAnunciada = true;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Nombre: entradaTeclado
+     * Entradas: texto, lo que se escribio en el teclado antes del ENTER
+     * Salidas: el proceso que recibio el valor
+     * Restricciones: lanza IllegalArgumentException si no es un numero de 0 a
+     *                255, e IllegalStateException si nadie espera el teclado
+     * Descripcion: la interrupcion de E/S del teclado (ver
+     *              ManejadorInterrupciones).
+     */
+    public Proceso entradaTeclado(String texto) {
+        ociosaAnunciada = false;
+        return interrupciones.entradaTeclado(texto);
+    }
+
+    /**
+     * Nombre: hayEsperaTeclado
+     * Entradas: ninguna
+     * Salidas: true si algun proceso espera un valor del teclado
+     * Restricciones: ninguna
+     * Descripcion: la interfaz habilita el teclado solo en ese caso.
+     */
+    public boolean hayEsperaTeclado() {
+        return interrupciones.hayEsperaTeclado();
     }
 
     /**
@@ -287,7 +358,9 @@ public class SistemaOperativo {
         memoria.limpiarZonaUsuario();
         cpu.limpiar();
         cpu.getEstadisticas().reset();
+        pantalla.limpiar();
         errores.clear();
+        ociosaAnunciada = false;
         reloj = 0;
     }
 
@@ -423,6 +496,17 @@ public class SistemaOperativo {
      */
     public Disco getDisco() {
         return disco;
+    }
+
+    /**
+     * Nombre: getPantalla
+     * Entradas: ninguna
+     * Salidas: la pantalla del Mini PC
+     * Restricciones: ninguna
+     * Descripcion: acceso de solo lectura al campo correspondiente.
+     */
+    public Pantalla getPantalla() {
+        return pantalla;
     }
 
     /**

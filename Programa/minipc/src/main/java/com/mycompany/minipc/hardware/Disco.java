@@ -44,6 +44,13 @@ public class Disco {
     /** Contenido de una posicion libre. */
     public static final String VACIA = "";
 
+    /**
+     * Contenido de un archivo de datos vacio. Un archivo de datos ocupa una
+     * celda con sus bytes entre corchetes, por ejemplo "[65,66]"; nunca queda
+     * vacia, para que no se confunda con una posicion libre.
+     */
+    public static final String DATOS_VACIOS = "[]";
+
     private String[] celdas;
     private int tamano;
     private int tamanoMemoriaVirtual;
@@ -245,6 +252,60 @@ public class Disco {
         }
         celdas[ranura] = entrada.aTexto();
         return entrada;
+    }
+
+    /**
+     * Nombre: crearArchivo
+     * Entradas: nombre, nombre del archivo de datos
+     * Salidas: la entrada del indice creada
+     * Restricciones: lanza DiscoException si ya existe, si el indice esta
+     *                lleno o si no hay lugar
+     * Descripcion: crea un archivo de datos vacio, que ocupa una celda. Lo
+     *              usa INT 21H con AH = 3Ch.
+     */
+    public EntradaIndice crearArchivo(String nombre) throws DiscoException {
+        return guardarPrograma(nombre, List.of(DATOS_VACIOS));
+    }
+
+    /**
+     * Nombre: leerDatos
+     * Entradas: nombre, nombre del archivo de datos
+     * Salidas: los bytes del archivo, en orden
+     * Restricciones: lanza DiscoException si no existe o si es un programa
+     *                y no un archivo de datos
+     * Descripcion: interpreta la celda "[65,66]" como la lista 65, 66.
+     */
+    public List<Integer> leerDatos(String nombre) throws DiscoException {
+        EntradaIndice entrada = buscarObligatorio(nombre);
+        String texto = celdas[entrada.getDireccionInicio()];
+        if (entrada.getTamano() != 1 || !texto.startsWith("[") || !texto.endsWith("]")) {
+            throw new DiscoException("\"" + entrada.getNombre()
+                    + "\" es un programa, no un archivo de datos");
+        }
+        List<Integer> datos = new ArrayList<>();
+        String contenido = texto.substring(1, texto.length() - 1).trim();
+        if (!contenido.isEmpty()) {
+            for (String parte : contenido.split(",")) {
+                datos.add(Integer.parseInt(parte.trim()));
+            }
+        }
+        return datos;
+    }
+
+    /**
+     * Nombre: escribirDatos
+     * Entradas: nombre, nombre del archivo de datos; datos, bytes a guardar
+     * Salidas: ninguna
+     * Restricciones: lanza DiscoException si no existe o si es un programa
+     * Descripcion: reemplaza el contenido de la celda del archivo.
+     */
+    public void escribirDatos(String nombre, List<Integer> datos) throws DiscoException {
+        leerDatos(nombre);
+        StringBuilder texto = new StringBuilder("[");
+        for (int i = 0; i < datos.size(); i++) {
+            texto.append(i == 0 ? "" : ",").append(datos.get(i));
+        }
+        celdas[buscar(nombre).getDireccionInicio()] = texto.append("]").toString();
     }
 
     /**

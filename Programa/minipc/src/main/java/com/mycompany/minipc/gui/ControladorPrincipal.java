@@ -287,6 +287,25 @@ public class ControladorPrincipal {
     }
 
     /**
+     * Nombre: alEnviarTeclado
+     * Entradas: texto, lo que el usuario escribio en el teclado
+     * Salidas: ninguna
+     * Restricciones: si el valor no es un numero de 0 a 255, o si nadie espera
+     *                el teclado, lo informa y no cambia nada
+     * Descripcion: el ENTER del teclado: el sistema operativo entrega el
+     *              valor al proceso que ejecuto INT 09H, que vuelve a
+     *              PREPARADO.
+     */
+    public void alEnviarTeclado(String texto) {
+        try {
+            so.entradaTeclado(texto);
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            vista.mostrarErrores("Teclado", Collections.singletonList(e.getMessage()));
+        }
+        actualizarVista();
+    }
+
+    /**
      * Nombre: alEjecutar
      * Entradas: ninguna
      * Salidas: ninguna; arranca el temporizador
@@ -487,6 +506,11 @@ public class ControladorPrincipal {
         int direccionActual = -1;
         if (actual != null) {
             direccionActual = actual.getPc();
+            Procesador cpu = so.getCpu();
+            if (cpu.getSegundosCumplidos() < cpu.getPesoActual()) {
+                // A mitad de su peso se resalta la instruccion en curso, no la siguiente.
+                direccionActual = cpu.getDireccionIr();
+            }
             int relativo = direccionActual - actual.getBase();
             indice = relativo >= 0 && relativo < actual.getAlcance() ? relativo : -1;
         }
@@ -500,6 +524,9 @@ public class ControladorPrincipal {
         vista.actualizarBarraContexto(actual != null ? actual.getPrograma() : "(CPU libre)",
                 textoDelEstado());
         vista.actualizarUsoMemoria(so.getMemoria().getPorcentajeUso());
+        vista.mostrarPantalla(so.getPantalla().getLineas());
+        vista.habilitarTeclado(so.hayEsperaTeclado());
+        vista.mostrarReloj(SistemaOperativo.formatearReloj(so.getReloj()));
         boolean hayTrabajos = !so.getListaTrabajos().getTrabajos().isEmpty();
         vista.actualizarBotones(hayTrabajos, temporizador.isRunning(), !so.hayPendientes());
     }

@@ -22,8 +22,8 @@ public enum OpCode {
     /** El registro recibe el valor del AC. */
     STORE(2, Forma.REGISTRO),
 
-    /** El registro destino recibe otro registro o un valor inmediato. */
-    MOV(1, Forma.REGISTRO_REGISTRO, Forma.REGISTRO_NUMERO),
+    /** El registro destino recibe otro registro, un valor inmediato o la direccion de un texto. */
+    MOV(1, Forma.REGISTRO_REGISTRO, Forma.REGISTRO_NUMERO, Forma.REGISTRO_TEXTO),
 
     /** AC recibe AC mas el registro. */
     ADD(3, Forma.REGISTRO),

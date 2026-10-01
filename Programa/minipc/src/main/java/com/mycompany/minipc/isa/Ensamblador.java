@@ -191,6 +191,9 @@ public class Ensamblador {
                 case DESPLAZAMIENTO:
                     operandos.add(Operando.desplazamiento(leerNumero(texto, numeroLinea)));
                     break;
+                case TEXTO:
+                    operandos.add(Operando.texto(texto));
+                    break;
                 default:
                     operandos.add(Operando.interrupcion(leerInterrupcion(texto, numeroLinea)));
                     break;
@@ -217,6 +220,11 @@ public class Ensamblador {
         List<String> operandos = resto.isEmpty() ? List.of()
                 : Arrays.asList(Sintaxis.SEPARADOR_DIAGNOSTICO.split(resto));
         String esperado = ". Se esperaba " + opcode.describirFormas();
+
+        String textoMal = diagnosticarTexto(opcode, resto);
+        if (textoMal != null) {
+            return textoMal + esperado;
+        }
 
         int minimo = Integer.MAX_VALUE;
         int maximo = 0;
@@ -260,7 +268,7 @@ public class Ensamblador {
                         }
                         break;
                     case DESPLAZAMIENTO:
-                        if (!Sintaxis.ES_NUMERO.matcher(texto).matches()) {
+                        if (!Sintaxis.ES_DESPLAZAMIENTO.matcher(texto).matches()) {
                             return "desplazamiento invalido \"" + texto + "\": debe ser un"
                                     + " entero, por ejemplo +2 o -3";
                         }
@@ -277,6 +285,36 @@ public class Ensamblador {
             }
         }
         return "formato invalido: \"" + linea + "\"" + esperado;
+    }
+
+    /**
+     * Nombre: diagnosticarTexto
+     * Entradas: opcode, operacion reconocida; resto, lo que sigue al mnemonico
+     * Salidas: el mensaje si el problema es un texto entre comillas, o nulo
+     * Restricciones: solo explica errores; nunca acepta una linea
+     * Descripcion: el diagnostico general separa por espacios y comas, lo que
+     *              partiria un texto con espacios. Por eso los textos se
+     *              revisan antes: comillas en una operacion que no las admite,
+     *              comillas sin cerrar o caracteres no permitidos, y un nombre
+     *              de archivo escrito sin comillas.
+     */
+    private String diagnosticarTexto(OpCode opcode, String resto) {
+        boolean admiteTexto = opcode.getFormas().contains(Forma.REGISTRO_TEXTO);
+        if (resto.contains("\"")) {
+            if (!admiteTexto) {
+                return "la operacion " + opcode + " no admite texto entre comillas";
+            }
+            if (resto.chars().filter(c -> c == '"').count() != 2) {
+                return "el texto debe abrir y cerrar comillas: " + resto;
+            }
+            return "texto invalido " + resto.substring(resto.indexOf('"')) + ": entre las"
+                    + " comillas solo se admiten letras, digitos, espacios, punto, guion y"
+                    + " parentesis";
+        }
+        if (admiteTexto && resto.matches("(?i)\\s*[A-Za-z]\\w*\\s*,\\s*[\\w-]+\\.\\w+\\s*")) {
+            return "el nombre de archivo va entre comillas, por ejemplo MOV DX, \"datos.txt\"";
+        }
+        return null;
     }
 
     /**
@@ -347,14 +385,19 @@ public class Ensamblador {
 
     /**
      * Nombre: leerNumero
-     * Entradas: texto, digitos con signo opcional; numeroLinea, para el mensaje
+     * Entradas: texto, entero decimal con signo opcional o hexadecimal con
+     *           sufijo h; numeroLinea, para el mensaje
      * Salidas: el valor numerico
      * Restricciones: lanza SintaxisException si el numero no cabe en un entero
-     * Descripcion: la expresion regular ya garantizo que son digitos; lo unico
-     *              que puede fallar es el tamano.
+     * Descripcion: la expresion regular ya garantizo el formato; lo unico que
+     *              puede fallar es el tamano. "3Ch" vale 60 y "40h" vale 64.
      */
     private int leerNumero(String texto, int numeroLinea) throws SintaxisException {
         try {
+            char ultimo = texto.charAt(texto.length() - 1);
+            if (ultimo == 'h' || ultimo == 'H') {
+                return Integer.parseInt(texto.substring(0, texto.length() - 1), 16);
+            }
             return Integer.parseInt(texto);
         } catch (NumberFormatException e) {
             throw error(numeroLinea, "el valor " + texto + " es demasiado grande");

@@ -1,21 +1,41 @@
 package com.mycompany.minipc.isa;
 
+import java.util.List;
+
 /**
  * Nombre: RegistroID
  * Entradas: no aplica, es una enumeracion de valores fijos
  * Salidas: no aplica
- * Restricciones: ninguna
- * Descripcion: identidad de los cuatro registros de proposito general del
- *              Mini PC. Los nombres AX, BX, CX y DX estan tomados del x86,
- *              pero aqui son simples identificadores sin relacion con los
- *              registros reales del procesador.
+ * Restricciones: AH y AL no son registros aparte: son la parte alta y la
+ *                parte baja de AX (confirmado por el profesor)
+ * Descripcion: los nombres de registro que acepta el ensamblador. AX, BX, CX
+ *              y DX son los cuatro registros de proposito general; AH y AL
+ *              permiten leer y escribir un byte de AX, como en el x86, y los
+ *              usa INT 21H: AH elige la operacion y AL lleva el dato.
  */
 public enum RegistroID {
 
     AX,
     BX,
     CX,
-    DX;
+    DX,
+    AH,
+    AL;
+
+    /** Los cuatro registros que existen de verdad, en orden. */
+    public static final List<RegistroID> GENERALES = List.of(AX, BX, CX, DX);
+
+    /**
+     * Nombre: esMitadDeAx
+     * Entradas: ninguna
+     * Salidas: true para AH y AL
+     * Restricciones: ninguna
+     * Descripcion: AH y AL no tienen almacenamiento propio; se calculan a
+     *              partir de AX.
+     */
+    public boolean esMitadDeAx() {
+        return this == AH || this == AL;
+    }
 
     /**
      * Nombre: desdeNombre

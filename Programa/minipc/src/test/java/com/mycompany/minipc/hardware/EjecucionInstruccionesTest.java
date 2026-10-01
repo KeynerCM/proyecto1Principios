@@ -4,6 +4,7 @@ import com.mycompany.minipc.excepciones.DesbordamientoException;
 import com.mycompany.minipc.excepciones.EjecucionException;
 import com.mycompany.minipc.excepciones.SintaxisException;
 import com.mycompany.minipc.isa.Ensamblador;
+import com.mycompany.minipc.isa.Interrupcion;
 import com.mycompany.minipc.isa.RegistroID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -51,12 +52,28 @@ class EjecucionInstruccionesTest {
         cpu.setPc(BASE);
     }
 
-    /** Carga el programa y lo ejecuta hasta el final, con un tope de pasos. */
+    /** Avanza segundo a segundo hasta que la instruccion en curso cumple su peso. */
+    private Procesador.Resultado instruccion() {
+        Procesador.Resultado resultado = cpu.paso();
+        while (resultado == Procesador.Resultado.EN_CURSO) {
+            resultado = cpu.paso();
+        }
+        return resultado;
+    }
+
+    /**
+     * Carga el programa y lo ejecuta hasta el final, con un tope de pasos. Sin
+     * sistema operativo, el final es pasar la ultima instruccion o llegar a
+     * INT 20H, que la CPU deja como llamada al sistema.
+     */
     private void ejecutar(String... lineas) throws Exception {
         cargar(validas(List.of(lineas)));
         boolean termino = false;
         for (int i = 0; i < 1000 && !termino; i++) {
-            termino = cpu.paso() == Procesador.Resultado.TERMINO;
+            Procesador.Resultado resultado = cpu.paso();
+            termino = resultado == Procesador.Resultado.TERMINO
+                    || (resultado == Procesador.Resultado.LLAMADA_SISTEMA
+                    && cpu.getInterrupcionPendiente() == Interrupcion.FIN_PROGRAMA);
         }
         assertTrue(termino, "El programa debio terminar");
     }
@@ -109,11 +126,11 @@ class EjecucionInstruccionesTest {
                 "MOV AX, 3", "MOV BX, 3", "CMP AX, BX", "MOV BX, 4", "CMP AX, BX",
                 "INT 20H")));
         for (int i = 0; i < 3; i++) {
-            cpu.paso();
+            instruccion();
         }
         assertTrue(cpu.getZf());
-        cpu.paso();
-        cpu.paso();
+        instruccion();
+        instruccion();
         assertFalse(cpu.getZf());
     }
 
@@ -157,7 +174,7 @@ class EjecucionInstruccionesTest {
         // probar que el procesador tambien protege la region del proceso.
         cargar(List.of("JMP +10"));
 
-        DesbordamientoException e = assertThrows(DesbordamientoException.class, cpu::paso);
+        DesbordamientoException e = assertThrows(DesbordamientoException.class, this::instruccion);
         assertTrue(e.getMessage().contains("fuera del programa"), e.getMessage());
     }
 
@@ -186,9 +203,9 @@ class EjecucionInstruccionesTest {
                 "PUSH AX", "PUSH AX", "PUSH AX", "PUSH AX", "PUSH AX", "PUSH AX",
                 "INT 20H")));
         for (int i = 0; i < 5; i++) {
-            cpu.paso();
+            instruccion();
         }
-        DesbordamientoException e = assertThrows(DesbordamientoException.class, cpu::paso);
+        DesbordamientoException e = assertThrows(DesbordamientoException.class, this::instruccion);
         assertTrue(e.getMessage().contains("Desbordamiento de pila"), e.getMessage());
         assertEquals(Pila.CAPACIDAD, cpu.getPila().getTamano());
     }
@@ -198,8 +215,8 @@ class EjecucionInstruccionesTest {
     void paramQueNoCabe() throws Exception {
         cargar(validas(List.of(
                 "PARAM 1, 2, 3", "PARAM 4, 5, 6", "INT 20H")));
-        cpu.paso();
-        assertThrows(DesbordamientoException.class, cpu::paso);
+        instruccion();
+        assertThrows(DesbordamientoException.class, this::instruccion);
         assertEquals(3, cpu.getPila().getTamano(), "El segundo PARAM no apilo nada");
     }
 
@@ -207,7 +224,7 @@ class EjecucionInstruccionesTest {
     @DisplayName("POP con la pila vacia es un error")
     void popConPilaVacia() throws Exception {
         cargar(validas(List.of("POP AX", "INT 20H")));
-        DesbordamientoException e = assertThrows(DesbordamientoException.class, cpu::paso);
+        DesbordamientoException e = assertThrows(DesbordamientoException.class, this::instruccion);
         assertTrue(e.getMessage().contains("Pila vacia"), e.getMessage());
     }
 
@@ -220,10 +237,12 @@ class EjecucionInstruccionesTest {
     }
 
     @Test
-    @DisplayName("Las interrupciones de entrada y salida todavia no se ejecutan")
-    void interrupcionesPendientes() throws Exception {
-        cargar(validas(List.of("INT 10H", "INT 20H")));
-        EjecucionException e = assertThrows(EjecucionException.class, cpu::paso);
-        assertTrue(e.getMessage().contains("todavia no esta disponible"), e.getMessage());
+    @DisplayName("Cada INT es una llamada al sistema que la CPU deja al sistema operativo")
+    void intEsLlamadaAlSistema() throws Exception {
+        cargar(validas(List.of("INT 10H", "INT 21H", "INT 20H")));
+        assertEquals(Procesador.Resultado.LLAMADA_SISTEMA, instruccion());
+        assertEquals(Interrupcion.PANTALLA, cpu.getInterrupcionPendiente());
+        assertEquals(Procesador.Resultado.LLAMADA_SISTEMA, instruccion());
+        assertEquals(Interrupcion.ARCHIVOS, cpu.getInterrupcionPendiente());
     }
 }

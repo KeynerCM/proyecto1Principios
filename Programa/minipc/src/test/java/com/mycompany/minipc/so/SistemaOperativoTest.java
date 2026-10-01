@@ -104,12 +104,13 @@ class SistemaOperativoTest {
 
         so.tick();
         so.tick();
+        so.tick();
         assertNull(so.getEnEjecucion(), "Al terminar la CPU queda libre");
         assertFalse(so.getCpu().tieneContexto());
         assertEquals(EstadoProceso.FINALIZADO, t.getEstado());
         assertEquals(0, so.getTablaBCP().getProcesosAdmitidos(), "El BCP se libero");
         assertTrue(so.getMemoria().estaLibre(128), "La memoria del programa se libero");
-        assertEquals(3, t.getTiempoCpu());
+        assertEquals(4, t.getTiempoCpu(), "Pesos 1 + 1 + 2");
     }
 
     @Test
@@ -125,9 +126,9 @@ class SistemaOperativoTest {
 
         ejecutarTodo();
         assertEquals(0, a.getInicio());
-        assertEquals(3, a.getFin());
-        assertEquals(5, b.getFin(), "B espero a que A terminara");
-        assertEquals(5, so.getReloj());
+        assertEquals(4, a.getFin(), "Pesos 1 + 1 + 2");
+        assertEquals(7, b.getFin(), "B espero a que A terminara: 4 + 1 + 2");
+        assertEquals(7, so.getReloj());
     }
 
     @Test
@@ -141,6 +142,7 @@ class SistemaOperativoTest {
         assertEquals(5, so.getTablaBCP().getProcesosAdmitidos());
         assertEquals(EstadoProceso.NUEVO, trabajos.get(5).getEstado());
 
+        so.tick();
         so.tick();
         so.tick();
         assertEquals(EstadoProceso.FINALIZADO, trabajos.get(0).getEstado());
@@ -195,9 +197,9 @@ class SistemaOperativoTest {
         Trabajo b = cargar("b.asm", "INC AX", "INC AX", "INT 20H");
         so.admitir();
 
-        so.tick();
-        so.tick();
-        so.tick();
+        for (int i = 0; i < 4; i++) {
+            so.tick();
+        }
         assertEquals(b.getProceso(), so.getEnEjecucion());
         assertEquals(1, b.getProceso().getRegistro(RegistroID.AX),
                 "B empieza con sus propios registros en cero, no con el AX = 7 de A");

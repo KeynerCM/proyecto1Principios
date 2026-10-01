@@ -14,6 +14,8 @@ import java.util.Map;
  * Restricciones: el conjunto de registros es fijo; no se agregan ni se
  *                quitan durante la ejecucion
  * Descripcion: agrupa los cuatro registros de proposito general del Mini PC.
+ *              AH y AL no se guardan aparte: leer AH devuelve el byte alto de
+ *              AX y escribir AL cambia solo el byte bajo (AX = AH x 256 + AL).
  *              Se usa un EnumMap porque la clave es una enumeracion:
  *              internamente es un arreglo indexado por el ordinal, de modo
  *              que el acceso es directo y el orden de recorrido es siempre
@@ -28,13 +30,12 @@ public class BancoRegistros {
      * Entradas: ninguna
      * Salidas: el banco construido, con los cuatro registros en cero
      * Restricciones: ninguna
-     * Descripcion: crea un registro por cada valor de RegistroID, de modo que
-     *              agregar un registro al juego de instrucciones no obliga a
-     *              tocar esta clase.
+     * Descripcion: crea un registro por cada registro general; AH y AL no
+     *              tienen registro propio.
      */
     public BancoRegistros() {
         registros = new EnumMap<>(RegistroID.class);
-        for (RegistroID id : RegistroID.values()) {
+        for (RegistroID id : RegistroID.GENERALES) {
             registros.put(id, new Registro(id));
         }
     }
@@ -46,9 +47,16 @@ public class BancoRegistros {
      * Restricciones: el identificador debe existir; si no, lanza
      *                IllegalArgumentException
      * Descripcion: lectura directa del contenido, usada por el procesador en
-     *              las operaciones LOAD, ADD y SUB.
+     *              las operaciones LOAD, ADD y SUB. AH y AL se calculan a
+     *              partir de AX.
      */
     public int leer(RegistroID id) {
+        if (id == RegistroID.AH) {
+            return (leer(RegistroID.AX) >> 8) & 0xFF;
+        }
+        if (id == RegistroID.AL) {
+            return leer(RegistroID.AX) & 0xFF;
+        }
         return obtener(id).getValor();
     }
 
@@ -59,10 +67,18 @@ public class BancoRegistros {
      * Restricciones: el identificador debe existir; si no, lanza
      *                IllegalArgumentException
      * Descripcion: escritura del contenido, usada por el procesador en las
-     *              operaciones MOV y STORE.
+     *              operaciones MOV y STORE. Escribir AH o AL guarda solo un
+     *              byte (0 a 255) y conserva el otro byte de AX.
      */
     public void escribir(RegistroID id, int valor) {
-        obtener(id).setValor(valor);
+        int ax = leer(RegistroID.AX);
+        if (id == RegistroID.AH) {
+            obtener(RegistroID.AX).setValor(((valor & 0xFF) << 8) | (ax & 0xFF));
+        } else if (id == RegistroID.AL) {
+            obtener(RegistroID.AX).setValor((ax & 0xFF00) | (valor & 0xFF));
+        } else {
+            obtener(id).setValor(valor);
+        }
     }
 
     /**

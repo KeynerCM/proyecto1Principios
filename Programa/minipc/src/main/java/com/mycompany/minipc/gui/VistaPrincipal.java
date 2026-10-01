@@ -148,4 +148,33 @@ public interface VistaPrincipal {
      *              situacion de un error real.
      */
     List<File> seleccionarArchivosAsm();
+
+    /**
+     * Nombre: mostrarPantalla
+     * Entradas: lineas, contenido de la pantalla del Mini PC
+     * Salidas: ninguna
+     * Restricciones: ninguna
+     * Descripcion: dibuja la salida de INT 10H, el aviso de INT 09H y el eco
+     *              del teclado.
+     */
+    void mostrarPantalla(List<String> lineas);
+
+    /**
+     * Nombre: habilitarTeclado
+     * Entradas: habilitado, true si algun proceso espera un valor
+     * Salidas: ninguna
+     * Restricciones: ninguna
+     * Descripcion: el teclado solo se puede usar cuando un proceso ejecuto
+     *              INT 09H y esta EN_ESPERA.
+     */
+    void habilitarTeclado(boolean habilitado);
+
+    /**
+     * Nombre: mostrarReloj
+     * Entradas: reloj, tiempo simulado como hora:minuto:segundo
+     * Salidas: ninguna
+     * Restricciones: ninguna
+     * Descripcion: muestra el tiempo de ejecucion, que pide el enunciado.
+     */
+    void mostrarReloj(String reloj);
 }

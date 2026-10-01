@@ -1,6 +1,7 @@
 package com.mycompany.minipc.gui;
 
 import com.mycompany.minipc.config.LectorConfiguracion;
+import com.mycompany.minipc.hardware.Procesador;
 import com.mycompany.minipc.isa.RegistroID;
 import com.mycompany.minipc.so.SistemaOperativo;
 import com.mycompany.minipc.so.procesos.Proceso;
@@ -8,15 +9,22 @@ import com.mycompany.minipc.so.procesos.Proceso;
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
 import javax.swing.JFileChooser;
+import javax.swing.JLabel;
 import javax.swing.JOptionPane;
+import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTabbedPane;
 import javax.swing.JTable;
+import javax.swing.JTextArea;
+import javax.swing.JTextField;
 import javax.swing.ListSelectionModel;
 import javax.swing.filechooser.FileNameExtensionFilter;
 import javax.swing.table.AbstractTableModel;
 import javax.swing.table.TableColumnModel;
+import java.awt.BorderLayout;
 import java.awt.Color;
+import java.awt.Font;
+import java.awt.GridLayout;
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
 import java.io.File;
@@ -83,6 +91,18 @@ public class VentanaPrincipal extends javax.swing.JFrame implements VistaPrincip
     /** Tabla de la lista de trabajos, agregada en una pestana junto al programa. */
     private JTable tblTrabajos;
 
+    /** Pantalla del Mini PC: salida de INT 10H y aviso de INT 09H. */
+    private JTextArea txtPantalla;
+
+    /** Teclado: se habilita solo cuando un proceso espera un valor. */
+    private JTextField txtTeclado;
+
+    /** Boton que envia el valor del teclado, como el ENTER. */
+    private JButton btnEnter;
+
+    /** Reloj simulado en la barra de contexto. */
+    private JLabel lblRelojValor;
+
     /**
      * Nombre: VentanaPrincipal
      * Entradas: ninguna
@@ -109,6 +129,8 @@ public class VentanaPrincipal extends javax.swing.JFrame implements VistaPrincip
         agregarPestanaDisco();
         agregarPestanaTrabajos();
         rotularContabilidad();
+        agregarPantallaYTeclado();
+        agregarReloj();
 
         pintarBotones();
         controlador.inicializarVista();
@@ -138,6 +160,80 @@ public class VentanaPrincipal extends javax.swing.JFrame implements VistaPrincip
         pestanas.addTab("Programa en ejecucion", scrInstrucciones);
         pnlInstrucciones.add(pestanas, java.awt.BorderLayout.CENTER);
         pnlInstrucciones.setBorder(BorderFactory.createTitledBorder("Procesos"));
+    }
+
+    /**
+     * Nombre: agregarPantallaYTeclado
+     * Entradas: ninguna
+     * Salidas: ninguna
+     * Restricciones: debe llamarse despues de initComponents
+     * Descripcion: pone la pantalla del Mini PC a la izquierda de la consola.
+     *              Debajo de la pantalla va el teclado, un campo y un boton
+     *              Enter (tambien sirve la tecla ENTER), que solo se habilitan
+     *              cuando un proceso ejecuto INT 09H. Se arma aqui para no
+     *              tocar el codigo generado; la interfaz nueva es del dia 5.
+     */
+    private void agregarPantallaYTeclado() {
+        txtPantalla = new JTextArea(6, 30);
+        txtPantalla.setEditable(false);
+        txtPantalla.setBackground(new Color(24, 28, 32));
+        txtPantalla.setForeground(new Color(120, 230, 140));
+        txtPantalla.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 13));
+
+        txtTeclado = new JTextField(8);
+        btnEnter = new JButton("Enter");
+        txtTeclado.addActionListener(e -> enviarTeclado());
+        btnEnter.addActionListener(e -> enviarTeclado());
+        habilitarTeclado(false);
+
+        JPanel teclado = new JPanel(new BorderLayout(6, 0));
+        teclado.setBorder(BorderFactory.createEmptyBorder(4, 0, 0, 0));
+        JLabel rotuloTeclado = new JLabel("Teclado:");
+        rotuloTeclado.setToolTipText("Solo numeros de 0 a 255; se habilita con INT 09H");
+        teclado.add(rotuloTeclado, BorderLayout.WEST);
+        teclado.add(txtTeclado, BorderLayout.CENTER);
+        teclado.add(btnEnter, BorderLayout.EAST);
+
+        JPanel pantalla = new JPanel(new BorderLayout());
+        pantalla.setBorder(BorderFactory.createTitledBorder("Pantalla"));
+        pantalla.add(new JScrollPane(txtPantalla), BorderLayout.CENTER);
+        pantalla.add(teclado, BorderLayout.SOUTH);
+
+        getContentPane().remove(pnlConsola);
+        JPanel inferior = new JPanel(new GridLayout(1, 2, 6, 0));
+        inferior.add(pantalla);
+        inferior.add(pnlConsola);
+        getContentPane().add(inferior, BorderLayout.SOUTH);
+    }
+
+    /**
+     * Nombre: enviarTeclado
+     * Entradas: ninguna; lee el campo del teclado
+     * Salidas: ninguna
+     * Restricciones: ninguna
+     * Descripcion: entrega el valor al controlador y vacia el campo.
+     */
+    private void enviarTeclado() {
+        String texto = txtTeclado.getText();
+        txtTeclado.setText("");
+        controlador.alEnviarTeclado(texto);
+    }
+
+    /**
+     * Nombre: agregarReloj
+     * Entradas: ninguna
+     * Salidas: ninguna
+     * Restricciones: debe llamarse despues de initComponents
+     * Descripcion: agrega el reloj simulado a la barra de contexto.
+     */
+    private void agregarReloj() {
+        JLabel separador = new JLabel("|");
+        separador.setForeground(lblSepA.getForeground());
+        pnlContexto.add(separador);
+        pnlContexto.add(new JLabel("Reloj:"));
+        lblRelojValor = new JLabel("00:00:00");
+        lblRelojValor.setFont(lblArchivoValor.getFont());
+        pnlContexto.add(lblRelojValor);
     }
 
     /**
@@ -376,6 +472,12 @@ public class VentanaPrincipal extends javax.swing.JFrame implements VistaPrincip
         lblEstadoBcpValor.setForeground(colorDelEstado(proceso.getEstado().name()));
         lblPcValor.setText(String.valueOf(proceso.getPc()));
         String ir = proceso.getIr();
+        Procesador cpu = controlador.getProcesador();
+        if (!ir.isEmpty() && proceso.equals(controlador.getSistemaOperativo().getEnEjecucion())
+                && cpu.getPesoActual() > 0) {
+            // Avance de la instruccion segun su peso, por ejemplo "ADD BX (2/3 s)".
+            ir = ir + "  (" + cpu.getSegundosCumplidos() + "/" + cpu.getPesoActual() + " s)";
+        }
         lblIrTextoValor.setText(ir.isEmpty() ? "-" : ir);
         lblAcValor.setText(String.valueOf(proceso.getAc()));
         lblAxValor.setText(String.valueOf(proceso.getRegistro(RegistroID.AX)));
@@ -503,6 +605,49 @@ public class VentanaPrincipal extends javax.swing.JFrame implements VistaPrincip
     public void actualizarUsoMemoria(int porcentaje) {
         pbUsoMemoria.setValue(porcentaje);
         pbUsoMemoria.setString(porcentaje + " %");
+    }
+
+    /**
+     * Nombre: mostrarPantalla
+     * Entradas: lineas, contenido de la pantalla del Mini PC
+     * Salidas: ninguna
+     * Restricciones: ninguna
+     * Descripcion: reemplaza el texto y deja visible la ultima linea.
+     */
+    @Override
+    public void mostrarPantalla(List<String> lineas) {
+        txtPantalla.setText(String.join("\n", lineas));
+        txtPantalla.setCaretPosition(txtPantalla.getDocument().getLength());
+    }
+
+    /**
+     * Nombre: habilitarTeclado
+     * Entradas: habilitado, true si algun proceso espera un valor
+     * Salidas: ninguna
+     * Restricciones: ninguna
+     * Descripcion: habilita el campo y el boton, y le da el foco al campo
+     *              para que se pueda escribir enseguida.
+     */
+    @Override
+    public void habilitarTeclado(boolean habilitado) {
+        boolean cambia = txtTeclado.isEnabled() != habilitado;
+        txtTeclado.setEnabled(habilitado);
+        btnEnter.setEnabled(habilitado);
+        if (habilitado && cambia) {
+            txtTeclado.requestFocusInWindow();
+        }
+    }
+
+    /**
+     * Nombre: mostrarReloj
+     * Entradas: reloj, tiempo simulado como hora:minuto:segundo
+     * Salidas: ninguna
+     * Restricciones: ninguna
+     * Descripcion: actualiza la etiqueta de la barra de contexto.
+     */
+    @Override
+    public void mostrarReloj(String reloj) {
+        lblRelojValor.setText(reloj);
     }
 
     /**

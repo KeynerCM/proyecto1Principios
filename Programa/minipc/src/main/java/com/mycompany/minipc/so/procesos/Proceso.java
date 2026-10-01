@@ -200,9 +200,17 @@ public final class Proceso {
      * Entradas: id, registro de proposito general
      * Salidas: el valor guardado en el BCP
      * Restricciones: ninguna
-     * Descripcion: AX, BX, CX y DX tienen cada uno su celda.
+     * Descripcion: AX, BX, CX y DX tienen cada uno su celda; AH y AL son el
+     *              byte alto y el byte bajo de la celda de AX.
      */
     public int getRegistro(RegistroID id) {
+        int ax = entero(CampoBCP.AX);
+        if (id == RegistroID.AH) {
+            return (ax >> 8) & 0xFF;
+        }
+        if (id == RegistroID.AL) {
+            return ax & 0xFF;
+        }
         return entero(campoDe(id));
     }
 
@@ -210,10 +218,14 @@ public final class Proceso {
      * Nombre: setRegistro
      * Entradas: id, registro; valor, nuevo valor
      * Salidas: ninguna
-     * Restricciones: ninguna
+     * Restricciones: solo registros generales; AH y AL se escriben a traves
+     *                de AX
      * Descripcion: escribe la celda del registro.
      */
     public void setRegistro(RegistroID id, int valor) {
+        if (id.esMitadDeAx()) {
+            throw new IllegalArgumentException("AH y AL se guardan dentro de AX");
+        }
         tabla.escribirEntero(direccionBCP, campoDe(id), valor);
     }
 
@@ -363,6 +375,18 @@ public final class Proceso {
         String texto = tabla.leer(direccionBCP, CampoBCP.ARCHIVOS_ABIERTOS);
         return texto.isEmpty() ? new ArrayList<>()
                 : new ArrayList<>(Arrays.asList(texto.split(SEPARADOR_ARCHIVOS)));
+    }
+
+    /**
+     * Nombre: setArchivosAbiertos
+     * Entradas: archivos, entradas de la lista de archivos abiertos
+     * Salidas: ninguna
+     * Restricciones: ninguna entrada debe contener el separador
+     * Descripcion: guarda la lista en su celda, separada por punto y coma.
+     */
+    public void setArchivosAbiertos(List<String> archivos) {
+        tabla.escribir(direccionBCP, CampoBCP.ARCHIVOS_ABIERTOS,
+                String.join(SEPARADOR_ARCHIVOS, archivos));
     }
 
     /**

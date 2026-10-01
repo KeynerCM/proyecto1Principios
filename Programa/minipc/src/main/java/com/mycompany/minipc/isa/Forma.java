@@ -32,6 +32,14 @@ public enum Forma {
     REGISTRO_NUMERO("REG, NUMERO",
             List.of(TipoOperando.REGISTRO, TipoOperando.NUMERO), 2),
 
+    /**
+     * Un registro y un texto entre comillas, por ejemplo
+     * MOV DX, "datos.txt". El registro recibe la direccion de memoria de la
+     * instruccion, que es donde queda guardado el texto.
+     */
+    REGISTRO_TEXTO("REG, \"TEXTO\"",
+            List.of(TipoOperando.REGISTRO, TipoOperando.TEXTO), 2),
+
     /** Un codigo de interrupcion, por ejemplo "INT 21H". */
     INTERRUPCION("CODIGO", List.of(TipoOperando.INTERRUPCION), 1),
 
@@ -55,11 +63,14 @@ public enum Forma {
         /** Un nombre de registro; el nombre se valida despues. */
         REGISTRO(Sintaxis.IDENT),
 
-        /** Un entero con signo opcional. */
+        /** Un entero con signo opcional, o un hexadecimal con sufijo h. */
         NUMERO(Sintaxis.NUM),
 
         /** Un desplazamiento de salto, entero con signo opcional. */
-        DESPLAZAMIENTO(Sintaxis.NUM),
+        DESPLAZAMIENTO(Sintaxis.DESP),
+
+        /** Un texto entre comillas, como el nombre de un archivo. */
+        TEXTO(Sintaxis.TEXTO),
 
         /** Un codigo de interrupcion; el codigo se valida despues. */
         INTERRUPCION(Sintaxis.CODIGO);

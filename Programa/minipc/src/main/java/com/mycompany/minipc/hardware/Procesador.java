@@ -6,6 +6,7 @@ import com.mycompany.minipc.excepciones.SintaxisException;
 import com.mycompany.minipc.isa.Ensamblador;
 import com.mycompany.minipc.isa.Forma;
 import com.mycompany.minipc.isa.Instruccion;
+import com.mycompany.minipc.isa.Interrupcion;
 import com.mycompany.minipc.isa.RegistroID;
 
 /**
@@ -30,14 +31,20 @@ public class Procesador {
      * Entradas: no aplica, es una enumeracion de valores fijos
      * Salidas: no aplica
      * Restricciones: ninguna
-     * Descripcion: lo que informa la CPU al terminar un ciclo.
+     * Descripcion: lo que informa la CPU al terminar cada segundo.
      */
     public enum Resultado {
 
-        /** El proceso puede seguir ejecutando. */
+        /** La instruccion todavia no cumple su peso; sigue en el siguiente segundo. */
+        EN_CURSO,
+
+        /** La instruccion termino y el proceso puede seguir. */
         CONTINUA,
 
-        /** Ejecuto INT 20H o paso su ultima instruccion. */
+        /** Termino INT: el sistema operativo debe atender la llamada. */
+        LLAMADA_SISTEMA,
+
+        /** El proceso paso su ultima instruccion sin INT 20H. */
         TERMINO
     }
 
@@ -58,6 +65,9 @@ public class Procesador {
     /** La instruccion del IR ya decodificada, o nulo si no se pudo. */
     private Instruccion ir;
 
+    /** Direccion de donde se trajo la instruccion del IR. */
+    private int direccionIr;
+
     /** Accumulator: almacenamiento temporal donde ocurre la aritmetica. */
     private int ac;
 
@@ -68,8 +78,14 @@ public class Procesador {
      */
     private boolean zf;
 
-    /** Se activa al ejecutar INT 20H, para terminar el proceso. */
-    private boolean finSolicitado;
+    /** Peso de la instruccion del IR, en segundos. */
+    private int pesoActual;
+
+    /** Segundos que le faltan a la instruccion del IR; cero si no hay ninguna. */
+    private int restante;
+
+    /** Interrupcion que pidio el ultimo INT, para el sistema operativo. */
+    private Interrupcion interrupcionPendiente;
 
     /** Registro base: primera direccion del proceso en ejecucion. */
     private int base;
@@ -96,40 +112,55 @@ public class Procesador {
     /**
      * Nombre: paso
      * Entradas: ninguna, opera sobre el contexto cargado
-     * Salidas: CONTINUA si el proceso puede seguir, TERMINO si ejecuto INT 20H
-     *          o paso su ultima instruccion
+     * Salidas: EN_CURSO si la instruccion todavia no cumple su peso; CONTINUA
+     *          si termino y el proceso sigue; LLAMADA_SISTEMA si termino un
+     *          INT; TERMINO si el proceso ya no tiene instrucciones
      * Restricciones: lanza IllegalStateException si no hay contexto cargado
      *                (alcance cero); lanza EjecucionException si la
      *                instruccion provoca un error, que es una interrupcion de
      *                programa que atiende el sistema operativo
-     * Descripcion: ejecuta una sola instruccion, es decir un ciclo de fetch
-     *              mas execute completo. El fetch trae el texto de la celda
-     *              que apunta el PC al IR; el execute lo decodifica y lo
-     *              ejecuta. El PC se incrementa en la etapa de fetch, igual
-     *              que en el libro, de modo que durante la ejecucion ya apunta
-     *              a la instruccion siguiente.
+     * Descripcion: un segundo de CPU. Cada instruccion dura tantos segundos
+     *              como su peso: en el primero se hace el fetch (el texto de
+     *              la celda del PC pasa al IR, se decodifica y el PC avanza,
+     *              como en el libro) y en el ultimo se aplica su efecto. Asi
+     *              ADD, de peso 3, necesita tres llamadas. INT 09H tiene peso
+     *              variable: dura un segundo y despues el proceso espera al
+     *              teclado, cosa que decide el sistema operativo.
      */
     public Resultado paso() {
         if (alcance <= 0) {
             throw new IllegalStateException("La CPU no tiene un proceso cargado");
         }
 
-        // ---------- ETAPA FETCH ----------
-        int direccion = pc;
-        irTexto = memoria.leerComoUsuario(direccion);
-        ir = null;
-        pc++;
-        estadisticas.registrarLectura();
+        if (restante == 0) {
+            if (pc >= base + alcance) {
+                return Resultado.TERMINO;
+            }
+            // ---------- ETAPA FETCH (y decodificacion) ----------
+            direccionIr = pc;
+            irTexto = memoria.leerComoUsuario(direccionIr);
+            ir = null;
+            pc++;
+            estadisticas.registrarLectura();
+            ir = decodificar(direccionIr, irTexto);
+            pesoActual = Math.max(1, ir.getPeso());
+            restante = pesoActual;
+        }
 
-        // ---------- ETAPA EXECUTE (decodifica y ejecuta) ----------
-        ir = decodificar(direccion, irTexto);
+        restante--;
+        if (restante > 0) {
+            return Resultado.EN_CURSO;
+        }
+
+        // ---------- ETAPA EXECUTE: ultimo segundo del peso ----------
+        interrupcionPendiente = null;
         ejecutar(ir);
         estadisticas.registrar(ir.getOpcode());
 
-        if (finSolicitado || pc >= base + alcance) {
-            return Resultado.TERMINO;
+        if (interrupcionPendiente != null) {
+            return Resultado.LLAMADA_SISTEMA;
         }
-        return Resultado.CONTINUA;
+        return pc >= base + alcance ? Resultado.TERMINO : Resultado.CONTINUA;
     }
 
     /**
@@ -168,9 +199,16 @@ public class Procesador {
     private void ejecutar(Instruccion instruccion) {
         switch (instruccion.getOpcode()) {
             case MOV:
-                int valor = instruccion.getForma() == Forma.REGISTRO_REGISTRO
-                        ? registros.leer(instruccion.getRegistro(1))
-                        : instruccion.getValor(1);
+                int valor;
+                if (instruccion.getForma() == Forma.REGISTRO_REGISTRO) {
+                    valor = registros.leer(instruccion.getRegistro(1));
+                } else if (instruccion.getForma() == Forma.REGISTRO_TEXTO) {
+                    // El texto queda guardado en la celda de esta misma
+                    // instruccion; el registro recibe su direccion.
+                    valor = direccionIr;
+                } else {
+                    valor = instruccion.getValor(1);
+                }
                 escribirRegistro(instruccion.getRegistro(0), valor);
                 break;
             case LOAD:
@@ -314,19 +352,15 @@ public class Procesador {
      * Nombre: interrumpir
      * Entradas: instruccion, INT con su codigo
      * Salidas: ninguna
-     * Restricciones: lanza EjecucionException para las interrupciones de
-     *                pantalla, teclado y archivos, que todavia no estan
-     *                disponibles
-     * Descripcion: INT 20H termina el proceso. Las demas necesitan los
-     *              dispositivos de entrada y salida del simulador.
+     * Restricciones: la CPU no atiende el servicio: solo lo anota
+     * Descripcion: INT es una llamada al sistema (Stallings, tabla 3.8, "supervisor
+     *              call"): la CPU deja anotado que servicio se pidio y paso()
+     *              devuelve LLAMADA_SISTEMA para que lo atienda el sistema
+     *              operativo, que es quien maneja la pantalla, el teclado, los
+     *              archivos y el fin del programa.
      */
     private void interrumpir(Instruccion instruccion) {
-        if (instruccion.esFinDePrograma()) {
-            finSolicitado = true;
-            return;
-        }
-        throw new EjecucionException("La interrupcion \"" + instruccion
-                + "\" todavia no esta disponible en esta version del simulador");
+        interrupcionPendiente = instruccion.getInterrupcion();
     }
 
 
@@ -347,7 +381,10 @@ public class Procesador {
         ir = null;
         ac = 0;
         zf = false;
-        finSolicitado = false;
+        pesoActual = 0;
+        restante = 0;
+        direccionIr = 0;
+        interrupcionPendiente = null;
         base = 0;
         alcance = 0;
     }
@@ -360,7 +397,8 @@ public class Procesador {
      * Restricciones: el alcance debe ser positivo
      * Descripcion: carga los registros base y limite, que es lo que hace el
      *              despachador al darle la CPU a un proceso. Tambien olvida
-     *              un INT 20H pendiente del proceso anterior.
+     *              la instruccion en curso y la interrupcion pendiente del
+     *              proceso anterior.
      */
     public void cargarLimites(int base, int alcance) {
         if (alcance <= 0) {
@@ -368,7 +406,8 @@ public class Procesador {
         }
         this.base = base;
         this.alcance = alcance;
-        this.finSolicitado = false;
+        this.restante = 0;
+        this.interrupcionPendiente = null;
     }
 
     /**
@@ -547,5 +586,49 @@ public class Procesador {
      */
     public int getAlcance() {
         return alcance;
+    }
+
+    /**
+     * Nombre: getInterrupcionPendiente
+     * Entradas: ninguna
+     * Salidas: el servicio que pidio el ultimo INT, o nulo
+     * Restricciones: solo tiene sentido justo despues de LLAMADA_SISTEMA
+     * Descripcion: el sistema operativo la consulta para atender la llamada.
+     */
+    public Interrupcion getInterrupcionPendiente() {
+        return interrupcionPendiente;
+    }
+
+    /**
+     * Nombre: getPesoActual
+     * Entradas: ninguna
+     * Salidas: el peso en segundos de la instruccion del IR, o cero
+     * Restricciones: ninguna
+     * Descripcion: la interfaz muestra el avance, por ejemplo "ADD BX (2/3 s)".
+     */
+    public int getPesoActual() {
+        return pesoActual;
+    }
+
+    /**
+     * Nombre: getSegundosCumplidos
+     * Entradas: ninguna
+     * Salidas: cuantos segundos de su peso lleva la instruccion del IR
+     * Restricciones: igual al peso cuando la instruccion ya termino
+     * Descripcion: acompana a getPesoActual para mostrar el avance.
+     */
+    public int getSegundosCumplidos() {
+        return pesoActual - restante;
+    }
+
+    /**
+     * Nombre: getDireccionIr
+     * Entradas: ninguna
+     * Salidas: la direccion de donde se trajo la instruccion del IR
+     * Restricciones: ninguna
+     * Descripcion: acceso de solo lectura al campo correspondiente.
+     */
+    public int getDireccionIr() {
+        return direccionIr;
     }
 }

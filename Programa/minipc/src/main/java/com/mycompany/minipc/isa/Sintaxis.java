@@ -29,8 +29,23 @@ final class Sintaxis {
      */
     static final String IDENT = "([A-Za-z]\\w*)";
 
-    /** Un entero con signo opcional. */
-    static final String NUM = "([+-]?\\d+)";
+    /**
+     * Un valor inmediato: un entero decimal con signo opcional, o un
+     * hexadecimal con sufijo h, como en el x86 ("3Ch", "40h"). El hexadecimal
+     * empieza con un digito para no confundirse con un nombre de registro.
+     */
+    static final String NUM = "([+-]?\\d+|\\d[0-9A-Fa-f]*[hH])";
+
+    /** Un desplazamiento de salto: entero decimal con signo opcional. */
+    static final String DESP = "([+-]?\\d+)";
+
+    /**
+     * Un texto entre comillas, como el nombre de un archivo. Solo admite
+     * letras, digitos, espacios, punto, guion, guion bajo y parentesis, para
+     * que una coma o un punto y coma dentro del texto no se confundan con un
+     * separador o un comentario.
+     */
+    static final String TEXTO = "\"([\\w .()-]+)\"";
 
     /**
      * Un codigo de interrupcion. Se acepta cualquier palabra y el codigo se
@@ -39,7 +54,10 @@ final class Sintaxis {
     static final String CODIGO = "(\\w+)";
 
     /** Un numero cualquiera, para reconocer operandos en el diagnostico. */
-    static final Pattern ES_NUMERO = Pattern.compile("[+-]?\\d+");
+    static final Pattern ES_NUMERO = Pattern.compile("[+-]?\\d+|\\d[0-9A-Fa-f]*[hH]");
+
+    /** Un desplazamiento cualquiera, para el diagnostico. */
+    static final Pattern ES_DESPLAZAMIENTO = Pattern.compile("[+-]?\\d+");
 
     /** Un nombre cualquiera, para reconocer operandos en el diagnostico. */
     static final Pattern ES_IDENT = Pattern.compile("[A-Za-z]\\w*");

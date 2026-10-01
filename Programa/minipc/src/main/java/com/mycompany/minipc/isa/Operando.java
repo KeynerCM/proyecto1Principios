@@ -7,8 +7,8 @@ package com.mycompany.minipc.isa;
  * Restricciones: es inmutable; se crea con los metodos de fabrica, que
  *                garantizan que el valor corresponde al tipo
  * Descripcion: un operando de una instruccion ya interpretado: un registro,
- *              un numero, un desplazamiento de salto o un codigo de
- *              interrupcion.
+ *              un numero, un desplazamiento de salto, un codigo de
+ *              interrupcion o un texto entre comillas.
  */
 public final class Operando {
 
@@ -16,13 +16,15 @@ public final class Operando {
     private final RegistroID registro;
     private final int valor;
     private final Interrupcion interrupcion;
+    private final String texto;
 
     private Operando(Forma.TipoOperando tipo, RegistroID registro, int valor,
-            Interrupcion interrupcion) {
+            Interrupcion interrupcion, String texto) {
         this.tipo = tipo;
         this.registro = registro;
         this.valor = valor;
         this.interrupcion = interrupcion;
+        this.texto = texto;
     }
 
     /**
@@ -36,7 +38,7 @@ public final class Operando {
         if (id == null) {
             throw new IllegalArgumentException("El registro es obligatorio");
         }
-        return new Operando(Forma.TipoOperando.REGISTRO, id, 0, null);
+        return new Operando(Forma.TipoOperando.REGISTRO, id, 0, null, null);
     }
 
     /**
@@ -47,7 +49,7 @@ public final class Operando {
      * Descripcion: fabrica un operando de tipo numero.
      */
     public static Operando numero(int valor) {
-        return new Operando(Forma.TipoOperando.NUMERO, null, valor, null);
+        return new Operando(Forma.TipoOperando.NUMERO, null, valor, null, null);
     }
 
     /**
@@ -58,7 +60,7 @@ public final class Operando {
      * Descripcion: fabrica un operando de salto.
      */
     public static Operando desplazamiento(int valor) {
-        return new Operando(Forma.TipoOperando.DESPLAZAMIENTO, null, valor, null);
+        return new Operando(Forma.TipoOperando.DESPLAZAMIENTO, null, valor, null, null);
     }
 
     /**
@@ -72,7 +74,21 @@ public final class Operando {
         if (interrupcion == null) {
             throw new IllegalArgumentException("La interrupcion es obligatoria");
         }
-        return new Operando(Forma.TipoOperando.INTERRUPCION, null, 0, interrupcion);
+        return new Operando(Forma.TipoOperando.INTERRUPCION, null, 0, interrupcion, null);
+    }
+
+    /**
+     * Nombre: texto
+     * Entradas: texto, contenido que iba entre comillas
+     * Salidas: el operando construido
+     * Restricciones: el texto no debe ser nulo ni vacio
+     * Descripcion: fabrica un operando de texto, como el nombre de un archivo.
+     */
+    public static Operando texto(String texto) {
+        if (texto == null || texto.isEmpty()) {
+            throw new IllegalArgumentException("El texto es obligatorio");
+        }
+        return new Operando(Forma.TipoOperando.TEXTO, null, 0, null, texto);
     }
 
     /**
@@ -120,6 +136,17 @@ public final class Operando {
     }
 
     /**
+     * Nombre: getTexto
+     * Entradas: ninguna
+     * Salidas: el texto, o nulo si el operando no es de ese tipo
+     * Restricciones: ninguna
+     * Descripcion: acceso de solo lectura al campo correspondiente.
+     */
+    public String getTexto() {
+        return texto;
+    }
+
+    /**
      * Nombre: toString
      * Entradas: ninguna
      * Salidas: el operando como se escribiria en el .asm
@@ -135,6 +162,8 @@ public final class Operando {
                 return interrupcion.getCodigo();
             case DESPLAZAMIENTO:
                 return (valor >= 0 ? "+" : "") + valor;
+            case TEXTO:
+                return "\"" + texto + "\"";
             default:
                 return String.valueOf(valor);
         }

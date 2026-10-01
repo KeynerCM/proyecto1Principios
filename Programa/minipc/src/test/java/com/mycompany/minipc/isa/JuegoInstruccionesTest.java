@@ -173,4 +173,45 @@ class JuegoInstruccionesTest {
         assertEquals(3, ensamblador.ensamblar(List.of("INC", "JMP -2", "INT 20H")).size());
         assertEquals(3, ensamblador.ensamblar(List.of("JMP +1", "INC", "INT 20H")).size());
     }
+
+    @Test
+    @DisplayName("AH y AL se aceptan como registros y los numeros pueden ir en hexadecimal")
+    void registrosAhAlYHexadecimal() throws SintaxisException {
+        Instruccion mov = una("MOV AH, 3Ch");
+        assertEquals(RegistroID.AH, mov.getRegistro(0));
+        assertEquals(0x3C, mov.getValor(1));
+        assertEquals(0x40, una("mov al, 40h").getValor(1));
+        assertEquals(255, una("MOV AL, 0FFh").getValor(1), "El hexadecimal empieza con digito");
+        assertEquals(RegistroID.AL, una("MOV BX, AL").getRegistro(1));
+        assertEquals(12, una("PARAM 0Ch").getValor(0));
+    }
+
+    @Test
+    @DisplayName("MOV acepta un nombre de archivo entre comillas")
+    void movConTexto() throws SintaxisException {
+        Instruccion mov = una("MOV DX, \"datos.txt\"");
+        assertEquals(Forma.REGISTRO_TEXTO, mov.getForma());
+        assertEquals(RegistroID.DX, mov.getRegistro(0));
+        assertEquals("datos.txt", mov.getTexto(1));
+        assertEquals("mi archivo (2).txt", una("MOV DX,\"mi archivo (2).txt\"").getTexto(1));
+    }
+
+    @ParameterizedTest(name = "rechaza \"{0}\"")
+    @DisplayName("Los textos mal escritos se rechazan")
+    @ValueSource(strings = {
+        "MOV DX, datos.txt", "MOV DX, \"datos.txt", "MOV DX, \"a,b.txt\"", "MOV DX, \"\"",
+        "ADD \"datos.txt\"", "MOV DX, \"a|b.txt\"", "JMP 3Ch", "MOV AX, FFh"
+    })
+    void rechazaTextosYHexMalEscritos(String linea) {
+        errorDe(linea);
+    }
+
+    @Test
+    @DisplayName("Los errores con texto tienen un mensaje concreto")
+    void mensajesDeTexto() {
+        assertTrue(errorDe("MOV DX, datos.txt").contains("va entre comillas"));
+        assertTrue(errorDe("MOV DX, \"datos.txt").contains("abrir y cerrar comillas"));
+        assertTrue(errorDe("ADD \"datos.txt\"").contains("no admite texto"));
+        assertTrue(errorDe("MOV DX, \"a|b.txt\"").contains("solo se admiten letras"));
+    }
 }

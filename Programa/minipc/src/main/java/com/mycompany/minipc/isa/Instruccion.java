@@ -128,6 +128,22 @@ public final class Instruccion {
     }
 
     /**
+     * Nombre: getTexto
+     * Entradas: indice, posicion del operando contando desde cero
+     * Salidas: el texto que iba entre comillas
+     * Restricciones: lanza IllegalStateException si el operando no es un texto
+     * Descripcion: acceso comodo para el procesador y el sistema de archivos.
+     */
+    public String getTexto(int indice) {
+        Operando operando = operandos.get(indice);
+        if (operando.getTipo() != Forma.TipoOperando.TEXTO) {
+            throw new IllegalStateException("El operando " + (indice + 1) + " de " + this
+                    + " no es un texto");
+        }
+        return operando.getTexto();
+    }
+
+    /**
      * Nombre: getInterrupcion
      * Entradas: ninguna
      * Salidas: la interrupcion pedida, o nulo si no es una instruccion INT

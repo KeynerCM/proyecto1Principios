@@ -3,6 +3,7 @@ package com.mycompany.minipc.hardware;
 import com.mycompany.minipc.excepciones.EjecucionException;
 import com.mycompany.minipc.excepciones.SintaxisException;
 import com.mycompany.minipc.isa.Ensamblador;
+import com.mycompany.minipc.isa.Interrupcion;
 import com.mycompany.minipc.isa.OpCode;
 import com.mycompany.minipc.isa.RegistroID;
 import org.junit.jupiter.api.BeforeEach;
@@ -60,6 +61,15 @@ class ProcesadorTest {
                 "MOV BX, -8"));
     }
 
+    /** Avanza segundo a segundo hasta que la instruccion en curso cumple su peso. */
+    private Procesador.Resultado instruccion() {
+        Procesador.Resultado resultado = cpu.paso();
+        while (resultado == Procesador.Resultado.EN_CURSO) {
+            resultado = cpu.paso();
+        }
+        return resultado;
+    }
+
     private int ax() {
         return cpu.getRegistros().leer(RegistroID.AX);
     }
@@ -92,7 +102,7 @@ class ProcesadorTest {
         };
 
         for (int i = 0; i < esperados.length; i++) {
-            Procesador.Resultado resultado = cpu.paso();
+            Procesador.Resultado resultado = instruccion();
             assertEquals(esperados[i][0], cpu.getAc(), "AC tras la instruccion " + (i + 1));
             assertEquals(esperados[i][1], ax(), "AX tras la instruccion " + (i + 1));
             assertEquals(esperados[i][2], bx(), "BX tras la instruccion " + (i + 1));
@@ -107,7 +117,7 @@ class ProcesadorTest {
         cargarEjemplo();
         for (int i = 0; i < 7; i++) {
             assertEquals(BASE + i, cpu.getPc(), "Antes de la instruccion " + (i + 1));
-            cpu.paso();
+            instruccion();
         }
         assertEquals(BASE + 7, cpu.getPc());
     }
@@ -119,7 +129,7 @@ class ProcesadorTest {
         assertNull(cpu.getIr());
         assertEquals("", cpu.getIrTexto());
 
-        cpu.paso();
+        instruccion();
         assertEquals("MOV AX, 5", cpu.getIrTexto());
         assertEquals(OpCode.MOV, cpu.getIr().getOpcode());
         assertEquals(RegistroID.AX, cpu.getIr().getRegistro(0));
@@ -132,11 +142,11 @@ class ProcesadorTest {
         cargar(List.of("MOV AX, 200", "MOV BX, 100", "LOAD AX", "ADD BX", "SUB AX",
                 "SUB AX"));
         for (int i = 0; i < 4; i++) {
-            cpu.paso();
+            instruccion();
         }
         assertEquals(300, cpu.getAc());
-        cpu.paso();
-        cpu.paso();
+        instruccion();
+        instruccion();
         assertEquals(-100, cpu.getAc());
     }
 
@@ -155,7 +165,7 @@ class ProcesadorTest {
         cargar(List.of("MOV AX, 1", "INT 20H"));
         memoria.escribir(BASE + 1, "163");
 
-        cpu.paso();
+        instruccion();
         EjecucionException e = assertThrows(EjecucionException.class, cpu::paso);
         assertTrue(e.getMessage().contains("no contiene una instruccion valida"), e.getMessage());
         assertEquals("163", cpu.getIrTexto(), "El IR muestra lo que se trajo de memoria");
@@ -165,8 +175,8 @@ class ProcesadorTest {
     @DisplayName("Limpiar deja la CPU sin contexto y con los registros en cero")
     void limpiar() throws Exception {
         cargarEjemplo();
-        cpu.paso();
-        cpu.paso();
+        instruccion();
+        instruccion();
         cpu.limpiar();
 
         assertFalse(cpu.tieneContexto());
@@ -180,7 +190,7 @@ class ProcesadorTest {
     @DisplayName("Las estadisticas cuentan las instrucciones por tipo")
     void estadisticasPorOperacion() throws Exception {
         cargarEjemplo();
-        while (cpu.paso() == Procesador.Resultado.CONTINUA) {
+        while (instruccion() == Procesador.Resultado.CONTINUA) {
             // ejecuta hasta el final
         }
 
@@ -193,5 +203,64 @@ class ProcesadorTest {
         assertEquals(1, e.getConteo(OpCode.SUB));
         assertEquals(7, e.getAccesosLectura(), "Una lectura de memoria por instruccion");
         assertEquals(4, e.getAccesosEscritura(), "Tres MOV mas un STORE");
+    }
+
+    @Test
+    @DisplayName("Cada instruccion dura tantos segundos como su peso y su efecto va al final")
+    void pesos() throws Exception {
+        cargar(List.of("MOV AX, 5", "ADD AX", "INT 20H"));
+
+        assertEquals(Procesador.Resultado.CONTINUA, cpu.paso(), "MOV pesa 1");
+        assertEquals(5, ax());
+
+        assertEquals(Procesador.Resultado.EN_CURSO, cpu.paso(), "ADD pesa 3: segundo 1");
+        assertEquals("ADD AX", cpu.getIrTexto(), "El fetch ocurre en el primer segundo");
+        assertEquals(1, cpu.getSegundosCumplidos());
+        assertEquals(3, cpu.getPesoActual());
+        assertEquals(0, cpu.getAc(), "El efecto todavia no se aplica");
+        assertEquals(Procesador.Resultado.EN_CURSO, cpu.paso(), "segundo 2");
+        assertEquals(Procesador.Resultado.CONTINUA, cpu.paso(), "segundo 3");
+        assertEquals(5, cpu.getAc());
+
+        assertEquals(Procesador.Resultado.EN_CURSO, cpu.paso(), "INT 20H pesa 2");
+        assertEquals(Procesador.Resultado.LLAMADA_SISTEMA, cpu.paso());
+        assertEquals(Interrupcion.FIN_PROGRAMA,
+                cpu.getInterrupcionPendiente(), "La CPU deja la llamada al sistema operativo");
+    }
+
+    @Test
+    @DisplayName("INT 09H tiene peso variable: la llamada dura un segundo")
+    void int09DuraUnSegundo() throws Exception {
+        cargar(List.of("INT 09H", "INT 20H"));
+        assertEquals(Procesador.Resultado.LLAMADA_SISTEMA, cpu.paso());
+        assertEquals(Interrupcion.TECLADO,
+                cpu.getInterrupcionPendiente());
+    }
+
+    @Test
+    @DisplayName("AH y AL son la parte alta y la parte baja de AX")
+    void ahYAlSonMitadesDeAx() throws Exception {
+        cargar(List.of("MOV AX, 772", "MOV AH, 3Ch", "MOV AL, 65", "MOV BX, AH", "INT 20H"));
+        instruccion();
+        assertEquals(3, cpu.getRegistros().leer(RegistroID.AH), "772 = 3 x 256 + 4");
+        assertEquals(4, cpu.getRegistros().leer(RegistroID.AL));
+
+        instruccion();
+        assertEquals(0x3C * 256 + 4, ax(), "Escribir AH conserva AL");
+        instruccion();
+        assertEquals(0x3C * 256 + 65, ax(), "Escribir AL conserva AH");
+        instruccion();
+        assertEquals(60, bx(), "3Ch en hexadecimal es 60");
+    }
+
+    @Test
+    @DisplayName("MOV DX con un texto guarda en DX la direccion donde esta el texto")
+    void movConTexto() throws Exception {
+        cargar(List.of("MOV AX, 1", "MOV DX, \"datos.txt\"", "INT 20H"));
+        instruccion();
+        instruccion();
+        assertEquals(BASE + 1, cpu.getRegistros().leer(RegistroID.DX));
+        assertEquals("MOV DX, \"datos.txt\"", memoria.leer(BASE + 1),
+                "El nombre queda guardado en esa celda de memoria");
     }
 }

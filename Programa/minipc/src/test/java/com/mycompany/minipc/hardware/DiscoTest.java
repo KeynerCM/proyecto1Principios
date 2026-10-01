@@ -222,4 +222,20 @@ class DiscoTest {
         assertThrows(IndexOutOfBoundsException.class, () -> disco.leer(-1));
         assertThrows(IndexOutOfBoundsException.class, () -> disco.leer(512));
     }
+
+    @Test
+    @DisplayName("Un archivo de datos ocupa una celda con sus bytes entre corchetes")
+    void archivosDeDatos() throws DiscoException {
+        EntradaIndice entrada = disco.crearArchivo("datos.txt");
+        assertEquals("[]", disco.leer(entrada.getDireccionInicio()),
+                "Un archivo vacio no deja la celda libre");
+        disco.escribirDatos("datos.txt", List.of(65, 66));
+        assertEquals("[65,66]", disco.leer(entrada.getDireccionInicio()));
+        assertEquals(List.of(65, 66), disco.leerDatos("DATOS.TXT"));
+
+        disco.guardarPrograma("p.asm", programaDe(2));
+        assertThrows(DiscoException.class, () -> disco.leerDatos("p.asm"),
+                "Un programa no es un archivo de datos");
+        assertThrows(DiscoException.class, () -> disco.crearArchivo("datos.txt"));
+    }
 }

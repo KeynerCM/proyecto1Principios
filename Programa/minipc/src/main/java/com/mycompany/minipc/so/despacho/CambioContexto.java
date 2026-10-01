@@ -32,7 +32,7 @@ public class CambioContexto {
         proceso.setPc(cpu.getPc());
         proceso.setIr(cpu.getIrTexto());
         proceso.setAc(cpu.getAc());
-        for (RegistroID id : RegistroID.values()) {
+        for (RegistroID id : RegistroID.GENERALES) {
             proceso.setRegistro(id, cpu.getRegistros().leer(id));
         }
         proceso.setZf(cpu.getZf());
@@ -53,7 +53,7 @@ public class CambioContexto {
         cpu.setPc(proceso.getPc());
         cpu.setIrTexto(proceso.getIr());
         cpu.setAc(proceso.getAc());
-        for (RegistroID id : RegistroID.values()) {
+        for (RegistroID id : RegistroID.GENERALES) {
             cpu.getRegistros().escribir(id, proceso.getRegistro(id));
         }
         cpu.setZf(proceso.getZf());
