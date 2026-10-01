@@ -4,8 +4,11 @@ import com.mycompany.minipc.config.Configuracion;
 import com.mycompany.minipc.excepciones.ConfiguracionException;
 import com.mycompany.minipc.hardware.Disco;
 import com.mycompany.minipc.hardware.Memoria;
+import com.mycompany.minipc.so.planificacion.FabricaAlgoritmos;
 import com.mycompany.minipc.so.procesos.TablaBCP;
 
+import javax.swing.JComboBox;
+import javax.swing.JLabel;
 import javax.swing.SpinnerNumberModel;
 
 /**
@@ -29,6 +32,9 @@ public class DialogoConfiguracion extends javax.swing.JDialog {
     private static final long serialVersionUID = 1L;
 
     private final ControladorPrincipal controlador;
+
+    /** Algoritmo de planificacion; se agrega desde el constructor. */
+    private JComboBox<String> cmbAlgoritmo;
 
     /**
      * Nombre: DialogoConfiguracion
@@ -67,6 +73,14 @@ public class DialogoConfiguracion extends javax.swing.JDialog {
         spnVelocidad.setModel(new SpinnerNumberModel(actual.getMsPorSegundo(),
                 Configuracion.MS_POR_SEGUNDO_MINIMO, Configuracion.MS_POR_SEGUNDO_MAXIMO, 50));
 
+        // El algoritmo se elige de los que conoce la fabrica; en este proyecto
+        // solo FCFS, y en el proyecto 2 apareceran los demas sin tocar esto.
+        cmbAlgoritmo = new JComboBox<>(FabricaAlgoritmos.disponibles().toArray(new String[0]));
+        cmbAlgoritmo.setSelectedItem(actual.getAlgoritmo());
+        cmbAlgoritmo.setToolTipText("Algoritmo de planificacion de procesos");
+        pnlParametros.add(new JLabel("Planificacion:"));
+        pnlParametros.add(cmbAlgoritmo);
+
         actualizarResumen();
         getRootPane().setDefaultButton(btnAceptar);
         pack();
@@ -97,7 +111,8 @@ public class DialogoConfiguracion extends javax.swing.JDialog {
     private Configuracion configuracionElegida() throws ConfiguracionException {
         return new Configuracion(valor(spnTamano), valor(spnDisco),
                 valor(spnMemoriaVirtual), valor(spnVelocidad),
-                controlador.getConfiguracion().getAlgoritmo());
+                cmbAlgoritmo == null ? controlador.getConfiguracion().getAlgoritmo()
+                        : (String) cmbAlgoritmo.getSelectedItem());
     }
 
     /**

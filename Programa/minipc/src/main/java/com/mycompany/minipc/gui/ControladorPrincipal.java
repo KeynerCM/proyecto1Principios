@@ -324,6 +324,21 @@ public class ControladorPrincipal {
     }
 
     /**
+     * Nombre: alPausar
+     * Entradas: ninguna
+     * Salidas: ninguna
+     * Restricciones: no hace nada si la ejecucion automatica no esta en marcha
+     * Descripcion: detiene la ejecucion automatica; se puede seguir con
+     *              Siguiente o volver a Ejecutar.
+     */
+    public void alPausar() {
+        if (temporizador.isRunning()) {
+            detener();
+            vista.escribirEnConsola("Ejecucion automatica en pausa.");
+        }
+    }
+
+    /**
      * Nombre: alPasoAPaso
      * Entradas: ninguna
      * Salidas: ninguna
@@ -527,6 +542,10 @@ public class ControladorPrincipal {
         vista.mostrarPantalla(so.getPantalla().getLineas());
         vista.habilitarTeclado(so.hayEsperaTeclado());
         vista.mostrarReloj(SistemaOperativo.formatearReloj(so.getReloj()));
+        vista.mostrarColas(so.getListaProcesos().recorrer());
+        Disco disco = so.getDisco();
+        int usoDisco = 100 - (disco.getPosicionesLibres() * 100) / Math.max(1, disco.getEspacioArchivos());
+        vista.mostrarResumen(usoDisco, so.getTablaBCP().getProcesosAdmitidos());
         boolean hayTrabajos = !so.getListaTrabajos().getTrabajos().isEmpty();
         vista.actualizarBotones(hayTrabajos, temporizador.isRunning(), !so.hayPendientes());
     }

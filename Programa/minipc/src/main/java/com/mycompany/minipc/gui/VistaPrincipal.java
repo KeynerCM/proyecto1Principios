@@ -177,4 +177,25 @@ public interface VistaPrincipal {
      * Descripcion: muestra el tiempo de ejecucion, que pide el enunciado.
      */
     void mostrarReloj(String reloj);
+
+    /**
+     * Nombre: mostrarColas
+     * Entradas: procesos, la lista de procesos en el orden de sus enlaces en
+     *           memoria
+     * Salidas: ninguna
+     * Restricciones: ninguna
+     * Descripcion: muestra la estructura de lista de procesos y las colas que
+     *              salen de ella (en CPU, preparados, en espera).
+     */
+    void mostrarColas(List<Proceso> procesos);
+
+    /**
+     * Nombre: mostrarResumen
+     * Entradas: usoDisco, porcentaje ocupado del area de archivos del disco;
+     *           admitidos, procesos con BCP en este momento
+     * Salidas: ninguna
+     * Restricciones: ninguna
+     * Descripcion: datos de la barra de estado.
+     */
+    void mostrarResumen(int usoDisco, int admitidos);
 }

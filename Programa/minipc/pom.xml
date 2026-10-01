@@ -19,6 +19,12 @@
 
     <dependencies>
         <dependency>
+            <!-- Apariencia plana y moderna de Swing (seccion 8.4 del plan). -->
+            <groupId>com.formdev</groupId>
+            <artifactId>flatlaf</artifactId>
+            <version>3.7.2</version>
+        </dependency>
+        <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
             <version>${junit.version}</version>

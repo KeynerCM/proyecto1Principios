@@ -60,6 +60,8 @@ class ControladorPrincipalTest {
         private List<String> pantalla = Collections.emptyList();
         private boolean tecladoHabilitado;
         private String reloj = "";
+        private List<Proceso> colas = Collections.emptyList();
+        private int admitidos = -1;
 
         @Override
         public void mostrarInstrucciones(List<String> programa) {
@@ -139,6 +141,16 @@ class ControladorPrincipalTest {
         @Override
         public void mostrarReloj(String reloj) {
             this.reloj = reloj;
+        }
+
+        @Override
+        public void mostrarColas(List<Proceso> procesos) {
+            this.colas = procesos;
+        }
+
+        @Override
+        public void mostrarResumen(int usoDisco, int admitidos) {
+            this.admitidos = admitidos;
         }
 
         /** Fija los archivos que "elegira" el usuario; sin argumentos, cancela. */
@@ -245,6 +257,8 @@ class ControladorPrincipalTest {
         assertEquals(22, controlador.getDisco().buscar("b.asm").getDireccionInicio());
         assertEquals(2, trabajos().size());
         assertEquals(2, controlador.getSistemaOperativo().getTablaBCP().getProcesosAdmitidos());
+        assertEquals(2, vista.colas.size(), "Las colas se arman con la lista de procesos en memoria");
+        assertEquals(2, vista.admitidos);
         assertNull(vista.tituloError, "No hubo errores");
     }
 
@@ -622,5 +636,22 @@ class ControladorPrincipalTest {
         controlador.alPasoAPaso();
         assertEquals(List.of(">> Ingresar valor:", "42", "42"), vista.pantalla,
                 "Eco del teclado y luego INT 10H imprime DX");
+    }
+
+    @Test
+    @DisplayName("Pausar detiene la ejecucion automatica y se puede seguir con Siguiente")
+    void pausarLaEjecucionAutomatica(@TempDir Path carpeta) throws Exception {
+        controlador.alConfigurar(config(256, 2000));
+        vista.entregar(ejemploDelEnunciado(carpeta));
+        controlador.alCargarArchivos();
+
+        controlador.alEjecutar();
+        assertTrue(vista.enEjecucion);
+        controlador.alPausar();
+        assertFalse(vista.enEjecucion, "El temporizador se detuvo");
+        assertTrue(vista.consolaContiene("en pausa"));
+
+        controlador.alPasoAPaso();
+        assertEquals(EstadoProceso.EJECUCION, trabajos().get(0).getEstado());
     }
 }

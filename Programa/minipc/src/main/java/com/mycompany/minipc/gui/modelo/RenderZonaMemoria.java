@@ -1,5 +1,6 @@
 package com.mycompany.minipc.gui.modelo;
 
+import com.mycompany.minipc.gui.Tema;
 import com.mycompany.minipc.hardware.Memoria;
 
 import javax.swing.JTable;
@@ -26,24 +27,13 @@ public class RenderZonaMemoria extends DefaultTableCellRenderer {
     private static final long serialVersionUID = 1L;
 
     /** Zona reservada al sistema operativo. */
-    private static final Color FONDO_KERNEL = new Color(232, 232, 232);
+    private static final Color FONDO_KERNEL = Tema.KERNEL_LIBRE;
 
     private static final Color TEXTO_KERNEL = new Color(120, 120, 120);
 
-    /** Un color por ranura de BCP (P en la ranura 0 a 4). */
-    private static final Color[] FONDO_BCP = {
-        new Color(173, 206, 240), new Color(178, 223, 178), new Color(247, 200, 160),
-        new Color(214, 188, 232), new Color(240, 180, 190)
-    };
-
-    /** Version clara de cada color, para el programa en la zona de usuario. */
-    private static final Color[] FONDO_PROGRAMA = {
-        new Color(222, 236, 250), new Color(224, 242, 224), new Color(252, 232, 214),
-        new Color(238, 228, 245), new Color(250, 222, 228)
-    };
 
     /** Posicion que apunta el PC en este momento. */
-    private static final Color FONDO_ACTUAL = new Color(255, 235, 156);
+    private static final Color FONDO_ACTUAL = Tema.RESALTADO;
 
     private static final Color TEXTO_ACTUAL = new Color(70, 50, 0);
 
@@ -128,11 +118,12 @@ public class RenderZonaMemoria extends DefaultTableCellRenderer {
     private void pintarZona(Component celda, JTable tabla, int fila) {
         int ranura = mapa.ranuraDe(fila);
         if (ranura == MapaMemoria.CABECERA) {
-            celda.setBackground(FONDO_KERNEL.darker());
+            celda.setBackground(Tema.CABECERA_SO);
             celda.setForeground(Color.WHITE);
         } else if (ranura >= 0) {
             boolean esKernel = memoria.esDireccionKernel(fila);
-            celda.setBackground(esKernel ? FONDO_BCP[ranura] : FONDO_PROGRAMA[ranura]);
+            celda.setBackground(esKernel ? Tema.colorProceso(ranura)
+                    : Tema.colorProcesoClaro(ranura));
         } else if (memoria.esDireccionKernel(fila)) {
             celda.setBackground(FONDO_KERNEL);
             celda.setForeground(TEXTO_KERNEL);
