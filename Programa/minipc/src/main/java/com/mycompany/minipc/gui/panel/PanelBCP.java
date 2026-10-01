@@ -245,7 +245,7 @@ public class PanelBCP extends JPanel {
         panel.setBorder(BorderFactory.createEmptyBorder(4, 0, 6, 0));
         JLabel rotulo = new JLabel(titulo);
         rotulo.setFont(Tema.FUENTE_NEGRITA);
-        rotulo.setForeground(Tema.PRIMARIO);
+        rotulo.setForeground(Tema.TITULO_SECCION);
         rotulo.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, Tema.BORDE));
         panel.add(rotulo, BorderLayout.NORTH);
         panel.add(contenido, BorderLayout.CENTER);

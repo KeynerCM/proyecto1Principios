@@ -28,8 +28,17 @@ import com.mycompany.minipc.so.procesos.EstadoProceso;
  */
 public final class Tema {
 
-    /** Azul oscuro de la barra de titulo y los encabezados. */
-    public static final Color PRIMARIO = new Color(31, 58, 95);
+    /** Menta de la barra de titulo y de los encabezados de las tablas. */
+    public static final Color MENTA = new Color(62, 180, 137);
+
+    /** Texto sobre el menta: verde muy oscuro, mas legible que el blanco. */
+    public static final Color TEXTO_SOBRE_MENTA = new Color(14, 52, 40);
+
+    /** Texto secundario sobre el menta (rotulos de la barra de titulo). */
+    public static final Color TEXTO_SUAVE_SOBRE_MENTA = new Color(30, 84, 66);
+
+    /** Menta oscuro para los titulos de seccion sobre fondo blanco. */
+    public static final Color TITULO_SECCION = new Color(26, 122, 92);
 
     /** Fondo general de la ventana. */
     public static final Color FONDO = new Color(242, 244, 247);
@@ -199,7 +208,7 @@ public final class Tema {
                 BorderFactory.createEmptyBorder(8, 8, 8, 8)));
         JLabel rotulo = new JLabel(titulo.toUpperCase());
         rotulo.setFont(FUENTE_SECCION);
-        rotulo.setForeground(PRIMARIO);
+        rotulo.setForeground(TITULO_SECCION);
         panel.add(rotulo, BorderLayout.NORTH);
         panel.add(contenido, BorderLayout.CENTER);
         return panel;

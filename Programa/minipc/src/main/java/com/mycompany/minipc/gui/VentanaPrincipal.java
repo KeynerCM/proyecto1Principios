@@ -200,18 +200,18 @@ public class VentanaPrincipal extends javax.swing.JFrame implements VistaPrincip
     /**
      * Nombre: crearBarraTitulo
      * Entradas: ninguna
-     * Salidas: la franja azul con el nombre del programa y el reloj
+     * Salidas: la franja menta con el nombre del programa y el reloj
      * Restricciones: ninguna
      * Descripcion: a la derecha muestra el reloj simulado, el algoritmo y la
      *              CPU, que son datos que conviene ver siempre.
      */
     private JComponent crearBarraTitulo() {
         JPanel barra = new JPanel(new BorderLayout());
-        barra.setBackground(Tema.PRIMARIO);
+        barra.setBackground(Tema.MENTA);
         barra.setBorder(BorderFactory.createEmptyBorder(8, 14, 8, 14));
         JLabel titulo = new JLabel("Proyecto 1 de SO - Gestor de Procesos");
         titulo.setFont(Tema.FUENTE_TITULO);
-        titulo.setForeground(Color.WHITE);
+        titulo.setForeground(Tema.TEXTO_SOBRE_MENTA);
         barra.add(titulo, BorderLayout.WEST);
 
         JPanel datos = new JPanel(new FlowLayout(FlowLayout.RIGHT, 14, 0));
@@ -224,9 +224,9 @@ public class VentanaPrincipal extends javax.swing.JFrame implements VistaPrincip
         datos.add(etiquetaTitulo("|"));
         datos.add(etiquetaTitulo("CPU 1"));
         lblReloj.setFont(Tema.FUENTE_TITULO);
-        lblReloj.setForeground(Color.WHITE);
+        lblReloj.setForeground(Tema.TEXTO_SOBRE_MENTA);
         lblAlgoritmo.setFont(Tema.FUENTE_NEGRITA);
-        lblAlgoritmo.setForeground(Color.WHITE);
+        lblAlgoritmo.setForeground(Tema.TEXTO_SOBRE_MENTA);
         barra.add(datos, BorderLayout.EAST);
         return barra;
     }
@@ -708,14 +708,14 @@ public class VentanaPrincipal extends javax.swing.JFrame implements VistaPrincip
     /**
      * Nombre: etiquetaTitulo
      * Entradas: texto
-     * Salidas: una etiqueta clara para la barra de titulo
+     * Salidas: una etiqueta para la barra de titulo
      * Restricciones: ninguna
      * Descripcion: todas las etiquetas de la barra con el mismo estilo.
      */
     private static JLabel etiquetaTitulo(String texto) {
         JLabel etiqueta = new JLabel(texto);
         etiqueta.setFont(Tema.FUENTE);
-        etiqueta.setForeground(new Color(214, 226, 240));
+        etiqueta.setForeground(Tema.TEXTO_SUAVE_SOBRE_MENTA);
         return etiqueta;
     }
 

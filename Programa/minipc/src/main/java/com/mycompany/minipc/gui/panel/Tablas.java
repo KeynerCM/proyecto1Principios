@@ -20,7 +20,7 @@ import com.mycompany.minipc.gui.Tema;
  * Salidas: no aplica
  * Restricciones: no se instancia
  * Descripcion: el mismo estilo para todas las tablas de la ventana (letra de
- *              ancho fijo, sin lineas verticales, encabezado azul) y las
+ *              ancho fijo, sin lineas verticales, encabezado menta) y las
  *              leyendas de colores de la memoria y el disco.
  */
 public final class Tablas {
@@ -88,7 +88,7 @@ public final class Tablas {
      * Entradas: no aplica
      * Salidas: no aplica
      * Restricciones: ninguna
-     * Descripcion: encabezado azul con texto blanco. Se dibuja con un
+     * Descripcion: encabezado menta con texto verde oscuro. Se dibuja con un
      *              renderer propio porque la apariencia de Windows ignora el
      *              color de fondo del encabezado.
      */
@@ -108,8 +108,8 @@ public final class Tablas {
                 boolean seleccionada, boolean foco, int fila, int columna) {
             super.getTableCellRendererComponent(tabla, valor, false, false, fila, columna);
             setFont(Tema.FUENTE_NEGRITA);
-            setBackground(Tema.PRIMARIO);
-            setForeground(Color.WHITE);
+            setBackground(Tema.MENTA);
+            setForeground(Tema.TEXTO_SOBRE_MENTA);
             setBorder(BorderFactory.createCompoundBorder(
                     BorderFactory.createMatteBorder(0, 0, 0, 1, Tema.BORDE),
                     BorderFactory.createEmptyBorder(3, 6, 3, 6)));
