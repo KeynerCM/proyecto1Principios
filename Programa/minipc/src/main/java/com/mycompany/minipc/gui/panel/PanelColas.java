@@ -149,6 +149,8 @@ public class PanelColas extends JPanel {
         JLabel etiqueta = new JLabel(contenido);
         etiqueta.setFont(Tema.FUENTE);
         etiqueta.setForeground(Tema.TEXTO_SUAVE);
+        // Un margen a la derecha para que la ultima letra no se recorte.
+        etiqueta.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 3));
         return etiqueta;
     }
 

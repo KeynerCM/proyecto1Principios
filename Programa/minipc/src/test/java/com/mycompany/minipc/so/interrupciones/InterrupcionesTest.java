@@ -220,11 +220,41 @@ class InterrupcionesTest {
     }
 
     @Test
-    @DisplayName("DX debe apuntar a un nombre dentro del propio programa")
+    @DisplayName("DX fuera del programa es una violacion de proteccion")
     void int21DxInvalido() throws Exception {
         Trabajo t = cargar("mal.asm", "MOV DX, 5", "MOV AH, 3Ch", "INT 21H", "INT 20H");
         ejecutarTodo();
-        assertTrue(t.getError().contains("no apunta al programa"), t.getError());
+        assertTrue(t.getError().startsWith("Violacion de proteccion"), t.getError());
+        assertTrue(t.getError().contains("sale del programa"), t.getError());
+    }
+
+    @Test
+    @DisplayName("DX dentro del programa pero sin nombre entre comillas es un error")
+    void int21DxSinNombre() throws Exception {
+        Trabajo t = cargar("mal.asm", "MOV DX, 1", "MOV AH, 3Ch", "INT 21H", "INT 20H");
+        ejecutarTodo();
+        assertTrue(t.getError().contains("no contiene un nombre"), t.getError());
+    }
+
+    @Test
+    @DisplayName("DX es relativo a la base: el mismo programa funciona en otra region")
+    void int21DxRelativo() throws Exception {
+        cargar("relleno.asm", "MOV AX, 1", "MOV AX, 2", "MOV AX, 3", "INT 20H");
+        Trabajo t = cargar("crea.asm", "MOV DX, \"rel.txt\"", "MOV AH, 3Ch", "INT 21H",
+                "INT 20H");
+        ejecutarTodo();
+        assertNull(t.getError());
+        assertNotNull(so.getDisco().buscar("rel.txt"));
+    }
+
+    @Test
+    @DisplayName("INT 21H no puede eliminar un programa del disco")
+    void int21NoEliminaProgramas() throws Exception {
+        Trabajo t = cargar("borra.asm", "MOV DX, \"borra.asm\"", "MOV AH, 41h", "INT 21H",
+                "INT 20H");
+        ejecutarTodo();
+        assertTrue(t.getError().contains("es un programa"), t.getError());
+        assertNotNull(so.getDisco().buscar("borra.asm"));
     }
 
     @Test

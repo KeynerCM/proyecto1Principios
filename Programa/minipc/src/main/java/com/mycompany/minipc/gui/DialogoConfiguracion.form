@@ -246,7 +246,7 @@
             <Component class="javax.swing.JButton" name="btnRestaurar">
               <Properties>
                 <Property name="text" type="java.lang.String" value="Valores por defecto"/>
-                <Property name="toolTipText" type="java.lang.String" value="Memoria de 256 con kernel de 0 a 63, disco de 512 con 64 de memoria virtual, 1000 ms por segundo"/>
+                <Property name="toolTipText" type="java.lang.String" value="Memoria de 256 con kernel de 0 a 127, disco de 512 con 64 de memoria virtual, 1000 ms por segundo"/>
               </Properties>
               <Events>
                 <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="btnRestaurarActionPerformed"/>

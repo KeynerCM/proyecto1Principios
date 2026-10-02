@@ -62,6 +62,7 @@ class ControladorPrincipalTest {
         private String reloj = "";
         private List<Proceso> colas = Collections.emptyList();
         private int admitidos = -1;
+        private int estadisticasMostradas;
 
         @Override
         public void mostrarInstrucciones(List<String> programa) {
@@ -151,6 +152,11 @@ class ControladorPrincipalTest {
         @Override
         public void mostrarResumen(int usoDisco, int admitidos) {
             this.admitidos = admitidos;
+        }
+
+        @Override
+        public void mostrarEstadisticas() {
+            estadisticasMostradas++;
         }
 
         /** Fija los archivos que "elegira" el usuario; sin argumentos, cancela. */
@@ -394,6 +400,7 @@ class ControladorPrincipalTest {
         Proceso p = enEjecucion();
         assertEquals(3, p.getAc());
         assertEquals(3, p.getRegistro(RegistroID.AX));
+        assertEquals(0, vista.estadisticasMostradas);
 
         controlador.alPasoAPaso();
         assertTrue(vista.termino);
@@ -402,6 +409,7 @@ class ControladorPrincipalTest {
         assertEquals(EstadoProceso.FINALIZADO, trabajos().get(0).getEstado());
         assertEquals(13, trabajos().get(0).getTiempoCpu(), "Suma de los pesos");
         assertTrue(vista.consolaContiene("Todos los trabajos finalizaron"));
+        assertEquals(1, vista.estadisticasMostradas, "Al final se muestran las estadisticas");
     }
 
     @Test

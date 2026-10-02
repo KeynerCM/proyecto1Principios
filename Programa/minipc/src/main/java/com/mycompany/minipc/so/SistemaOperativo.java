@@ -15,6 +15,8 @@ import com.mycompany.minipc.so.despacho.CambioContexto;
 import com.mycompany.minipc.so.despacho.Despachador;
 import com.mycompany.minipc.so.interrupciones.ManejadorInterrupciones;
 import com.mycompany.minipc.so.memoria.GestorMemoria;
+import com.mycompany.minipc.so.memoria.Intercambio;
+import com.mycompany.minipc.so.memoria.MemoriaVirtual;
 import com.mycompany.minipc.so.planificacion.AlgoritmoPlanificacion;
 import com.mycompany.minipc.so.planificacion.PlanificadorProcesos;
 import com.mycompany.minipc.so.procesos.EstadoProceso;
@@ -61,6 +63,7 @@ public class SistemaOperativo {
     private final ListaProcesos listaProcesos;
     private final ListaTrabajos listaTrabajos;
     private final GestorMemoria gestorMemoria;
+    private final MemoriaVirtual memoriaVirtual;
     private final PlanificadorTrabajos planificadorTrabajos;
     private final PlanificadorProcesos planificadorProcesos;
     private final Despachador despachador;
@@ -94,13 +97,16 @@ public class SistemaOperativo {
         this.listaProcesos = new ListaProcesos(tabla);
         this.listaTrabajos = new ListaTrabajos();
         this.gestorMemoria = new GestorMemoria(memoria);
+        this.memoriaVirtual = new MemoriaVirtual(disco);
         this.errores = new ArrayList<>();
         this.bitacora = mensaje -> { };
 
         Consumer<String> conHora = mensaje -> bitacora.accept("[" + formatearReloj(reloj) + "] "
                 + mensaje);
+        Intercambio intercambio = new Intercambio(listaProcesos, gestorMemoria,
+                this.memoriaVirtual, conHora);
         this.planificadorTrabajos = new PlanificadorTrabajos(listaTrabajos, listaProcesos, tabla,
-                gestorMemoria, disco, conHora);
+                gestorMemoria, this.memoriaVirtual, intercambio, disco, conHora);
         this.planificadorProcesos = new PlanificadorProcesos(listaProcesos, algoritmo);
         this.despachador = new Despachador(cpu, tabla, listaProcesos, new CambioContexto(),
                 conHora);
@@ -350,12 +356,13 @@ public class SistemaOperativo {
      * Entradas: ninguna
      * Salidas: ninguna
      * Restricciones: ninguna
-     * Descripcion: deja la memoria, la CPU, el reloj y los errores como al
-     *              arrancar.
+     * Descripcion: deja la memoria, la memoria virtual, la CPU, el reloj y
+     *              los errores como al arrancar.
      */
     private void descargarTodo() {
         tabla.formatear();
         memoria.limpiarZonaUsuario();
+        memoriaVirtual.limpiar();
         cpu.limpiar();
         cpu.getEstadisticas().reset();
         pantalla.limpiar();

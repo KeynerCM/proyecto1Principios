@@ -140,7 +140,8 @@ public class PanelBCP extends JPanel {
         sp.setText(valores.size() + " de " + Pila.CAPACIDAD);
         mostrarPila(valores, proceso.getRanura());
 
-        base.setText(String.valueOf(proceso.getBase()));
+        base.setText(proceso.getBase() + (proceso.estaEnMemoriaVirtual()
+                ? " (memoria virtual, en el disco)" : ""));
         alcance.setText(proceso.getAlcance() + " posiciones");
         ubicacion.setText(proceso.getDireccionBCP() + " a " + proceso.getDireccionFinBCP()
                 + " (ranura " + proceso.getRanura() + ")");
@@ -156,17 +157,20 @@ public class PanelBCP extends JPanel {
      * Nombre: textoDx
      * Entradas: proceso; memoria
      * Salidas: el valor de DX y, si apunta a un nombre dentro del programa,
-     *          ese nombre, por ejemplo "130 -> \"datos.txt\""
-     * Restricciones: ninguna
+     *          la direccion real y ese nombre, por ejemplo
+     *          "2 (130)  ->  \"datos.txt\""
+     * Restricciones: si el proceso esta suspendido solo muestra el numero,
+     *                porque su programa esta en el disco
      * Descripcion: asi se ve que DX "contiene" el nombre del archivo (9.3).
      */
     private static String textoDx(Proceso proceso, Memoria memoria) {
         int valor = proceso.getRegistro(RegistroID.DX);
-        if (memoria != null && valor >= proceso.getBase()
-                && valor < proceso.getBase() + proceso.getAlcance()) {
-            Matcher texto = TEXTO.matcher(memoria.leer(valor));
+        if (memoria != null && !proceso.estaEnMemoriaVirtual() && valor >= 0
+                && valor < proceso.getAlcance()) {
+            int direccion = proceso.getBase() + valor;
+            Matcher texto = TEXTO.matcher(memoria.leer(direccion));
             if (texto.find()) {
-                return valor + "  ->  \"" + texto.group(1) + "\"";
+                return valor + " (" + direccion + ")  ->  \"" + texto.group(1) + "\"";
             }
         }
         return String.valueOf(valor);

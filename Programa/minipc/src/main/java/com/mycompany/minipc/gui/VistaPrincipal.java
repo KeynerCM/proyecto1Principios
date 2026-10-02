@@ -198,4 +198,14 @@ public interface VistaPrincipal {
      * Descripcion: datos de la barra de estado.
      */
     void mostrarResumen(int usoDisco, int admitidos);
+
+    /**
+     * Nombre: mostrarEstadisticas
+     * Entradas: ninguna
+     * Salidas: ninguna
+     * Restricciones: se llama una vez, cuando finaliza el ultimo trabajo
+     * Descripcion: el enunciado pide las estadisticas "al final de la
+     *              ejecucion de los procesos".
+     */
+    void mostrarEstadisticas();
 }

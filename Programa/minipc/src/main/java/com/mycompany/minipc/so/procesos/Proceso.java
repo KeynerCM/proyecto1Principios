@@ -308,6 +308,38 @@ public final class Proceso {
     }
 
     /**
+     * Nombre: reubicar
+     * Entradas: nuevaBase, donde queda ahora la imagen del programa
+     * Salidas: ninguna
+     * Restricciones: el proceso no debe estar en ejecucion
+     * Descripcion: cuando el intercambio mueve la imagen entre la memoria
+     *              principal y la memoria virtual cambia la base, y el PC se
+     *              corrige con el mismo desplazamiento: PC nuevo = base nueva
+     *              + (PC - base vieja). DX no se toca porque ya es relativo a
+     *              la base. Es la reubicacion dinamica del libro (Stallings,
+     *              seccion 7.2).
+     */
+    public void reubicar(int nuevaBase) {
+        int desplazamiento = getPc() - getBase();
+        tabla.escribirEntero(direccionBCP, CampoBCP.BASE, nuevaBase);
+        setPc(nuevaBase + desplazamiento);
+    }
+
+    /**
+     * Nombre: estaEnMemoriaVirtual
+     * Entradas: ninguna
+     * Salidas: true si la imagen del programa esta en el disco
+     * Restricciones: ninguna
+     * Descripcion: los dos estados suspendidos son los que viven en la
+     *              memoria virtual; ahi la BASE es una direccion del disco.
+     */
+    public boolean estaEnMemoriaVirtual() {
+        EstadoProceso estado = getEstado();
+        return estado == EstadoProceso.SUSPENDIDO_PREPARADO
+                || estado == EstadoProceso.SUSPENDIDO_EN_ESPERA;
+    }
+
+    /**
      * Nombre: getCpu
      * Entradas: ninguna
      * Salidas: la CPU donde se ejecuta, o vacio si no esta en ejecucion

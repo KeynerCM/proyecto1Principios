@@ -1,5 +1,6 @@
 package com.mycompany.minipc.so.memoria;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import com.mycompany.minipc.hardware.Memoria;
@@ -63,6 +64,22 @@ public class GestorMemoria {
             memoria.escribir(base + i, lineas.get(i));
         }
         return base;
+    }
+
+    /**
+     * Nombre: leer
+     * Entradas: base, primera posicion del bloque; alcance, cuantas ocupa
+     * Salidas: el texto de cada posicion del bloque, en orden
+     * Restricciones: ninguna
+     * Descripcion: la imagen del programa, para copiarla a la memoria
+     *              virtual al suspender el proceso.
+     */
+    public List<String> leer(int base, int alcance) {
+        List<String> imagen = new ArrayList<>();
+        for (int i = base; i < base + alcance; i++) {
+            imagen.add(memoria.leer(i));
+        }
+        return imagen;
     }
 
     /**

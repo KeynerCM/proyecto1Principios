@@ -154,21 +154,93 @@ class SistemaOperativoTest {
     }
 
     @Test
-    @DisplayName("Si no hay espacio en memoria, el trabajo espera hasta que se libere")
-    void esperaPorMemoria() throws Exception {
+    @DisplayName("Si no cabe en la memoria principal, el trabajo nuevo pasa a la memoria virtual")
+    void nuevoAMemoriaVirtual() throws Exception {
         so = crear(160);
         Trabajo a = cargar("a.asm", programaDe(20));
         Trabajo b = cargar("b.asm", programaDe(20));
 
-        assertEquals(1, so.admitir(), "La zona de usuario de 32 solo alcanza para uno");
+        assertEquals(2, so.admitir(), "La zona de usuario de 32 solo alcanza para uno");
+        assertEquals(EstadoProceso.PREPARADO, a.getEstado());
+        assertEquals(EstadoProceso.SUSPENDIDO_PREPARADO, b.getEstado());
+        int inicioVirtual = so.getDisco().getInicioMemoriaVirtual();
+        assertEquals(inicioVirtual, b.getProceso().getBase(), "La BASE apunta al disco");
+        assertEquals(inicioVirtual, b.getProceso().getPc());
+        assertEquals("INC", so.getDisco().leer(inicioVirtual));
+        assertTrue(bitacora.stream().anyMatch(m -> m.contains("pasa a la memoria virtual")));
+
+        ejecutarTodo();
+        assertEquals(EstadoProceso.FINALIZADO, a.getEstado());
+        assertEquals(EstadoProceso.FINALIZADO, b.getEstado());
+        assertEquals(0, b.getInicio(), "El inicio es cuando se admitio, aunque fuera al disco");
+        assertTrue(bitacora.stream().anyMatch(m -> m.contains("P2 vuelve del disco")));
+        assertTrue(so.getDisco().estaLibre(inicioVirtual), "La memoria virtual queda libre");
+    }
+
+    @Test
+    @DisplayName("Si no cabe en ninguna memoria, el trabajo espera en la lista de trabajos")
+    void esperaPorMemoria() throws Exception {
+        so = new SistemaOperativo(160, 512, 16, new FCFS());
+        so.setBitacora(bitacora::add);
+        Trabajo a = cargar("a.asm", programaDe(20));
+        Trabajo b = cargar("b.asm", programaDe(20));
+
+        assertEquals(1, so.admitir(), "La memoria virtual de 16 tampoco alcanza");
         assertEquals(EstadoProceso.NUEVO, b.getEstado());
         assertTrue(b.isEsperandoMemoria());
-        assertTrue(bitacora.stream().anyMatch(m -> m.contains("espera a que se libere memoria")));
+        assertTrue(bitacora.stream().anyMatch(m -> m.contains("espera en la lista de trabajos")));
 
         ejecutarTodo();
         assertEquals(EstadoProceso.FINALIZADO, a.getEstado());
         assertEquals(EstadoProceso.FINALIZADO, b.getEstado());
         assertTrue(b.getInicio() >= a.getFin());
+    }
+
+    @Test
+    @DisplayName("Sin procesos listos, un proceso EN_ESPERA se suspende para traer otro")
+    void suspendeAlBloqueado() throws Exception {
+        so = crear(160);
+        String[] lineasA = programaDe(20);
+        lineasA[0] = "INT 09H";
+        lineasA[1] = "INT 10H";
+        lineasA[19] = "INT 20H";
+        Trabajo a = cargar("a.asm", lineasA);
+        Trabajo b = cargar("b.asm", programaDe(20));
+        so.admitir();
+
+        so.tick();
+        Proceso pa = a.getProceso();
+        assertEquals(EstadoProceso.SUSPENDIDO_EN_ESPERA, a.getEstado());
+        assertTrue(so.getDisco().esDireccionMemoriaVirtual(pa.getBase()));
+        assertEquals(pa.getBase() + 1, pa.getPc(), "El PC se reubica con la base");
+        assertEquals(EstadoProceso.PREPARADO, b.getEstado(), "B ocupa el lugar que dejo A");
+        assertEquals(128, b.getProceso().getBase());
+        assertTrue(so.hayEsperaTeclado(), "A sigue esperando el teclado desde el disco");
+
+        so.entradaTeclado("7");
+        assertEquals(EstadoProceso.SUSPENDIDO_PREPARADO, a.getEstado());
+        assertEquals(7, pa.getRegistro(RegistroID.DX), "El BCP sigue en el kernel");
+
+        ejecutarTodo();
+        assertEquals(EstadoProceso.FINALIZADO, a.getEstado());
+        assertNull(a.getError());
+        List<String> pantalla = so.getPantalla().getLineas();
+        assertEquals("7", pantalla.get(pantalla.size() - 1),
+                "A siguio en INT 10H despues de volver del disco");
+    }
+
+    @Test
+    @DisplayName("Reiniciar vacia la memoria virtual")
+    void reiniciarLimpiaMemoriaVirtual() throws Exception {
+        so = crear(160);
+        cargar("a.asm", programaDe(20));
+        cargar("b.asm", programaDe(20));
+        so.admitir();
+        int inicioVirtual = so.getDisco().getInicioMemoriaVirtual();
+        assertFalse(so.getDisco().estaLibre(inicioVirtual));
+
+        so.reiniciar();
+        assertTrue(so.getDisco().estaLibre(inicioVirtual));
     }
 
     @Test

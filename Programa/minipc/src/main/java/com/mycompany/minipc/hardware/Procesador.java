@@ -3,6 +3,7 @@ package com.mycompany.minipc.hardware;
 import com.mycompany.minipc.excepciones.DesbordamientoException;
 import com.mycompany.minipc.excepciones.EjecucionException;
 import com.mycompany.minipc.excepciones.SintaxisException;
+import com.mycompany.minipc.excepciones.ViolacionProteccionException;
 import com.mycompany.minipc.isa.Ensamblador;
 import com.mycompany.minipc.isa.Forma;
 import com.mycompany.minipc.isa.Instruccion;
@@ -133,12 +134,22 @@ public class Procesador {
         }
 
         if (restante == 0) {
-            if (pc >= base + alcance) {
+            if (pc == base + alcance) {
                 return Resultado.TERMINO;
+            }
+            // Proteccion: el PC solo puede traer instrucciones de la region
+            // del proceso, comparado con los registros base y alcance.
+            if (pc < base || pc > base + alcance) {
+                throw new ViolacionProteccionException("el PC (" + pc + ") salio de la region"
+                        + " del proceso (" + base + " a " + (base + alcance - 1) + ")");
             }
             // ---------- ETAPA FETCH (y decodificacion) ----------
             direccionIr = pc;
-            irTexto = memoria.leerComoUsuario(direccionIr);
+            try {
+                irTexto = memoria.leerComoUsuario(direccionIr);
+            } catch (IllegalArgumentException e) {
+                throw new ViolacionProteccionException(e.getMessage());
+            }
             ir = null;
             pc++;
             estadisticas.registrarLectura();
@@ -204,8 +215,11 @@ public class Procesador {
                     valor = registros.leer(instruccion.getRegistro(1));
                 } else if (instruccion.getForma() == Forma.REGISTRO_TEXTO) {
                     // El texto queda guardado en la celda de esta misma
-                    // instruccion; el registro recibe su direccion.
-                    valor = direccionIr;
+                    // instruccion; el registro recibe su desplazamiento dentro
+                    // del programa, como DX en el par DS:DX del x86. Al ser
+                    // relativo a la base, sigue valiendo si el proceso se
+                    // mueve a otra parte de la memoria.
+                    valor = direccionIr - base;
                 } else {
                     valor = instruccion.getValor(1);
                 }

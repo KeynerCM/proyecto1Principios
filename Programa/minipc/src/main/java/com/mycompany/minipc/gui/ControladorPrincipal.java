@@ -127,7 +127,7 @@ public class ControladorPrincipal {
         MapaMemoria mapa = new MapaMemoria(so.getMemoria(), so.getTablaBCP());
         this.modeloInstrucciones = new ModeloTablaInstrucciones();
         this.modeloMemoria = new ModeloTablaMemoria(so.getMemoria(), mapa);
-        this.modeloDisco = new ModeloTablaDisco(so.getDisco());
+        this.modeloDisco = new ModeloTablaDisco(so.getDisco(), so.getTablaBCP());
         this.modeloTrabajos = new ModeloTablaTrabajos(so.getListaTrabajos());
         this.renderInstrucciones = new RenderInstruccionActual();
         this.renderMemoria = new RenderZonaMemoria(so.getMemoria(), mapa);
@@ -485,6 +485,9 @@ public class ControladorPrincipal {
                     + SistemaOperativo.formatearReloj(so.getReloj()) + ".");
         }
         actualizarVista();
+        if (!quedan) {
+            vista.mostrarEstadisticas();
+        }
         return quedan;
     }
 

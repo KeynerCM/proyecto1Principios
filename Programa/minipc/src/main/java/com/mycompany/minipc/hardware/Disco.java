@@ -207,6 +207,27 @@ public class Disco {
     }
 
     /**
+     * Nombre: escribirMemoriaVirtual
+     * Entradas: direccion, posicion del area de memoria virtual; texto,
+     *           contenido a guardar (vacio para liberarla)
+     * Salidas: ninguna
+     * Restricciones: lanza IllegalArgumentException si la direccion no
+     *                pertenece a la memoria virtual: asi el intercambio nunca
+     *                pisa el indice ni los archivos
+     * Descripcion: escritura directa en el area de intercambio, la usa el
+     *              sistema operativo para guardar y traer las imagenes de los
+     *              procesos suspendidos.
+     */
+    public void escribirMemoriaVirtual(int direccion, String texto) {
+        if (!esDireccionMemoriaVirtual(direccion)) {
+            throw new IllegalArgumentException("La direccion " + direccion
+                    + " no pertenece a la memoria virtual (" + getInicioMemoriaVirtual()
+                    + " a " + (tamano - 1) + ")");
+        }
+        celdas[direccion] = texto == null ? VACIA : texto;
+    }
+
+    /**
      * Nombre: guardarPrograma
      * Entradas: nombre, nombre del archivo; lineas, texto de cada instruccion
      *           ya validada, en orden
@@ -393,6 +414,20 @@ public class Disco {
         EntradaIndice entrada = buscarObligatorio(nombre);
         Arrays.fill(celdas, entrada.getDireccionInicio(), entrada.getDireccionFin() + 1, VACIA);
         celdas[ranuraDe(nombre)] = VACIA;
+    }
+
+    /**
+     * Nombre: eliminarDatos
+     * Entradas: nombre, nombre del archivo de datos a eliminar
+     * Salidas: ninguna
+     * Restricciones: lanza DiscoException si no existe o si es un programa
+     * Descripcion: la eliminacion que pide un proceso con INT 21H. Solo borra
+     *              archivos de datos: los programas .asm quedan protegidos,
+     *              porque otro trabajo puede estar esperando cargarlos.
+     */
+    public void eliminarDatos(String nombre) throws DiscoException {
+        leerDatos(nombre);
+        eliminar(nombre);
     }
 
     /**

@@ -2,6 +2,7 @@ package com.mycompany.minipc.hardware;
 
 import com.mycompany.minipc.excepciones.EjecucionException;
 import com.mycompany.minipc.excepciones.SintaxisException;
+import com.mycompany.minipc.excepciones.ViolacionProteccionException;
 import com.mycompany.minipc.isa.Ensamblador;
 import com.mycompany.minipc.isa.Interrupcion;
 import com.mycompany.minipc.isa.OpCode;
@@ -156,7 +157,22 @@ class ProcesadorTest {
         memoria.escribir(10, "INC");
         cpu.cargarLimites(10, 1);
         cpu.setPc(10);
-        assertThrows(IllegalArgumentException.class, cpu::paso);
+        ViolacionProteccionException e = assertThrows(ViolacionProteccionException.class,
+                cpu::paso);
+        assertTrue(e.getMessage().contains("zona de kernel"), e.getMessage());
+    }
+
+    @Test
+    @DisplayName("Un PC fuera de la region base y alcance es una violacion de proteccion")
+    void pcFueraDeLaRegion() throws Exception {
+        cargar(List.of("MOV AX, 1", "INT 20H"));
+        cpu.setPc(BASE + 5);
+        ViolacionProteccionException e = assertThrows(ViolacionProteccionException.class,
+                cpu::paso);
+        assertTrue(e.getMessage().contains("salio de la region"), e.getMessage());
+
+        cpu.setPc(BASE - 1);
+        assertThrows(ViolacionProteccionException.class, cpu::paso);
     }
 
     @Test
@@ -254,12 +270,12 @@ class ProcesadorTest {
     }
 
     @Test
-    @DisplayName("MOV DX con un texto guarda en DX la direccion donde esta el texto")
+    @DisplayName("MOV DX con un texto guarda en DX el desplazamiento del texto en el programa")
     void movConTexto() throws Exception {
         cargar(List.of("MOV AX, 1", "MOV DX, \"datos.txt\"", "INT 20H"));
         instruccion();
         instruccion();
-        assertEquals(BASE + 1, cpu.getRegistros().leer(RegistroID.DX));
+        assertEquals(1, cpu.getRegistros().leer(RegistroID.DX));
         assertEquals("MOV DX, \"datos.txt\"", memoria.leer(BASE + 1),
                 "El nombre queda guardado en esa celda de memoria");
     }

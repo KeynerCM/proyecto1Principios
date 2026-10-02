@@ -319,7 +319,7 @@ public class DialogoConfiguracion extends javax.swing.JDialog {
         pnlBotones.setLayout(new java.awt.FlowLayout(java.awt.FlowLayout.RIGHT));
 
         btnRestaurar.setText("Valores por defecto");
-        btnRestaurar.setToolTipText("Memoria de 256 con kernel de 0 a 63, disco de 512 con 64 de memoria virtual, 1000 ms por segundo");
+        btnRestaurar.setToolTipText("Memoria de 256 con kernel de 0 a 127, disco de 512 con 64 de memoria virtual, 1000 ms por segundo");
         btnRestaurar.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 btnRestaurarActionPerformed(evt);

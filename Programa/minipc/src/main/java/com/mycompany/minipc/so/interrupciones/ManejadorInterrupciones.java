@@ -1,5 +1,6 @@
 package com.mycompany.minipc.so.interrupciones;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
 import java.util.regex.Pattern;
@@ -112,11 +113,11 @@ public class ManejadorInterrupciones {
      * Salidas: true si algun proceso espera un valor del teclado
      * Restricciones: ninguna
      * Descripcion: la interfaz habilita el teclado solo en ese caso. Como
-     *              INT 09H es lo unico que bloquea, EN_ESPERA significa
-     *              esperando el teclado.
+     *              INT 09H es lo unico que bloquea, EN_ESPERA y
+     *              SUSPENDIDO_EN_ESPERA significan esperando el teclado.
      */
     public boolean hayEsperaTeclado() {
-        return !procesos.conEstado(EstadoProceso.EN_ESPERA).isEmpty();
+        return !esperandoTeclado().isEmpty();
     }
 
     /**
@@ -126,9 +127,14 @@ public class ManejadorInterrupciones {
      * Restricciones: lanza IllegalArgumentException si no es un numero de 0 a
      *                255, e IllegalStateException si nadie espera el teclado
      * Descripcion: la interrupcion de entrada y salida del teclado. El valor
-     *              va al DX del BCP del primer proceso que espera, que vuelve
-     *              a PREPARADO al final de la cola de listos. El valor se
-     *              muestra en la pantalla como eco.
+     *              va al DX del BCP del primer proceso que espera, que pasa
+     *              al final de la lista. Si estaba en memoria vuelve a
+     *              PREPARADO; si estaba suspendido pasa a SUSPENDIDO_PREPARADO
+     *              ("when the event for which it has been waiting occurs",
+     *              Stallings p. 147) y el intercambio lo trae cuando haya
+     *              espacio. El BCP nunca sale del kernel, por eso se puede
+     *              escribir DX aunque el programa este en el disco. El valor
+     *              se muestra en la pantalla como eco.
      */
     public Proceso entradaTeclado(String texto) {
         String valorTexto = texto == null ? "" : texto.trim();
@@ -137,18 +143,40 @@ public class ManejadorInterrupciones {
             throw new IllegalArgumentException("El teclado solo acepta numeros enteros de 0 a "
                     + MAXIMO_TECLADO + ", se recibio \"" + valorTexto + "\"");
         }
-        List<Proceso> esperando = procesos.conEstado(EstadoProceso.EN_ESPERA);
+        List<Proceso> esperando = esperandoTeclado();
         if (esperando.isEmpty()) {
             throw new IllegalStateException("Ningun proceso esta esperando un valor del teclado");
         }
         int valor = Integer.parseInt(valorTexto);
         Proceso proceso = esperando.get(0);
+        EstadoProceso nuevo = proceso.getEstado() == EstadoProceso.SUSPENDIDO_EN_ESPERA
+                ? EstadoProceso.SUSPENDIDO_PREPARADO : EstadoProceso.PREPARADO;
         proceso.setRegistro(RegistroID.DX, valor);
-        proceso.setEstado(EstadoProceso.PREPARADO);
+        proceso.setEstado(nuevo);
         procesos.moverAlFinal(proceso);
         pantalla.escribir(String.valueOf(valor));
         bitacora.accept("Interrupcion de E/S (teclado): " + proceso + " recibe " + valor
-                + " en DX y pasa a PREPARADO.");
+                + " en DX y pasa a " + nuevo + ".");
         return proceso;
+    }
+
+    /**
+     * Nombre: esperandoTeclado
+     * Entradas: ninguna
+     * Salidas: los procesos EN_ESPERA o SUSPENDIDO_EN_ESPERA, en el orden de
+     *          la lista de procesos
+     * Restricciones: ninguna
+     * Descripcion: el teclado atiende al primero de esta lista.
+     */
+    private List<Proceso> esperandoTeclado() {
+        List<Proceso> esperando = new ArrayList<>();
+        for (Proceso proceso : procesos.recorrer()) {
+            EstadoProceso estado = proceso.getEstado();
+            if (estado == EstadoProceso.EN_ESPERA
+                    || estado == EstadoProceso.SUSPENDIDO_EN_ESPERA) {
+                esperando.add(proceso);
+            }
+        }
+        return esperando;
     }
 }

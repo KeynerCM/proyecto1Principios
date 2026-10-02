@@ -32,6 +32,7 @@ import javax.swing.JTabbedPane;
 import javax.swing.JTable;
 import javax.swing.JTextArea;
 import javax.swing.KeyStroke;
+import javax.swing.SwingUtilities;
 import javax.swing.filechooser.FileNameExtensionFilter;
 import javax.swing.table.AbstractTableModel;
 
@@ -562,6 +563,19 @@ public class VentanaPrincipal extends javax.swing.JFrame implements VistaPrincip
         lblAdmitidos.setText("Procesos admitidos: " + admitidos + " de "
                 + TablaBCP.MAX_PROCESOS);
         lblAlgoritmo.setText(controlador.getSistemaOperativo().getAlgoritmo().getNombre());
+    }
+
+    /**
+     * Nombre: mostrarEstadisticas
+     * Entradas: ninguna
+     * Salidas: ninguna
+     * Restricciones: se difiere con invokeLater para que la ventana termine
+     *                de refrescarse antes de abrir el dialogo modal
+     * Descripcion: ver VistaPrincipal.
+     */
+    @Override
+    public void mostrarEstadisticas() {
+        SwingUtilities.invokeLater(this::abrirEstadisticas);
     }
 
     /**

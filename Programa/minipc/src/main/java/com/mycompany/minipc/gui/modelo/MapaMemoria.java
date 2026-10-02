@@ -84,10 +84,14 @@ public class MapaMemoria {
      * Entradas: direccion, posicion de la zona de usuario
      * Salidas: el proceso cuya region contiene la direccion, o nulo
      * Restricciones: ninguna
-     * Descripcion: compara contra la base y el alcance de cada BCP.
+     * Descripcion: compara contra la base y el alcance de cada BCP. Los
+     *              procesos suspendidos se saltan: su BASE es del disco.
      */
     private Proceso duenoDe(int direccion) {
         for (Proceso proceso : tabla.getProcesos()) {
+            if (proceso.estaEnMemoriaVirtual()) {
+                continue;
+            }
             int base = proceso.getBase();
             if (direccion >= base && direccion < base + proceso.getAlcance()) {
                 return proceso;

@@ -6,6 +6,7 @@ import java.util.regex.Pattern;
 
 import com.mycompany.minipc.excepciones.DiscoException;
 import com.mycompany.minipc.excepciones.EjecucionException;
+import com.mycompany.minipc.excepciones.ViolacionProteccionException;
 import com.mycompany.minipc.hardware.BancoRegistros;
 import com.mycompany.minipc.hardware.Disco;
 import com.mycompany.minipc.hardware.Memoria;
@@ -85,7 +86,7 @@ public class SistemaArchivos {
                 case ESCRIBIR:
                     return escribir(proceso, nombre, registros.leer(RegistroID.AL));
                 case ELIMINAR:
-                    disco.eliminar(nombre);
+                    disco.eliminarDatos(nombre);
                     cerrar(proceso, nombre);
                     return "elimina el archivo " + nombre;
                 default:
@@ -103,24 +104,28 @@ public class SistemaArchivos {
      * Entradas: cpu, con DX y los registros base y alcance del proceso
      * Salidas: el nombre del archivo
      * Restricciones: DX debe apuntar a una celda del propio proceso que tenga
-     *                un texto entre comillas; si no, lanza EjecucionException
-     * Descripcion: DX guarda la direccion donde esta el nombre, que es la
-     *              celda de la instruccion MOV DX, "nombre". Que la direccion
-     *              este dentro del proceso es parte de la proteccion: un
-     *              proceso no puede usar datos de otro.
+     *                un texto entre comillas; si sale del programa lanza
+     *                ViolacionProteccionException y si la celda no tiene un
+     *                nombre lanza EjecucionException
+     * Descripcion: DX guarda el desplazamiento del nombre dentro del programa,
+     *              que es la celda de la instruccion MOV DX, "nombre". La
+     *              direccion real es base + DX, como en el hardware de
+     *              reubicacion del libro: primero se compara DX con el alcance
+     *              y despues se suma la base. Asi un proceso no puede leer
+     *              datos de otro ni del kernel.
      */
     private String nombreApuntadoPorDx(Procesador cpu) {
         int dx = cpu.getRegistros().leer(RegistroID.DX);
-        if (dx < cpu.getBase() || dx >= cpu.getBase() + cpu.getAlcance()) {
-            throw new EjecucionException("INT 21H: DX = " + dx + " no apunta al programa"
-                    + " (direcciones " + cpu.getBase() + " a "
-                    + (cpu.getBase() + cpu.getAlcance() - 1) + "). Cargue el nombre con"
-                    + " MOV DX, \"archivo.txt\"");
+        if (dx < 0 || dx >= cpu.getAlcance()) {
+            throw new ViolacionProteccionException("INT 21H: DX = " + dx + " sale del programa"
+                    + " (desplazamientos 0 a " + (cpu.getAlcance() - 1) + "). Cargue el"
+                    + " nombre con MOV DX, \"archivo.txt\"");
         }
-        Matcher texto = NOMBRE.matcher(memoria.leer(dx));
+        int direccion = cpu.getBase() + dx;
+        Matcher texto = NOMBRE.matcher(memoria.leer(direccion));
         if (!texto.find()) {
-            throw new EjecucionException("INT 21H: la posicion " + dx + " (DX) no contiene"
-                    + " un nombre de archivo entre comillas");
+            throw new EjecucionException("INT 21H: la posicion " + direccion + " (base + DX)"
+                    + " no contiene un nombre de archivo entre comillas");
         }
         return texto.group(1);
     }
