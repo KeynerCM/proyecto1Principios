@@ -281,6 +281,17 @@ public class SistemaOperativo {
     }
 
     /**
+     * Nombre: getEsperandoTeclado
+     * Entradas: ninguna
+     * Salidas: el proceso que recibira el proximo valor del teclado, o nulo
+     * Restricciones: ninguna
+     * Descripcion: ver ManejadorInterrupciones.getEsperandoTeclado.
+     */
+    public Proceso getEsperandoTeclado() {
+        return interrupciones.getEsperandoTeclado();
+    }
+
+    /**
      * Nombre: terminar
      * Entradas: proceso, el que estaba en ejecucion; error, motivo si fallo,
      *           o nulo si termino normalmente

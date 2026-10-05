@@ -67,7 +67,7 @@ class InterrupcionesTest {
         ticks(2);
         assertTrue(so.getPantalla().getLineas().isEmpty(), "INT 10H pesa 2");
         ticks(1);
-        assertEquals(List.of("12"), so.getPantalla().getLineas());
+        assertEquals(List.of("[P1] 12"), so.getPantalla().getLineas());
         assertTrue(bitacoraContiene("Llamada al sistema INT 10H: P1 imprime DX = 12"));
     }
 
@@ -91,10 +91,12 @@ class InterrupcionesTest {
         assertEquals(EstadoProceso.EN_ESPERA, t.getEstado());
         assertNull(so.getEnEjecucion(), "La CPU queda libre para otro proceso");
         assertTrue(so.hayEsperaTeclado());
-        assertEquals(List.of(ManejadorInterrupciones.AVISO_TECLADO),
+        assertEquals(List.of("[P1] " + ManejadorInterrupciones.AVISO_TECLADO),
                 so.getPantalla().getLineas());
 
         so.entradaTeclado("12");
+        assertEquals(List.of("[P1] >> Ingresar valor: 12"), so.getPantalla().getLineas(),
+                "El eco queda en la misma linea del aviso");
         assertEquals(EstadoProceso.PREPARADO, t.getEstado());
         assertEquals(12, t.getProceso().getRegistro(RegistroID.DX), "El valor va al DX del BCP");
         assertFalse(so.hayEsperaTeclado());
@@ -265,5 +267,23 @@ class InterrupcionesTest {
         ejecutarTodo();
         assertTrue(t.getError().contains("63h no es un servicio"), t.getError());
         assertTrue(t.getError().contains("3Ch crear"), t.getError());
+    }
+    @Test
+    @DisplayName("Con varios esperando, cada valor completa la linea de su proceso")
+    void variosEsperanElTeclado() throws Exception {
+        cargar("a.asm", "INT 09H", "INT 10H", "INT 20H");
+        cargar("b.asm", "INT 09H", "INT 10H", "INT 20H");
+        ticks(2);
+        assertEquals(List.of("[P1] >> Ingresar valor:", "[P2] >> Ingresar valor:"),
+                so.getPantalla().getLineas());
+        assertEquals("P1", so.getEsperandoTeclado().toString(), "El primero que espero");
+
+        so.entradaTeclado("5");
+        assertEquals("P2", so.getEsperandoTeclado().toString());
+        so.entradaTeclado("9");
+        assertNull(so.getEsperandoTeclado());
+        ejecutarTodo();
+        assertEquals(List.of("[P1] >> Ingresar valor: 5", "[P2] >> Ingresar valor: 9",
+                "[P1] 5", "[P2] 9"), so.getPantalla().getLineas());
     }
 }

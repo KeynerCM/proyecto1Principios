@@ -592,14 +592,15 @@ public class VentanaPrincipal extends javax.swing.JFrame implements VistaPrincip
 
     /**
      * Nombre: habilitarTeclado
-     * Entradas: habilitado, true si algun proceso espera un valor
+     * Entradas: habilitado, true si algun proceso espera un valor; destino,
+     *           el proceso que recibira el valor, o nulo
      * Salidas: ninguna
      * Restricciones: ninguna
      * Descripcion: delega en el panel de la pantalla.
      */
     @Override
-    public void habilitarTeclado(boolean habilitado) {
-        panelPantalla.habilitarTeclado(habilitado);
+    public void habilitarTeclado(boolean habilitado, String destino) {
+        panelPantalla.habilitarTeclado(habilitado, destino);
     }
 
     /**
@@ -619,8 +620,10 @@ public class VentanaPrincipal extends javax.swing.JFrame implements VistaPrincip
      * Entradas: ninguna
      * Salidas: los archivos elegidos, o una lista vacia si el usuario cancelo
      * Restricciones: el selector solo ofrece archivos con extension .asm
-     * Descripcion: abre el selector en la carpeta de ejemplos y permite elegir
-     *              varios a la vez con Ctrl o Shift.
+     * Descripcion: abre el selector en la carpeta de ejemplos. Se pueden
+     *              elegir varios con Ctrl o Shift, o todos los de la carpeta
+     *              con el boton "Seleccionar todos los .asm", que los deja en
+     *              orden alfabetico.
      */
     @Override
     public List<File> seleccionarArchivosAsm() {
@@ -630,10 +633,41 @@ public class VentanaPrincipal extends javax.swing.JFrame implements VistaPrincip
         selector.setAcceptAllFileFilterUsed(false);
         selector.setFileFilter(new FileNameExtensionFilter(
                 "Archivos de ensamblador (*.asm)", "asm"));
+        selector.setAccessory(accesorioSelector(selector));
         if (selector.showOpenDialog(this) != JFileChooser.APPROVE_OPTION) {
             return Collections.emptyList();
         }
         return Arrays.asList(selector.getSelectedFiles());
+    }
+
+    /**
+     * Nombre: accesorioSelector
+     * Entradas: selector, el selector de archivos abierto
+     * Salidas: el panel lateral con la ayuda y el boton
+     * Restricciones: ninguna
+     * Descripcion: el boton marca todos los .asm de la carpeta que se esta
+     *              viendo, para no tener que usar Ctrl en cada archivo.
+     */
+    private static JPanel accesorioSelector(JFileChooser selector) {
+        JButton todos = new JButton("Seleccionar todos los .asm");
+        todos.addActionListener(e -> {
+            File[] archivos = selector.getCurrentDirectory().listFiles(
+                    archivo -> archivo.isFile()
+                    && archivo.getName().toLowerCase().endsWith(".asm"));
+            if (archivos != null && archivos.length > 0) {
+                Arrays.sort(archivos);
+                selector.setSelectedFiles(archivos);
+            }
+        });
+        JLabel ayuda = new JLabel("<html>Para elegir varios:<br>Ctrl + clic, uno por uno;<br>"
+                + "Shift + clic, un rango.<br><br>Volver a usar Cargar archivos<br>"
+                + "agrega mas trabajos.</html>");
+        ayuda.setFont(Tema.FUENTE);
+        JPanel panel = new JPanel(new BorderLayout(0, 8));
+        panel.setBorder(BorderFactory.createEmptyBorder(0, 10, 0, 0));
+        panel.add(todos, BorderLayout.NORTH);
+        panel.add(ayuda, BorderLayout.CENTER);
+        return panel;
     }
 
     // ------------------------------------------------------------------

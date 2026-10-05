@@ -32,6 +32,7 @@ public class PanelPantalla extends JPanel {
     private final JTextArea pantalla;
     private final JTextField teclado;
     private final JButton enter;
+    private final JLabel aviso;
 
     /**
      * Nombre: PanelPantalla
@@ -64,7 +65,7 @@ public class PanelPantalla extends JPanel {
         teclado.addActionListener(e -> enviar.run());
         enter.addActionListener(e -> enviar.run());
 
-        JLabel aviso = new JLabel("Teclado:");
+        aviso = new JLabel("Teclado:");
         aviso.setFont(Tema.FUENTE_MONO);
         JPanel linea = new JPanel(new BorderLayout(6, 0));
         linea.setBackground(Tema.TARJETA);
@@ -74,7 +75,7 @@ public class PanelPantalla extends JPanel {
 
         add(new JScrollPane(pantalla), BorderLayout.CENTER);
         add(linea, BorderLayout.SOUTH);
-        habilitarTeclado(false);
+        habilitarTeclado(false, null);
     }
 
     /**
@@ -91,13 +92,17 @@ public class PanelPantalla extends JPanel {
 
     /**
      * Nombre: habilitarTeclado
-     * Entradas: habilitado, true si un proceso espera un valor
+     * Entradas: habilitado, true si un proceso espera un valor; destino, el
+     *           proceso que recibira el valor, o nulo
      * Salidas: ninguna
      * Restricciones: ninguna
      * Descripcion: al habilitarse, el campo recibe el foco para escribir
-     *              enseguida.
+     *              enseguida, y el rotulo dice a quien le llega el valor,
+     *              por ejemplo "Teclado (P3):".
      */
-    public void habilitarTeclado(boolean habilitado) {
+    public void habilitarTeclado(boolean habilitado, String destino) {
+        aviso.setText(habilitado && destino != null ? "Teclado (" + destino + "):"
+                : "Teclado:");
         boolean cambia = teclado.isEnabled() != habilitado;
         teclado.setEnabled(habilitado);
         enter.setEnabled(habilitado);

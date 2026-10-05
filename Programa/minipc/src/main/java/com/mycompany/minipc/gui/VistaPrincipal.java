@@ -161,13 +161,15 @@ public interface VistaPrincipal {
 
     /**
      * Nombre: habilitarTeclado
-     * Entradas: habilitado, true si algun proceso espera un valor
+     * Entradas: habilitado, true si algun proceso espera un valor; destino,
+     *           el proceso que recibira el proximo valor, o nulo
      * Salidas: ninguna
      * Restricciones: ninguna
      * Descripcion: el teclado solo se puede usar cuando un proceso ejecuto
-     *              INT 09H y esta EN_ESPERA.
+     *              INT 09H y esta esperando. Junto al campo se muestra a
+     *              quien le llega el ENTER.
      */
-    void habilitarTeclado(boolean habilitado);
+    void habilitarTeclado(boolean habilitado, String destino);
 
     /**
      * Nombre: mostrarReloj

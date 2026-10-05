@@ -543,7 +543,8 @@ public class ControladorPrincipal {
                 textoDelEstado());
         vista.actualizarUsoMemoria(so.getMemoria().getPorcentajeUso());
         vista.mostrarPantalla(so.getPantalla().getLineas());
-        vista.habilitarTeclado(so.hayEsperaTeclado());
+        Proceso destino = so.getEsperandoTeclado();
+        vista.habilitarTeclado(destino != null, destino == null ? null : destino.toString());
         vista.mostrarReloj(SistemaOperativo.formatearReloj(so.getReloj()));
         vista.mostrarColas(so.getListaProcesos().recorrer());
         Disco disco = so.getDisco();

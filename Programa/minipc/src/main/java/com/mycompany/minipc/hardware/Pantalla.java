@@ -12,7 +12,9 @@ import java.util.List;
  * Descripcion: el monitor del Mini PC. Es un dispositivo de solo salida: el
  *              sistema operativo escribe en el lo que pide INT 10H y el aviso
  *              de INT 09H (">> Ingresar valor:"), y el eco de lo que se
- *              escribe en el teclado.
+ *              escribe en el teclado. Cada linea lleva el proceso que la
+ *              escribio, por ejemplo "[P2] 14", porque varios procesos
+ *              comparten la misma pantalla.
  */
 public class Pantalla {
 
@@ -44,6 +46,27 @@ public class Pantalla {
      */
     public List<String> getLineas() {
         return Collections.unmodifiableList(lineas);
+    }
+
+    /**
+     * Nombre: completar
+     * Entradas: linea, texto exacto de una linea ya escrita; agregado, texto
+     *           que se le pega al final
+     * Salidas: ninguna
+     * Restricciones: busca desde la ultima linea hacia arriba; si la linea ya
+     *                no esta (se descarto por vieja), escribe una nueva con
+     *                los dos textos
+     * Descripcion: el eco del teclado queda en la misma linea del aviso, como
+     *              en una terminal: "[P3] >> Ingresar valor: 56".
+     */
+    public void completar(String linea, String agregado) {
+        for (int i = lineas.size() - 1; i >= 0; i--) {
+            if (lineas.get(i).equals(linea)) {
+                lineas.set(i, linea + agregado);
+                return;
+            }
+        }
+        escribir(linea + agregado);
     }
 
     /**

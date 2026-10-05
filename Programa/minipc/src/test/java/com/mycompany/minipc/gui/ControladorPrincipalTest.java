@@ -59,6 +59,7 @@ class ControladorPrincipalTest {
         private int usoMemoria = -1;
         private List<String> pantalla = Collections.emptyList();
         private boolean tecladoHabilitado;
+        private String destinoTeclado;
         private String reloj = "";
         private List<Proceso> colas = Collections.emptyList();
         private int admitidos = -1;
@@ -135,8 +136,9 @@ class ControladorPrincipalTest {
         }
 
         @Override
-        public void habilitarTeclado(boolean habilitado) {
+        public void habilitarTeclado(boolean habilitado, String destino) {
             this.tecladoHabilitado = habilitado;
+            this.destinoTeclado = destino;
         }
 
         @Override
@@ -629,7 +631,8 @@ class ControladorPrincipalTest {
 
         controlador.alPasoAPaso();
         assertTrue(vista.tecladoHabilitado, "El proceso espera el teclado");
-        assertEquals(List.of(">> Ingresar valor:"), vista.pantalla);
+        assertEquals(List.of("[P1] >> Ingresar valor:"), vista.pantalla);
+        assertEquals("P1", vista.destinoTeclado, "El rotulo dice a quien le llega el valor");
         assertEquals("EN_ESPERA", controlador.getModeloTrabajos().getValueAt(0, 2));
 
         controlador.alEnviarTeclado("300");
@@ -642,8 +645,8 @@ class ControladorPrincipalTest {
 
         controlador.alPasoAPaso();
         controlador.alPasoAPaso();
-        assertEquals(List.of(">> Ingresar valor:", "42", "42"), vista.pantalla,
-                "Eco del teclado y luego INT 10H imprime DX");
+        assertEquals(List.of("[P1] >> Ingresar valor: 42", "[P1] 42"), vista.pantalla,
+                "Eco en la linea del aviso y luego INT 10H imprime DX");
     }
 
     @Test

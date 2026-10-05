@@ -225,7 +225,7 @@ class SistemaOperativoTest {
         assertEquals(EstadoProceso.FINALIZADO, a.getEstado());
         assertNull(a.getError());
         List<String> pantalla = so.getPantalla().getLineas();
-        assertEquals("7", pantalla.get(pantalla.size() - 1),
+        assertEquals("[P1] 7", pantalla.get(pantalla.size() - 1),
                 "A siguio en INT 10H despues de volver del disco");
     }
 

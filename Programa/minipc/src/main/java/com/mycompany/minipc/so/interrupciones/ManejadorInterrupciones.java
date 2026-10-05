@@ -90,12 +90,12 @@ public class ManejadorInterrupciones {
                 return true;
             case PANTALLA:
                 int dx = cpu.getRegistros().leer(RegistroID.DX);
-                pantalla.escribir(String.valueOf(dx));
+                pantalla.escribir(etiqueta(proceso) + dx);
                 bitacora.accept("Llamada al sistema INT 10H: " + proceso
                         + " imprime DX = " + dx + " en la pantalla.");
                 return false;
             case TECLADO:
-                pantalla.escribir(AVISO_TECLADO);
+                pantalla.escribir(etiqueta(proceso) + AVISO_TECLADO);
                 bitacora.accept("Llamada al sistema INT 09H: " + proceso
                         + " espera un valor del teclado.");
                 despachador.sacar(EstadoProceso.EN_ESPERA);
@@ -134,7 +134,7 @@ public class ManejadorInterrupciones {
      *              Stallings p. 147) y el intercambio lo trae cuando haya
      *              espacio. El BCP nunca sale del kernel, por eso se puede
      *              escribir DX aunque el programa este en el disco. El valor
-     *              se muestra en la pantalla como eco.
+     *              se muestra como eco al final de la linea del aviso.
      */
     public Proceso entradaTeclado(String texto) {
         String valorTexto = texto == null ? "" : texto.trim();
@@ -154,7 +154,7 @@ public class ManejadorInterrupciones {
         proceso.setRegistro(RegistroID.DX, valor);
         proceso.setEstado(nuevo);
         procesos.moverAlFinal(proceso);
-        pantalla.escribir(String.valueOf(valor));
+        pantalla.completar(etiqueta(proceso) + AVISO_TECLADO, " " + valor);
         bitacora.accept("Interrupcion de E/S (teclado): " + proceso + " recibe " + valor
                 + " en DX y pasa a " + nuevo + ".");
         return proceso;
@@ -178,5 +178,29 @@ public class ManejadorInterrupciones {
             }
         }
         return esperando;
+    }
+    /**
+     * Nombre: getEsperandoTeclado
+     * Entradas: ninguna
+     * Salidas: el proceso que recibira el proximo valor del teclado, o nulo
+     * Restricciones: ninguna
+     * Descripcion: la interfaz lo muestra junto al teclado para que se sepa a
+     *              quien le llega el ENTER cuando varios esperan.
+     */
+    public Proceso getEsperandoTeclado() {
+        List<Proceso> esperando = esperandoTeclado();
+        return esperando.isEmpty() ? null : esperando.get(0);
+    }
+
+    /**
+     * Nombre: etiqueta
+     * Entradas: proceso, el que escribe en la pantalla
+     * Salidas: el prefijo "[P3] "
+     * Restricciones: ninguna
+     * Descripcion: varios procesos comparten la pantalla; el prefijo dice de
+     *              quien es cada linea.
+     */
+    private static String etiqueta(Proceso proceso) {
+        return "[" + proceso + "] ";
     }
 }
