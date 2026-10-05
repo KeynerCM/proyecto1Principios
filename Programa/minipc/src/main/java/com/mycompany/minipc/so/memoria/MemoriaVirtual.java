@@ -23,13 +23,17 @@ public class MemoriaVirtual {
 
     private final Disco disco;
 
+    /** Mayor cantidad de posiciones ocupadas a la vez, para las estadisticas. */
+    private int ocupacionMaxima;
+
     /**
      * Nombre: MemoriaVirtual
      * Entradas: disco, disco del Mini PC
      * Salidas: la memoria virtual construida
      * Restricciones: ninguna
-     * Descripcion: no guarda nada propio: todo lo consulta en el disco, asi
-     *              que sigue valiendo si el disco cambia de tamano.
+     * Descripcion: no copia el disco: todo lo consulta en el, asi que sigue
+     *              valiendo si el disco cambia de tamano. Solo guarda la
+     *              ocupacion maxima, para las estadisticas.
      */
     public MemoriaVirtual(Disco disco) {
         this.disco = disco;
@@ -51,6 +55,7 @@ public class MemoriaVirtual {
         for (int i = 0; i < imagen.size(); i++) {
             disco.escribirMemoriaVirtual(inicio + i, imagen.get(i));
         }
+        ocupacionMaxima = Math.max(ocupacionMaxima, getPosicionesUsadas());
         return inicio;
     }
 
@@ -86,11 +91,42 @@ public class MemoriaVirtual {
      * Nombre: limpiar
      * Entradas: ninguna
      * Salidas: ninguna
-     * Restricciones: descarta todas las imagenes
+     * Restricciones: descarta todas las imagenes y el maximo medido
      * Descripcion: se usa al reiniciar el sistema.
      */
     public void limpiar() {
         liberar(disco.getInicioMemoriaVirtual(), disco.getTamanoMemoriaVirtual());
+        ocupacionMaxima = 0;
+    }
+
+    /**
+     * Nombre: getOcupacionMaxima
+     * Entradas: ninguna
+     * Salidas: la mayor cantidad de posiciones ocupadas a la vez
+     * Restricciones: ninguna
+     * Descripcion: se mide en cada imagen que se guarda, asi cuenta tambien
+     *              los momentos en que dos procesos coinciden en el disco
+     *              aunque uno vuelva enseguida a la memoria principal.
+     */
+    public int getOcupacionMaxima() {
+        return ocupacionMaxima;
+    }
+
+    /**
+     * Nombre: getPosicionesUsadas
+     * Entradas: ninguna
+     * Salidas: cuantas posiciones de la memoria virtual estan ocupadas
+     * Restricciones: ninguna
+     * Descripcion: para las estadisticas.
+     */
+    public int getPosicionesUsadas() {
+        int usadas = 0;
+        for (int i = disco.getInicioMemoriaVirtual(); i < disco.getTamano(); i++) {
+            if (!disco.estaLibre(i)) {
+                usadas++;
+            }
+        }
+        return usadas;
     }
 
     /**

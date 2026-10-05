@@ -74,7 +74,9 @@ public class DialogoEstadisticas extends javax.swing.JDialog {
      * Restricciones: ninguna
      * Descripcion: cuantos trabajos hay y como terminaron, el reloj simulado,
      *              el porcentaje del tiempo en que la CPU estuvo ocupada y la
-     *              ocupacion de la zona de usuario.
+     *              ocupacion maxima de la zona de usuario. Se usa el maximo y
+     *              no la ocupacion actual porque al terminar todos los
+     *              procesos ya liberaron su memoria y la actual es cero.
      */
     private void llenarResumen(SistemaOperativo so, List<Trabajo> trabajos, int cpuOcupada) {
         int finalizados = 0;
@@ -94,9 +96,9 @@ public class DialogoEstadisticas extends javax.swing.JDialog {
         barra(pbCpu, cpuOcupada, reloj, cpuOcupada + " de " + reloj + " s");
 
         Memoria memoria = so.getMemoria();
-        barra(pbUsoMemoria, memoria.getPosicionesUsadas(), memoria.getEspacioUsuario(),
-                memoria.getPosicionesUsadas() + " de " + memoria.getEspacioUsuario()
-                + " posiciones");
+        int maxima = so.getOcupacionMaxima();
+        barra(pbUsoMemoria, maxima, memoria.getEspacioUsuario(),
+                maxima + " de " + memoria.getEspacioUsuario() + " posiciones a la vez");
     }
 
     /**
@@ -165,7 +167,12 @@ public class DialogoEstadisticas extends javax.swing.JDialog {
         modelo.agregar("Zona de usuario", memoria.getLimiteKernel() + " a "
                 + (memoria.getTamano() - 1));
         modelo.agregar("Memoria virtual (disco)", disco.getTamanoMemoriaVirtual() == 0
-                ? "ninguna" : disco.getInicioMemoriaVirtual() + " a " + (disco.getTamano() - 1));
+                ? "ninguna" : disco.getInicioMemoriaVirtual() + " a " + (disco.getTamano() - 1)
+                + ", uso maximo " + so.getMemoriaVirtualMaxima() + " de "
+                + disco.getTamanoMemoriaVirtual() + " posiciones");
+        modelo.agregar("Ocupacion actual (usuario)",
+                memoria.getPosicionesUsadas() + " de " + memoria.getEspacioUsuario()
+                + " posiciones");
         modelo.refrescar();
         tblContadores.setModel(modelo);
         Tablas.estilo(tblContadores, new int[]{220, 640});
@@ -265,7 +272,7 @@ public class DialogoEstadisticas extends javax.swing.JDialog {
         pbCpu.setStringPainted(true);
         pnlEncabezado.add(pbCpu);
 
-        lblOcupacion.setText("Ocupacion de la zona de usuario:");
+        lblOcupacion.setText("Ocupacion maxima de la zona de usuario:");
         pnlEncabezado.add(lblOcupacion);
 
         pbUsoMemoria.setStringPainted(true);
@@ -290,7 +297,7 @@ public class DialogoEstadisticas extends javax.swing.JDialog {
         pnlContadores.setBorder(javax.swing.BorderFactory.createTitledBorder("Contadores de la CPU"));
         pnlContadores.setLayout(new java.awt.BorderLayout());
 
-        scrContadores.setPreferredSize(new java.awt.Dimension(860, 192));
+        scrContadores.setPreferredSize(new java.awt.Dimension(860, 212));
 
         tblContadores.setAutoResizeMode(javax.swing.JTable.AUTO_RESIZE_ALL_COLUMNS);
         scrContadores.setViewportView(tblContadores);

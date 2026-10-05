@@ -380,6 +380,7 @@ public class SistemaOperativo {
         errores.clear();
         ociosaAnunciada = false;
         reloj = 0;
+        gestorMemoria.reiniciarMaximo();
     }
 
     /**
@@ -448,6 +449,30 @@ public class SistemaOperativo {
      */
     public int getReloj() {
         return reloj;
+    }
+
+    /**
+     * Nombre: getOcupacionMaxima
+     * Entradas: ninguna
+     * Salidas: la mayor cantidad de posiciones de la zona de usuario que se
+     *          ocuparon a la vez desde que se cargo o reinicio
+     * Restricciones: ninguna
+     * Descripcion: para las estadisticas.
+     */
+    public int getOcupacionMaxima() {
+        return gestorMemoria.getOcupacionMaxima();
+    }
+
+    /**
+     * Nombre: getMemoriaVirtualMaxima
+     * Entradas: ninguna
+     * Salidas: la mayor cantidad de posiciones de la memoria virtual que se
+     *          ocuparon a la vez
+     * Restricciones: ninguna
+     * Descripcion: para las estadisticas.
+     */
+    public int getMemoriaVirtualMaxima() {
+        return memoriaVirtual.getOcupacionMaxima();
     }
 
     /**

@@ -175,6 +175,9 @@ class SistemaOperativoTest {
         assertEquals(0, b.getInicio(), "El inicio es cuando se admitio, aunque fuera al disco");
         assertTrue(bitacora.stream().anyMatch(m -> m.contains("P2 vuelve del disco")));
         assertTrue(so.getDisco().estaLibre(inicioVirtual), "La memoria virtual queda libre");
+        assertEquals(0, so.getMemoria().getPosicionesUsadas(), "Al final no queda nada en memoria");
+        assertEquals(20, so.getOcupacionMaxima(), "Pero el maximo fue el programa de A");
+        assertEquals(20, so.getMemoriaVirtualMaxima(), "B ocupo 20 en la memoria virtual");
     }
 
     @Test
@@ -214,6 +217,8 @@ class SistemaOperativoTest {
         assertTrue(so.getDisco().esDireccionMemoriaVirtual(pa.getBase()));
         assertEquals(pa.getBase() + 1, pa.getPc(), "El PC se reubica con la base");
         assertEquals(EstadoProceso.PREPARADO, b.getEstado(), "B ocupa el lugar que dejo A");
+        assertEquals(40, so.getMemoriaVirtualMaxima(),
+                "A (20) y B (20) coincidieron en el disco aunque B volvio enseguida");
         assertEquals(128, b.getProceso().getBase());
         assertTrue(so.hayEsperaTeclado(), "A sigue esperando el teclado desde el disco");
 
@@ -241,6 +246,8 @@ class SistemaOperativoTest {
 
         so.reiniciar();
         assertTrue(so.getDisco().estaLibre(inicioVirtual));
+        assertEquals(0, so.getOcupacionMaxima(), "Reiniciar empieza a medir de nuevo");
+        assertEquals(0, so.getMemoriaVirtualMaxima());
     }
 
     @Test

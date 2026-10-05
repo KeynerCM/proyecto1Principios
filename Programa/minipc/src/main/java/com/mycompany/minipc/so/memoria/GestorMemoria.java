@@ -22,12 +22,16 @@ public class GestorMemoria {
 
     private final Memoria memoria;
 
+    /** Mayor cantidad de posiciones de usuario ocupadas a la vez, para las estadisticas. */
+    private int ocupacionMaxima;
+
     /**
      * Nombre: GestorMemoria
      * Entradas: memoria, memoria principal a administrar
      * Salidas: el gestor construido
      * Restricciones: ninguna
-     * Descripcion: no guarda nada propio: todo lo consulta en la memoria.
+     * Descripcion: no copia la memoria: todo lo consulta en ella. Solo guarda
+     *              la ocupacion maxima, para las estadisticas.
      */
     public GestorMemoria(Memoria memoria) {
         this.memoria = memoria;
@@ -63,6 +67,7 @@ public class GestorMemoria {
         for (int i = 0; i < lineas.size(); i++) {
             memoria.escribir(base + i, lineas.get(i));
         }
+        ocupacionMaxima = Math.max(ocupacionMaxima, memoria.getPosicionesUsadas());
         return base;
     }
 
@@ -94,6 +99,31 @@ public class GestorMemoria {
         for (int i = base; i < base + alcance; i++) {
             memoria.escribir(i, Memoria.VACIA);
         }
+    }
+
+    /**
+     * Nombre: getOcupacionMaxima
+     * Entradas: ninguna
+     * Salidas: la mayor cantidad de posiciones de usuario ocupadas a la vez
+     * Restricciones: ninguna
+     * Descripcion: se mide en cada asignacion, que es el unico momento en
+     *              que la ocupacion sube. Al final todos los procesos
+     *              liberaron su memoria; para las estadisticas sirve el
+     *              maximo que se alcanzo.
+     */
+    public int getOcupacionMaxima() {
+        return ocupacionMaxima;
+    }
+
+    /**
+     * Nombre: reiniciarMaximo
+     * Entradas: ninguna
+     * Salidas: ninguna
+     * Restricciones: ninguna
+     * Descripcion: se usa al reiniciar el sistema.
+     */
+    public void reiniciarMaximo() {
+        ocupacionMaxima = 0;
     }
 
     /**
