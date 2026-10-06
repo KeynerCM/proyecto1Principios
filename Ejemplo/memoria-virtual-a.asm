@@ -3,12 +3,10 @@
 ; Memoria virtual: cargar juntos memoria-virtual-a.asm,
 ; memoria-virtual-b.asm, memoria-virtual-c.asm y
 ; memoria-virtual-d.asm, en ese orden.
-; Ocupa 40 posiciones. INT 09H lo deja EN_ESPERA. Cuando a, b
-; y c esperan el teclado no hay procesos PREPARADO, y d espera
-; en el disco; entonces el sistema suspende al ultimo proceso
-; EN_ESPERA: su imagen pasa a la memoria virtual
-; (SUSPENDIDO_EN_ESPERA) y deja lugar para d. Con su ENTER pasa
-; a SUSPENDIDO_PREPARADO y vuelve cuando haya espacio.
+; Ocupa 40 posiciones: a, b y c juntos llenan 120 de las 128
+; de la zona de usuario, y por eso d va a la memoria virtual.
+; INT 09H pide un valor; la CPU espera el ENTER antes de seguir
+; con este mismo proceso, e INT 10H lo imprime.
 ; ==========================================================
 
 INT 09H           ; pantalla: >> Ingresar valor:

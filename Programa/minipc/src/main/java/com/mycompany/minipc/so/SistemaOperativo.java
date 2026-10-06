@@ -199,6 +199,12 @@ public class SistemaOperativo {
         planificadorTrabajos.admitir(reloj);
         Proceso actual = tabla.getEnEjecucion();
         if (actual == null) {
+            // Proyecto 1 (indicacion del profesor): mientras un proceso espera
+            // el teclado, la CPU lo espera a el y no pasa a otro proceso. Los
+            // procesos se ejecutan de uno en uno, en orden de llegada.
+            if (interrupciones.hayEsperaTeclado()) {
+                return tickOcioso();
+            }
             actual = planificadorProcesos.elegir();
             if (actual == null) {
                 return tickOcioso();
@@ -235,10 +241,12 @@ public class SistemaOperativo {
      * Nombre: tickOcioso
      * Entradas: ninguna
      * Salidas: true si todavia quedan trabajos sin finalizar
-     * Restricciones: solo se llama cuando no hay ningun proceso PREPARADO
-     * Descripcion: si algun proceso espera el teclado, el tiempo pasa aunque
-     *              la CPU no tenga nada que hacer: el reloj avanza y la CPU
-     *              queda ociosa. El aviso se escribe una sola vez.
+     * Restricciones: se llama cuando la CPU esta libre y no se puede
+     *                despachar a nadie
+     * Descripcion: si un proceso espera el teclado, el tiempo pasa aunque la
+     *              CPU no tenga nada que hacer: el reloj avanza y la CPU queda
+     *              ociosa hasta el ENTER, aunque haya otros procesos
+     *              PREPARADO. El aviso se escribe una sola vez.
      */
     private boolean tickOcioso() {
         if (!listaTrabajos.hayPendientes()) {
@@ -247,8 +255,9 @@ public class SistemaOperativo {
         if (interrupciones.hayEsperaTeclado()) {
             reloj++;
             if (!ociosaAnunciada) {
-                anotar("CPU ociosa: no hay procesos PREPARADO; se espera un valor del"
-                        + " teclado.");
+                anotar("CPU ociosa: " + interrupciones.getEsperandoTeclado()
+                        + " espera un valor del teclado; la CPU lo espera antes de pasar"
+                        + " al siguiente proceso.");
                 ociosaAnunciada = true;
             }
         }

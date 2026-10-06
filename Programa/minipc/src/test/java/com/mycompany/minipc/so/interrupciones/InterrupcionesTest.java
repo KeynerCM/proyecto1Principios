@@ -109,18 +109,27 @@ class InterrupcionesTest {
     }
 
     @Test
-    @DisplayName("Mientras uno espera el teclado, la CPU ejecuta a otro")
-    void otroProcesoUsaLaCpu() throws Exception {
+    @DisplayName("Mientras uno espera el teclado, la CPU lo espera y no pasa al siguiente")
+    void cpuEsperaAlProceso() throws Exception {
         Trabajo espera = cargar("teclado.asm", "INT 09H", "INT 20H");
         Trabajo otro = cargar("otro.asm", "MOV AX, 1", "INT 20H");
 
         ticks(1);
         assertEquals(EstadoProceso.EN_ESPERA, espera.getEstado());
+        int reloj = so.getReloj();
+        ticks(3);
+        assertNull(so.getEnEjecucion(), "La CPU no pasa al otro proceso");
+        assertEquals(EstadoProceso.PREPARADO, otro.getEstado());
+        assertEquals(0, otro.getProceso().getTiempoEmpleado(), "El otro no ha ejecutado nada");
+        assertEquals(reloj + 3, so.getReloj(), "El tiempo de espera cuenta en el reloj");
+
+        so.entradaTeclado("4");
         ticks(1);
-        assertEquals(otro.getProceso(), so.getEnEjecucion(), "Cambio de contexto al otro");
+        assertEquals(espera.getProceso(), so.getEnEjecucion(),
+                "Vuelve el que esperaba, no el otro");
         ejecutarTodo();
         assertEquals(EstadoProceso.FINALIZADO, otro.getEstado());
-        assertEquals(EstadoProceso.EN_ESPERA, espera.getEstado(), "Sigue esperando el ENTER");
+        assertTrue(otro.getFin() > espera.getFin(), "El otro corre cuando el primero termina");
     }
 
     @Test
@@ -269,21 +278,23 @@ class InterrupcionesTest {
         assertTrue(t.getError().contains("3Ch crear"), t.getError());
     }
     @Test
-    @DisplayName("Con varios esperando, cada valor completa la linea de su proceso")
-    void variosEsperanElTeclado() throws Exception {
+    @DisplayName("Los procesos piden el teclado de uno en uno, en orden de llegada")
+    void tecladoDeUnoEnUno() throws Exception {
         cargar("a.asm", "INT 09H", "INT 10H", "INT 20H");
         cargar("b.asm", "INT 09H", "INT 10H", "INT 20H");
         ticks(2);
-        assertEquals(List.of("[P1] >> Ingresar valor:", "[P2] >> Ingresar valor:"),
-                so.getPantalla().getLineas());
-        assertEquals("P1", so.getEsperandoTeclado().toString(), "El primero que espero");
+        assertEquals(List.of("[P1] >> Ingresar valor:"), so.getPantalla().getLineas(),
+                "P2 no empieza mientras P1 espera");
+        assertEquals("P1", so.getEsperandoTeclado().toString());
 
         so.entradaTeclado("5");
+        for (int i = 0; i < 100 && !so.hayEsperaTeclado(); i++) {
+            so.tick();
+        }
         assertEquals("P2", so.getEsperandoTeclado().toString());
         so.entradaTeclado("9");
-        assertNull(so.getEsperandoTeclado());
         ejecutarTodo();
-        assertEquals(List.of("[P1] >> Ingresar valor: 5", "[P2] >> Ingresar valor: 9",
-                "[P1] 5", "[P2] 9"), so.getPantalla().getLineas());
+        assertEquals(List.of("[P1] >> Ingresar valor: 5", "[P1] 5",
+                "[P2] >> Ingresar valor: 9", "[P2] 9"), so.getPantalla().getLineas());
     }
 }

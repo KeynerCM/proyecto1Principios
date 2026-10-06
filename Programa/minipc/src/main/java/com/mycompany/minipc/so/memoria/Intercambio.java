@@ -1,6 +1,5 @@
 package com.mycompany.minipc.so.memoria;
 
-import java.util.List;
 import java.util.function.Consumer;
 
 import com.mycompany.minipc.so.procesos.EstadoProceso;
@@ -27,6 +26,10 @@ import com.mycompany.minipc.so.procesos.Proceso;
  *              SUSPENDIDO_PREPARADO la hace el manejador de interrupciones
  *              cuando llega el valor del teclado. Al mover la imagen se
  *              reubica el proceso: cambian su BASE y su PC.
+ *
+ *              En el Proyecto 1 la CPU espera al proceso que pidio el
+ *              teclado, asi que solo se usa traer: suspender a un proceso
+ *              EN_ESPERA queda listo para el Proyecto 2 (ver equilibrar).
  */
 public class Intercambio {
 
@@ -57,28 +60,16 @@ public class Intercambio {
      * Entradas: ninguna
      * Salidas: ninguna
      * Restricciones: se llama en cada segundo, despues de admitir trabajos
-     * Descripcion: primero trae los SUSPENDIDO_PREPARADO que quepan. Si aun
-     *              asi no hay ningun proceso listo en memoria y alguno espera
-     *              en el disco, suspende a un proceso EN_ESPERA para hacerle
-     *              lugar, como dice el libro: "If there are no ready
-     *              processes, then at least one blocked process is swapped
-     *              out to make room for another process that is not blocked"
-     *              (p. 146). Repite mientras siga sin haber procesos listos.
+     * Descripcion: trae los SUSPENDIDO_PREPARADO que quepan. El libro
+     *              tambien suspende a un proceso bloqueado cuando no hay
+     *              procesos listos (p. 146), pero en el Proyecto 1 la CPU
+     *              espera al proceso que pidio el teclado y nadie mas puede
+     *              ejecutarse mientras tanto, asi que sacarlo de memoria no
+     *              ayudaria. Esa transicion queda en suspender() para cuando
+     *              la CPU pueda pasar a otro proceso (Proyecto 2).
      */
     public void equilibrar() {
         traerSuspendidos();
-        while (!hayListosEnMemoria() && hayEsperandoMemoria()) {
-            List<Proceso> bloqueados = procesos.conEstado(EstadoProceso.EN_ESPERA);
-            if (bloqueados.isEmpty()) {
-                return;
-            }
-            // El ultimo de la lista es el que mas tardara en recibir el
-            // teclado, que se entrega en orden de llegada.
-            if (!suspender(bloqueados.get(bloqueados.size() - 1))) {
-                return;
-            }
-            traerSuspendidos();
-        }
     }
 
     /**
@@ -157,18 +148,6 @@ public class Intercambio {
                 + rango(inicio, alcance) + " a la memoria principal " + rango(base, alcance)
                 + " y pasa a PREPARADO.");
         return true;
-    }
-
-    /**
-     * Nombre: hayListosEnMemoria
-     * Entradas: ninguna
-     * Salidas: true si hay un proceso PREPARADO o en EJECUCION
-     * Restricciones: ninguna
-     * Descripcion: si la CPU tiene trabajo no hace falta suspender a nadie.
-     */
-    private boolean hayListosEnMemoria() {
-        return !procesos.conEstado(EstadoProceso.PREPARADO).isEmpty()
-                || !procesos.conEstado(EstadoProceso.EJECUCION).isEmpty();
     }
 
     /**

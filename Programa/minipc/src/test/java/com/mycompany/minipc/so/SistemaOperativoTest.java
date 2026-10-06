@@ -200,8 +200,8 @@ class SistemaOperativoTest {
     }
 
     @Test
-    @DisplayName("Sin procesos listos, un proceso EN_ESPERA se suspende para traer otro")
-    void suspendeAlBloqueado() throws Exception {
+    @DisplayName("Mientras A espera el teclado no se suspende; B sigue en la memoria virtual")
+    void esperaNoSeSuspende() throws Exception {
         so = crear(160);
         String[] lineasA = programaDe(20);
         lineasA[0] = "INT 09H";
@@ -212,26 +212,19 @@ class SistemaOperativoTest {
         so.admitir();
 
         so.tick();
-        Proceso pa = a.getProceso();
-        assertEquals(EstadoProceso.SUSPENDIDO_EN_ESPERA, a.getEstado());
-        assertTrue(so.getDisco().esDireccionMemoriaVirtual(pa.getBase()));
-        assertEquals(pa.getBase() + 1, pa.getPc(), "El PC se reubica con la base");
-        assertEquals(EstadoProceso.PREPARADO, b.getEstado(), "B ocupa el lugar que dejo A");
-        assertEquals(40, so.getMemoriaVirtualMaxima(),
-                "A (20) y B (20) coincidieron en el disco aunque B volvio enseguida");
-        assertEquals(128, b.getProceso().getBase());
-        assertTrue(so.hayEsperaTeclado(), "A sigue esperando el teclado desde el disco");
+        so.tick();
+        assertEquals(EstadoProceso.EN_ESPERA, a.getEstado());
+        assertEquals(128, a.getProceso().getBase(), "A se queda en memoria: la CPU lo espera");
+        assertEquals(EstadoProceso.SUSPENDIDO_PREPARADO, b.getEstado());
 
         so.entradaTeclado("7");
-        assertEquals(EstadoProceso.SUSPENDIDO_PREPARADO, a.getEstado());
-        assertEquals(7, pa.getRegistro(RegistroID.DX), "El BCP sigue en el kernel");
+        assertEquals(EstadoProceso.PREPARADO, a.getEstado());
+        assertEquals(7, a.getProceso().getRegistro(RegistroID.DX));
 
         ejecutarTodo();
-        assertEquals(EstadoProceso.FINALIZADO, a.getEstado());
-        assertNull(a.getError());
-        List<String> pantalla = so.getPantalla().getLineas();
-        assertEquals("[P1] 7", pantalla.get(pantalla.size() - 1),
-                "A siguio en INT 10H despues de volver del disco");
+        assertEquals(EstadoProceso.FINALIZADO, b.getEstado());
+        assertTrue(b.getFin() > a.getFin(), "B entra a memoria cuando A termina");
+        assertEquals(List.of("[P1] >> Ingresar valor: 7", "[P1] 7"), so.getPantalla().getLineas());
     }
 
     @Test

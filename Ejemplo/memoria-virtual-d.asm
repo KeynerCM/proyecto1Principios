@@ -6,8 +6,9 @@
 ; usuario es de 128; a, b y c ya usan 120, asi que este
 ; programa no cabe y el planificador de trabajos lo admite en
 ; la memoria virtual del disco (NUEVO -> SUSPENDIDO_PREPARADO).
-; Cuando a, b y c esperan el teclado, c se suspende y este
-; programa entra a la memoria en su lugar.
+; Cuando a termina y libera sus 40 posiciones, el intercambio
+; lo trae a la memoria principal (SUSPENDIDO_PREPARADO ->
+; PREPARADO) y se ejecuta despues de c, en orden de llegada.
 ; Cuenta hasta 20 en CX y lo imprime.
 ; ==========================================================
 

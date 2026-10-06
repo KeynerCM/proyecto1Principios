@@ -29,7 +29,8 @@ import com.mycompany.minipc.so.procesos.Proceso;
  *                  INT 20H  fin del programa
  *                  INT 10H  imprime DX en la pantalla
  *                  INT 09H  pide un valor al teclado: el proceso pasa a
- *                           EN_ESPERA y la CPU queda para otro
+ *                           EN_ESPERA y la CPU lo espera hasta el ENTER
+ *                           (en el Proyecto 1 no pasa a otro proceso)
  *                  INT 21H  manejo de archivos (SistemaArchivos)
  *
  *                interrupcion de entrada y salida:
@@ -127,9 +128,9 @@ public class ManejadorInterrupciones {
      * Restricciones: lanza IllegalArgumentException si no es un numero de 0 a
      *                255, e IllegalStateException si nadie espera el teclado
      * Descripcion: la interrupcion de entrada y salida del teclado. El valor
-     *              va al DX del BCP del primer proceso que espera, que pasa
-     *              al final de la lista. Si estaba en memoria vuelve a
-     *              PREPARADO; si estaba suspendido pasa a SUSPENDIDO_PREPARADO
+     *              va al DX del BCP del proceso que espera, que conserva su
+     *              lugar en la lista para que FCFS le devuelva la CPU antes
+     *              que a los demas. Si estaba en memoria vuelve a PREPARADO; si estaba suspendido pasa a SUSPENDIDO_PREPARADO
      *              ("when the event for which it has been waiting occurs",
      *              Stallings p. 147) y el intercambio lo trae cuando haya
      *              espacio. El BCP nunca sale del kernel, por eso se puede
@@ -153,7 +154,8 @@ public class ManejadorInterrupciones {
                 ? EstadoProceso.SUSPENDIDO_PREPARADO : EstadoProceso.PREPARADO;
         proceso.setRegistro(RegistroID.DX, valor);
         proceso.setEstado(nuevo);
-        procesos.moverAlFinal(proceso);
+        // No pasa al final de la lista: sigue siendo el primero que llego,
+        // asi FCFS le devuelve la CPU antes que a los demas.
         pantalla.completar(etiqueta(proceso) + AVISO_TECLADO, " " + valor);
         bitacora.accept("Interrupcion de E/S (teclado): " + proceso + " recibe " + valor
                 + " en DX y pasa a " + nuevo + ".");

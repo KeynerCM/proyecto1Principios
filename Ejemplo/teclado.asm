@@ -1,8 +1,9 @@
 ; ==========================================================
 ; teclado.asm
 ; INT 09H pide un valor al teclado (0 a 255). El proceso pasa
-; a EN_ESPERA y la CPU queda para otro proceso; al presionar
-; ENTER el valor llega a DX y el proceso vuelve a PREPARADO.
+; a EN_ESPERA y la CPU lo espera hasta el ENTER: en este
+; proyecto no pasa a otro proceso mientras tanto. Con el ENTER
+; el valor llega a DX y el proceso vuelve a PREPARADO.
 ; Despues imprime el doble del valor con INT 10H.
 ; ==========================================================
 
