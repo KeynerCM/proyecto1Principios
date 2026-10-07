@@ -24,18 +24,56 @@ class TablaBCPTest {
 
     @BeforeEach
     void preparar() {
-        memoria = new Memoria(256, TablaBCP.TAMANO_KERNEL);
+        memoria = new Memoria(256, TablaBCP.calcularKernel(256,
+                TablaBCP.PORCENTAJE_KERNEL_POR_DEFECTO));
         tabla = new TablaBCP(memoria);
     }
 
     @Test
-    @DisplayName("K = C + P x B = 3 + 5 x 25 = 128")
-    void formulaDelKernel() {
+    @DisplayName("El kernel es un porcentaje de la memoria y de el sale cuantos BCP caben")
+    void calculoDelKernel() {
         assertEquals(3, TablaBCP.TAMANO_CABECERA);
         assertEquals(25, TablaBCP.TAMANO_BCP);
         assertEquals(5, TablaBCP.MAX_PROCESOS);
-        assertEquals(128, TablaBCP.TAMANO_KERNEL);
-        assertEquals("128 celdas (3 de cabecera + 5 BCP x 25)", TablaBCP.describirFormula());
+        assertEquals(50, TablaBCP.PORCENTAJE_KERNEL_POR_DEFECTO);
+
+        assertEquals(128, TablaBCP.calcularKernel(256, 50));
+        assertEquals(5, TablaBCP.ranurasPara(128), "Con 50 % caben los 5 BCP");
+        assertEquals(51, TablaBCP.calcularKernel(256, 20));
+        assertEquals(1, TablaBCP.ranurasPara(51), "Con 20 % cabe uno solo");
+        assertEquals(5, TablaBCP.ranurasPara(TablaBCP.calcularKernel(256, 60)),
+                "Con mas kernel siguen siendo 5 como maximo");
+        assertEquals(0, TablaBCP.ranurasPara(27));
+
+        assertEquals("256 x 50 % = 128 celdas: 3 de cabecera + 5 BCP x 25",
+                TablaBCP.describirCalculo(256, 50));
+        assertEquals("256 x 60 % = 153 celdas: 3 de cabecera + 5 BCP x 25 + 25 sin usar",
+                TablaBCP.describirCalculo(256, 60));
+    }
+
+    @Test
+    @DisplayName("El porcentaje debe estar entre 10 y 90 y dejar lugar para un BCP")
+    void validarPorcentaje() {
+        assertTrue(TablaBCP.validarKernel(256, 50).isEmpty());
+        assertTrue(TablaBCP.validarKernel(256, 20).isEmpty());
+        assertTrue(TablaBCP.validarKernel(256, 5).get(0).contains("entre 10 y 90"));
+        assertTrue(TablaBCP.validarKernel(256, 95).get(0).contains("entre 10 y 90"));
+        assertTrue(TablaBCP.validarKernel(100, 20).get(0).contains("no cabe ningun BCP"));
+    }
+
+    @Test
+    @DisplayName("Con 20 % de kernel cabe un solo BCP y el resto del kernel queda sin usar")
+    void kernelChico() {
+        Memoria chica = new Memoria(256, TablaBCP.calcularKernel(256, 20));
+        TablaBCP pequena = new TablaBCP(chica);
+        assertEquals(1, pequena.getRanuras());
+        pequena.crear(1, "a.asm", 100, 5, 0);
+        assertFalse(pequena.hayRanuraLibre(), "Solo se admite un proceso a la vez");
+        assertEquals("P1.PC", pequena.describir(TablaBCP.direccionCampo(3, CampoBCP.PC)));
+        assertEquals("Kernel sin usar", pequena.describir(30));
+        assertEquals("", pequena.describir(51), "51 ya es zona de usuario");
+        assertThrows(IllegalArgumentException.class,
+                () -> new TablaBCP(new Memoria(256, 20)), "Con 20 celdas no cabe un BCP");
     }
 
     @Test
@@ -145,9 +183,9 @@ class TablaBCPTest {
     }
 
     @Test
-    @DisplayName("La memoria debe tener al menos el kernel calculado")
+    @DisplayName("En el kernel debe caber al menos un BCP")
     void memoriaChica() {
         assertThrows(IllegalArgumentException.class,
-                () -> new TablaBCP(new Memoria(256, 64)));
+                () -> new TablaBCP(new Memoria(256, 27)));
     }
 }

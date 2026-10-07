@@ -57,15 +57,13 @@ public class DialogoConfiguracion extends javax.swing.JDialog {
         initComponents();
 
         Configuracion actual = controlador.getConfiguracion();
-        int minimo = TablaBCP.TAMANO_KERNEL + Memoria.ESPACIO_USUARIO_MINIMO;
+        int minimo = 2 * Memoria.ESPACIO_USUARIO_MINIMO;
         spnTamano.setModel(new SpinnerNumberModel(
                 Math.max(actual.getTamanoMemoria(), minimo), minimo, 1024, 32));
-        // El kernel no se configura: se muestra el valor calculado.
-        lblKernel.setText("Kernel (calculado):");
-        spnKernel.setModel(new SpinnerNumberModel(TablaBCP.TAMANO_KERNEL,
-                TablaBCP.TAMANO_KERNEL, TablaBCP.TAMANO_KERNEL, 1));
-        spnKernel.setEnabled(false);
-        spnKernel.setToolTipText("K = " + TablaBCP.describirFormula());
+        // El kernel es un porcentaje de la memoria; de su tamano sale cuantos
+        // BCP caben, y el resumen lo muestra al cambiar el valor.
+        spnKernel.setModel(new SpinnerNumberModel(actual.getPorcentajeKernel(),
+                TablaBCP.PORCENTAJE_KERNEL_MINIMO, TablaBCP.PORCENTAJE_KERNEL_MAXIMO, 5));
         spnDisco.setModel(new SpinnerNumberModel(
                 actual.getTamanoDisco(), Disco.TAMANO_MINIMO, 4096, 64));
         spnMemoriaVirtual.setModel(new SpinnerNumberModel(
@@ -109,7 +107,7 @@ public class DialogoConfiguracion extends javax.swing.JDialog {
      *              reglas que la memoria y el disco, para no repetirlas aqui.
      */
     private Configuracion configuracionElegida() throws ConfiguracionException {
-        return new Configuracion(valor(spnTamano), valor(spnDisco),
+        return new Configuracion(valor(spnTamano), valor(spnKernel), valor(spnDisco),
                 valor(spnMemoriaVirtual), valor(spnVelocidad),
                 cmbAlgoritmo == null ? controlador.getConfiguracion().getAlgoritmo()
                         : (String) cmbAlgoritmo.getSelectedItem());
@@ -142,11 +140,12 @@ public class DialogoConfiguracion extends javax.swing.JDialog {
         }
 
         int tamano = elegida.getTamanoMemoria();
-        int kernel = TablaBCP.TAMANO_KERNEL;
+        int kernel = TablaBCP.calcularKernel(tamano, elegida.getPorcentajeKernel());
         int disco = elegida.getTamanoDisco();
         int inicioVirtual = disco - elegida.getTamanoMemoriaVirtual();
 
-        lblZonaKernelValor.setText("0 a " + (kernel - 1));
+        lblZonaKernelValor.setText("0 a " + (kernel - 1) + " (" + TablaBCP.ranurasPara(kernel)
+                + " BCP: hasta " + TablaBCP.ranurasPara(kernel) + " procesos a la vez)");
         lblZonaUsuarioValor.setText(kernel + " a " + (tamano - 1));
         lblEspacioValor.setText((tamano - kernel) + " posiciones");
         lblIndiceDiscoValor.setText("0 a " + (Disco.ENTRADAS_INDICE - 1));
@@ -222,10 +221,10 @@ public class DialogoConfiguracion extends javax.swing.JDialog {
         });
         pnlParametros.add(spnTamano);
 
-        lblKernel.setText("Limite de kernel:");
+        lblKernel.setText("Kernel (% de la memoria):");
         pnlParametros.add(lblKernel);
 
-        spnKernel.setToolTipText("Primera direccion de la zona de usuario");
+        spnKernel.setToolTipText("Porcentaje de la memoria principal que ocupa el kernel; de el sale cuantos BCP caben");
         spnKernel.addChangeListener(new javax.swing.event.ChangeListener() {
             public void stateChanged(javax.swing.event.ChangeEvent evt) {
                 spnKernelStateChanged(evt);
@@ -369,7 +368,7 @@ public class DialogoConfiguracion extends javax.swing.JDialog {
      * Entradas: evt, evento de cambio del spinner
      * Salidas: ninguna
      * Restricciones: ninguna
-     * Descripcion: recalcula el resumen cada vez que cambia el limite de
+     * Descripcion: recalcula el resumen cada vez que cambia el porcentaje del
      *              kernel.
      */
     private void spnKernelStateChanged(javax.swing.event.ChangeEvent evt) {//GEN-FIRST:event_spnKernelStateChanged
@@ -412,6 +411,7 @@ public class DialogoConfiguracion extends javax.swing.JDialog {
     private void btnRestaurarActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnRestaurarActionPerformed
         Configuracion porDefecto = Configuracion.porDefecto();
         spnTamano.setValue(porDefecto.getTamanoMemoria());
+        spnKernel.setValue(porDefecto.getPorcentajeKernel());
         spnDisco.setValue(porDefecto.getTamanoDisco());
         spnMemoriaVirtual.setValue(porDefecto.getTamanoMemoriaVirtual());
         spnVelocidad.setValue(porDefecto.getMsPorSegundo());

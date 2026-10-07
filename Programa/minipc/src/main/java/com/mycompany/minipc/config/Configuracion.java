@@ -9,6 +9,7 @@ import com.mycompany.minipc.hardware.Memoria;
 import com.mycompany.minipc.so.SistemaOperativo;
 import com.mycompany.minipc.so.planificacion.FCFS;
 import com.mycompany.minipc.so.planificacion.FabricaAlgoritmos;
+import com.mycompany.minipc.so.procesos.TablaBCP;
 
 /**
  * Nombre: Configuracion
@@ -39,10 +40,30 @@ public final class Configuracion {
     private final int tamanoMemoriaVirtual;
     private final int msPorSegundo;
     private final String algoritmo;
+    private final int porcentajeKernel;
 
     /**
      * Nombre: Configuracion
      * Entradas: tamanoMemoria, posiciones de la memoria principal;
+     *           tamanoDisco, posiciones del disco; tamanoMemoriaVirtual,
+     *           posiciones del disco reservadas para intercambio;
+     *           msPorSegundo, milisegundos reales que dura cada segundo de
+     *           CPU en la ejecucion automatica; algoritmo, nombre del
+     *           algoritmo de planificacion
+     * Salidas: la configuracion construida
+     * Restricciones: las mismas que el constructor con porcentaje
+     * Descripcion: usa el porcentaje de kernel por defecto (50 %).
+     */
+    public Configuracion(int tamanoMemoria, int tamanoDisco, int tamanoMemoriaVirtual,
+            int msPorSegundo, String algoritmo) throws ConfiguracionException {
+        this(tamanoMemoria, TablaBCP.PORCENTAJE_KERNEL_POR_DEFECTO, tamanoDisco,
+                tamanoMemoriaVirtual, msPorSegundo, algoritmo);
+    }
+
+    /**
+     * Nombre: Configuracion
+     * Entradas: tamanoMemoria, posiciones de la memoria principal;
+     *           porcentajeKernel, parte de la memoria que ocupa el kernel;
      *           tamanoDisco, posiciones del disco; tamanoMemoriaVirtual,
      *           posiciones del disco reservadas para intercambio;
      *           msPorSegundo, milisegundos reales que dura cada segundo de
@@ -56,10 +77,12 @@ public final class Configuracion {
      *              una configuracion aceptada siempre se puede aplicar sin
      *              errores. El nombre del algoritmo se guarda en mayusculas.
      */
-    public Configuracion(int tamanoMemoria, int tamanoDisco, int tamanoMemoriaVirtual,
-            int msPorSegundo, String algoritmo) throws ConfiguracionException {
+    public Configuracion(int tamanoMemoria, int porcentajeKernel, int tamanoDisco,
+            int tamanoMemoriaVirtual, int msPorSegundo, String algoritmo)
+            throws ConfiguracionException {
+        this.porcentajeKernel = porcentajeKernel;
         List<String> errores = new ArrayList<>();
-        errores.addAll(SistemaOperativo.validarMemoria(tamanoMemoria));
+        errores.addAll(SistemaOperativo.validarMemoria(tamanoMemoria, porcentajeKernel));
         errores.addAll(Disco.validar(tamanoDisco, tamanoMemoriaVirtual));
         if (msPorSegundo < MS_POR_SEGUNDO_MINIMO || msPorSegundo > MS_POR_SEGUNDO_MAXIMO) {
             errores.add("La duracion de cada segundo de CPU debe estar entre "
@@ -87,13 +110,15 @@ public final class Configuracion {
      * Entradas: ninguna
      * Salidas: la configuracion con los valores por defecto
      * Restricciones: ninguna
-     * Descripcion: memoria de 256, disco de 512 con 64 de memoria virtual,
-     *              un segundo real por segundo de CPU y FCFS. Es la que se
-     *              escribe cuando el archivo todavia no existe.
+     * Descripcion: memoria de 256 con 50 % de kernel, disco de 512 con 64 de
+     *              memoria virtual, un segundo real por segundo de CPU y
+     *              FCFS. Es la que se escribe cuando el archivo todavia no
+     *              existe.
      */
     public static Configuracion porDefecto() {
         try {
-            return new Configuracion(Memoria.TAMANO_POR_DEFECTO, Disco.TAMANO_POR_DEFECTO,
+            return new Configuracion(Memoria.TAMANO_POR_DEFECTO,
+                    TablaBCP.PORCENTAJE_KERNEL_POR_DEFECTO, Disco.TAMANO_POR_DEFECTO,
                     Disco.MEMORIA_VIRTUAL_POR_DEFECTO, MS_POR_SEGUNDO_POR_DEFECTO, FCFS.NOMBRE);
         } catch (ConfiguracionException e) {
             // Los valores por defecto son constantes validas; si esto falla,
@@ -111,6 +136,17 @@ public final class Configuracion {
      */
     public int getTamanoMemoria() {
         return tamanoMemoria;
+    }
+
+    /**
+     * Nombre: getPorcentajeKernel
+     * Entradas: ninguna
+     * Salidas: el porcentaje de la memoria principal que ocupa el kernel
+     * Restricciones: ninguna
+     * Descripcion: acceso de solo lectura al campo correspondiente.
+     */
+    public int getPorcentajeKernel() {
+        return porcentajeKernel;
     }
 
     /**

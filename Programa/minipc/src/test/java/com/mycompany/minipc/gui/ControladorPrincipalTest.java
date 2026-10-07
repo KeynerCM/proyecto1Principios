@@ -333,7 +333,7 @@ class ControladorPrincipalTest {
     @Test
     @DisplayName("Un programa mas grande que la memoria de usuario se rechaza al cargarlo")
     void reportaMemoriaInsuficiente(@TempDir Path carpeta) throws Exception {
-        controlador.alConfigurar(config(160, 500));
+        controlador.alConfigurar(new Configuracion(160, 80, 512, 64, 500, "FCFS"));
 
         StringBuilder largo = new StringBuilder();
         for (int i = 0; i < 40; i++) {
@@ -515,8 +515,8 @@ class ControladorPrincipalTest {
         controlador.alConfigurar(new Configuracion(512, 1024, 128, 250, "FCFS"));
 
         assertEquals(512, controlador.getProcesador().getMemoria().getTamano());
-        assertEquals(128, controlador.getProcesador().getMemoria().getLimiteKernel(),
-                "El kernel sigue siendo el calculado");
+        assertEquals(256, controlador.getProcesador().getMemoria().getLimiteKernel(),
+                "El kernel es el 50 % de la memoria nueva");
         assertEquals(1024, controlador.getDisco().getTamano());
         assertEquals(896, controlador.getDisco().getInicioMemoriaVirtual());
         assertTrue(controlador.getDisco().getIndice().isEmpty(), "Reconfigurar vacia el disco");
@@ -566,7 +566,7 @@ class ControladorPrincipalTest {
         conArchivo.inicializarVista();
 
         assertEquals("Configuracion invalida", vista.tituloError);
-        assertTrue(vista.errores.stream().anyMatch(e -> e.contains("al menos 160")));
+        assertTrue(vista.errores.stream().anyMatch(e -> e.contains("no cabe ningun BCP")));
         assertEquals(256, conArchivo.getProcesador().getMemoria().getTamano());
     }
 

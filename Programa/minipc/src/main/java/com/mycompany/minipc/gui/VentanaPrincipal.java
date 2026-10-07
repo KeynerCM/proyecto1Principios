@@ -43,7 +43,6 @@ import com.mycompany.minipc.gui.panel.PanelListaTrabajos;
 import com.mycompany.minipc.gui.panel.PanelPantalla;
 import com.mycompany.minipc.gui.panel.Tablas;
 import com.mycompany.minipc.so.procesos.Proceso;
-import com.mycompany.minipc.so.procesos.TablaBCP;
 
 /**
  * Nombre: VentanaPrincipal
@@ -322,7 +321,8 @@ public class VentanaPrincipal extends javax.swing.JFrame implements VistaPrincip
         JMenu ayuda = new JMenu("Ayuda");
         ayuda.add(item("Acerca de", null, e -> JOptionPane.showMessageDialog(this,
                 "Proyecto 1 - Gestor de Procesos\nIC-6600 Principios de Sistemas Operativos\n"
-                + "Kernel: " + TablaBCP.describirFormula() + "\nPlanificacion: FCFS",
+                + "Kernel: " + controlador.getSistemaOperativo().describirKernel()
+                + "\nPlanificacion: FCFS",
                 "Acerca de", JOptionPane.INFORMATION_MESSAGE)));
 
         barra.add(archivo);
@@ -560,7 +560,7 @@ public class VentanaPrincipal extends javax.swing.JFrame implements VistaPrincip
     public void mostrarResumen(int usoDisco, int admitidos) {
         lblDisco.setText("Disco: " + usoDisco + " %");
         lblAdmitidos.setText("Procesos admitidos: " + admitidos + " de "
-                + TablaBCP.MAX_PROCESOS);
+                + controlador.getSistemaOperativo().getTablaBCP().getRanuras());
         lblAlgoritmo.setText(controlador.getSistemaOperativo().getAlgoritmo().getNombre());
     }
 

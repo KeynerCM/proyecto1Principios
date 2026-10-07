@@ -32,7 +32,7 @@ class IntercambioTest {
 
     @BeforeEach
     void preparar() {
-        memoria = new Memoria(160, TablaBCP.TAMANO_KERNEL);
+        memoria = new Memoria(160, TablaBCP.calcularKernel(160, 80));
         disco = new Disco(512, 64);
         tabla = new TablaBCP(memoria);
         procesos = new ListaProcesos(tabla);

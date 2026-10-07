@@ -32,7 +32,6 @@ import com.mycompany.minipc.isa.Instruccion;
 import com.mycompany.minipc.so.SistemaOperativo;
 import com.mycompany.minipc.so.planificacion.FabricaAlgoritmos;
 import com.mycompany.minipc.so.procesos.Proceso;
-import com.mycompany.minipc.so.procesos.TablaBCP;
 
 /**
  * Nombre: ControladorPrincipal
@@ -118,7 +117,8 @@ public class ControladorPrincipal {
         this.configuracion = leerConfiguracion();
 
         this.so = new SistemaOperativo(configuracion.getTamanoMemoria(),
-                configuracion.getTamanoDisco(), configuracion.getTamanoMemoriaVirtual(),
+                configuracion.getPorcentajeKernel(), configuracion.getTamanoDisco(),
+                configuracion.getTamanoMemoriaVirtual(),
                 FabricaAlgoritmos.crear(configuracion.getAlgoritmo()));
         this.so.setBitacora(vista::escribirEnConsola);
         this.cargador = new CargadorASM();
@@ -403,8 +403,9 @@ public class ControladorPrincipal {
      */
     public void alConfigurar(Configuracion nueva) {
         detener();
-        so.reconfigurar(nueva.getTamanoMemoria(), nueva.getTamanoDisco(),
-                nueva.getTamanoMemoriaVirtual(), FabricaAlgoritmos.crear(nueva.getAlgoritmo()));
+        so.reconfigurar(nueva.getTamanoMemoria(), nueva.getPorcentajeKernel(),
+                nueva.getTamanoDisco(), nueva.getTamanoMemoriaVirtual(),
+                FabricaAlgoritmos.crear(nueva.getAlgoritmo()));
         temporizador.setDelay(nueva.getMsPorSegundo());
         configuracion = nueva;
 
@@ -435,7 +436,7 @@ public class ControladorPrincipal {
         Memoria memoria = so.getMemoria();
         Disco disco = so.getDisco();
         return "Memoria de " + memoria.getTamano() + " posiciones: kernel de 0 a "
-                + (memoria.getLimiteKernel() - 1) + " (" + TablaBCP.describirFormula()
+                + (memoria.getLimiteKernel() - 1) + " (" + so.describirKernel()
                 + "), usuario de " + memoria.getLimiteKernel() + " a "
                 + (memoria.getTamano() - 1) + ". Disco de " + disco.getTamano()
                 + " posiciones (indice de 0 a " + (Disco.ENTRADAS_INDICE - 1)

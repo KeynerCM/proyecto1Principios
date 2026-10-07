@@ -38,7 +38,13 @@ class SistemaOperativoTest {
     }
 
     private SistemaOperativo crear(int memoria) {
-        SistemaOperativo nuevo = new SistemaOperativo(memoria, 512, 64, new FCFS());
+        return crear(memoria, TablaBCP.PORCENTAJE_KERNEL_POR_DEFECTO);
+    }
+
+    /** Con 160 y 80 % el kernel mide 128 y a los programas les quedan 32. */
+    private SistemaOperativo crear(int memoria, int porcentajeKernel) {
+        SistemaOperativo nuevo = new SistemaOperativo(memoria, porcentajeKernel, 512, 64,
+                new FCFS());
         bitacora = new ArrayList<>();
         nuevo.setBitacora(bitacora::add);
         return nuevo;
@@ -156,7 +162,7 @@ class SistemaOperativoTest {
     @Test
     @DisplayName("Si no cabe en la memoria principal, el trabajo nuevo pasa a la memoria virtual")
     void nuevoAMemoriaVirtual() throws Exception {
-        so = crear(160);
+        so = crear(160, 80);
         Trabajo a = cargar("a.asm", programaDe(20));
         Trabajo b = cargar("b.asm", programaDe(20));
 
@@ -183,7 +189,7 @@ class SistemaOperativoTest {
     @Test
     @DisplayName("Si no cabe en ninguna memoria, el trabajo espera en la lista de trabajos")
     void esperaPorMemoria() throws Exception {
-        so = new SistemaOperativo(160, 512, 16, new FCFS());
+        so = new SistemaOperativo(160, 80, 512, 16, new FCFS());
         so.setBitacora(bitacora::add);
         Trabajo a = cargar("a.asm", programaDe(20));
         Trabajo b = cargar("b.asm", programaDe(20));
@@ -202,7 +208,7 @@ class SistemaOperativoTest {
     @Test
     @DisplayName("Mientras A espera el teclado no se suspende; B sigue en la memoria virtual")
     void esperaNoSeSuspende() throws Exception {
-        so = crear(160);
+        so = crear(160, 80);
         String[] lineasA = programaDe(20);
         lineasA[0] = "INT 09H";
         lineasA[1] = "INT 10H";
@@ -230,7 +236,7 @@ class SistemaOperativoTest {
     @Test
     @DisplayName("Reiniciar vacia la memoria virtual")
     void reiniciarLimpiaMemoriaVirtual() throws Exception {
-        so = crear(160);
+        so = crear(160, 80);
         cargar("a.asm", programaDe(20));
         cargar("b.asm", programaDe(20));
         so.admitir();
@@ -311,6 +317,26 @@ class SistemaOperativoTest {
         so.limpiar();
         so.getDisco().guardarPrograma("enorme.asm", List.of(programaDe(129)));
         assertThrows(IllegalArgumentException.class, () -> so.agregarTrabajo("enorme.asm"));
+    }
+
+    @Test
+    @DisplayName("El kernel es un porcentaje: con 20 % cabe un BCP y se admite un proceso a la vez")
+    void kernelPorPorcentaje() throws Exception {
+        assertEquals("256 x 50 % = 128 celdas: 3 de cabecera + 5 BCP x 25", so.describirKernel());
+        assertEquals(5, so.getTablaBCP().getRanuras());
+
+        so = crear(256, 20);
+        assertEquals(51, so.getMemoria().getLimiteKernel());
+        assertEquals(1, so.getTablaBCP().getRanuras());
+        Trabajo a = cargar("a.asm", "MOV AX, 1", "INT 20H");
+        Trabajo b = cargar("b.asm", "MOV AX, 2", "INT 20H");
+
+        assertEquals(1, so.admitir(), "Solo cabe un BCP");
+        assertEquals(EstadoProceso.NUEVO, b.getEstado());
+        ejecutarTodo();
+        assertEquals(EstadoProceso.FINALIZADO, a.getEstado());
+        assertEquals(EstadoProceso.FINALIZADO, b.getEstado());
+        assertTrue(b.getInicio() >= a.getFin(), "B entra cuando A libera su BCP");
     }
 
     @Test

@@ -76,21 +76,43 @@ public class SistemaOperativo {
     private int reloj;
     private int siguientePid;
 
+    /** Porcentaje de la memoria principal que ocupa el kernel. */
+    private int porcentajeKernel;
+
     /**
      * Nombre: SistemaOperativo
      * Entradas: tamanoMemoria, posiciones de la memoria principal;
      *           tamanoDisco y memoriaVirtual, configuracion del disco;
      *           algoritmo, algoritmo de planificacion
      * Salidas: el sistema construido, sin trabajos
-     * Restricciones: lanza IllegalArgumentException si la memoria no alcanza
-     *                para el kernel mas 32 posiciones, o si el disco no es
-     *                valido
-     * Descripcion: el kernel ocupa K = C + P x B posiciones, calculadas por la
-     *              tabla de BCP; el resto de la memoria es para los programas.
+     * Restricciones: las mismas que el constructor con porcentaje
+     * Descripcion: usa el porcentaje de kernel por defecto (50 %).
      */
     public SistemaOperativo(int tamanoMemoria, int tamanoDisco, int memoriaVirtual,
             AlgoritmoPlanificacion algoritmo) {
-        this.memoria = new Memoria(tamanoMemoria, TablaBCP.TAMANO_KERNEL);
+        this(tamanoMemoria, TablaBCP.PORCENTAJE_KERNEL_POR_DEFECTO, tamanoDisco, memoriaVirtual,
+                algoritmo);
+    }
+
+    /**
+     * Nombre: SistemaOperativo
+     * Entradas: tamanoMemoria, posiciones de la memoria principal;
+     *           porcentajeKernel, parte de la memoria para el kernel;
+     *           tamanoDisco y memoriaVirtual, configuracion del disco;
+     *           algoritmo, algoritmo de planificacion
+     * Salidas: el sistema construido, sin trabajos
+     * Restricciones: lanza IllegalArgumentException si en el kernel no cabe
+     *                ningun BCP, si a los programas no les quedan 32
+     *                posiciones, o si el disco no es valido
+     * Descripcion: el kernel ocupa el porcentaje indicado de la memoria y de
+     *              su tamano sale cuantos BCP caben (como maximo 5); el resto
+     *              de la memoria es para los programas.
+     */
+    public SistemaOperativo(int tamanoMemoria, int porcentajeKernel, int tamanoDisco,
+            int memoriaVirtual, AlgoritmoPlanificacion algoritmo) {
+        this.porcentajeKernel = porcentajeKernel;
+        this.memoria = new Memoria(tamanoMemoria,
+                TablaBCP.calcularKernel(tamanoMemoria, porcentajeKernel));
         this.disco = new Disco(tamanoDisco, memoriaVirtual);
         this.cpu = new Procesador(memoria);
         this.tabla = new TablaBCP(memoria);
@@ -118,14 +140,21 @@ public class SistemaOperativo {
 
     /**
      * Nombre: validarMemoria
-     * Entradas: tamano, posiciones de la memoria principal
-     * Salidas: los problemas encontrados, vacia si el tamano sirve
+     * Entradas: tamano, posiciones de la memoria principal; porcentajeKernel,
+     *           parte de la memoria para el kernel
+     * Salidas: los problemas encontrados, vacia si la combinacion sirve
      * Restricciones: ninguna
-     * Descripcion: la memoria debe tener el kernel calculado mas 32
-     *              posiciones para programas. La usa la configuracion.
+     * Descripcion: el porcentaje debe estar entre 10 y 90, en el kernel debe
+     *              caber al menos un BCP y a los programas les deben quedar 32
+     *              posiciones. La usa la configuracion.
      */
-    public static List<String> validarMemoria(int tamano) {
-        return Memoria.validar(tamano, TablaBCP.TAMANO_KERNEL);
+    public static List<String> validarMemoria(int tamano, int porcentajeKernel) {
+        List<String> problemas = TablaBCP.validarKernel(tamano, porcentajeKernel);
+        if (problemas.isEmpty()) {
+            problemas.addAll(Memoria.validar(tamano,
+                    TablaBCP.calcularKernel(tamano, porcentajeKernel)));
+        }
+        return problemas;
     }
 
     /**
@@ -355,17 +384,25 @@ public class SistemaOperativo {
 
     /**
      * Nombre: reconfigurar
-     * Entradas: tamanoMemoria, tamanoDisco y memoriaVirtual, nuevos tamanos;
-     *           algoritmo, algoritmo de planificacion
+     * Entradas: tamanoMemoria, porcentajeKernel, tamanoDisco y
+     *           memoriaVirtual, nuevos tamanos; algoritmo, algoritmo de
+     *           planificacion
      * Salidas: ninguna
      * Restricciones: lanza IllegalArgumentException si los tamanos no son
      *                validos; descarta los procesos, los trabajos y el disco
      * Descripcion: redimensionar invalida todas las direcciones asignadas,
-     *              por eso se empieza de cero.
+     *              por eso se empieza de cero. El kernel se vuelve a calcular
+     *              con el porcentaje nuevo.
      */
-    public void reconfigurar(int tamanoMemoria, int tamanoDisco, int memoriaVirtual,
-            AlgoritmoPlanificacion algoritmo) {
-        memoria.redimensionar(tamanoMemoria, TablaBCP.TAMANO_KERNEL);
+    public void reconfigurar(int tamanoMemoria, int porcentajeKernel, int tamanoDisco,
+            int memoriaVirtual, AlgoritmoPlanificacion algoritmo) {
+        List<String> problemas = TablaBCP.validarKernel(tamanoMemoria, porcentajeKernel);
+        if (!problemas.isEmpty()) {
+            throw new IllegalArgumentException(problemas.get(0));
+        }
+        memoria.redimensionar(tamanoMemoria,
+                TablaBCP.calcularKernel(tamanoMemoria, porcentajeKernel));
+        this.porcentajeKernel = porcentajeKernel;
         disco.redimensionar(tamanoDisco, memoriaVirtual);
         planificadorProcesos.setAlgoritmo(algoritmo);
         limpiar();
@@ -458,6 +495,29 @@ public class SistemaOperativo {
      */
     public int getReloj() {
         return reloj;
+    }
+
+    /**
+     * Nombre: getPorcentajeKernel
+     * Entradas: ninguna
+     * Salidas: el porcentaje de la memoria principal que ocupa el kernel
+     * Restricciones: ninguna
+     * Descripcion: acceso de solo lectura al porcentaje configurado.
+     */
+    public int getPorcentajeKernel() {
+        return porcentajeKernel;
+    }
+
+    /**
+     * Nombre: describirKernel
+     * Entradas: ninguna
+     * Salidas: el calculo del kernel actual en texto, por ejemplo
+     *          "256 x 50 % = 128 celdas: 3 de cabecera + 5 BCP x 25"
+     * Restricciones: ninguna
+     * Descripcion: lo muestran la consola, las estadisticas y "Acerca de".
+     */
+    public String describirKernel() {
+        return TablaBCP.describirCalculo(memoria.getTamano(), porcentajeKernel);
     }
 
     /**

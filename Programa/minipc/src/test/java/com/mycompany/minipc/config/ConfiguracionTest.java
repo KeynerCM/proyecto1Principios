@@ -52,18 +52,20 @@ class ConfiguracionTest {
         assertTrue(texto.contains("memoria.tamano=256"), texto);
         assertTrue(texto.contains("disco.memoriaVirtual=64"), texto);
         assertTrue(texto.contains("planificacion.algoritmo=FCFS"), texto);
-        assertFalse(texto.contains("memoria.kernel"), "El kernel ya no se configura");
+        assertTrue(texto.contains("memoria.kernelPorcentaje=50"), texto);
+        assertEquals(50, c.getPorcentajeKernel());
     }
 
     @Test
     @DisplayName("Lo que se guarda se vuelve a leer igual")
     void guardarYCargar(@TempDir Path carpeta) throws Exception {
         LectorConfiguracion lector = new LectorConfiguracion(carpeta.resolve("config.properties"));
-        lector.guardar(new Configuracion(512, 1024, 128, 250, "fcfs"));
+        lector.guardar(new Configuracion(512, 40, 1024, 128, 250, "fcfs"));
 
         Configuracion c = lector.cargar();
 
         assertEquals(512, c.getTamanoMemoria());
+        assertEquals(40, c.getPorcentajeKernel());
         assertEquals("FCFS", c.getAlgoritmo(), "El nombre se guarda en mayusculas");
         assertEquals(1024, c.getTamanoDisco());
         assertEquals(128, c.getTamanoMemoriaVirtual());
@@ -100,25 +102,31 @@ class ConfiguracionTest {
     @DisplayName("Los valores fuera de rango se reportan con las reglas de memoria y disco")
     void reportaValoresFueraDeRango(@TempDir Path carpeta) throws Exception {
         Path archivo = escribir(carpeta,
-                "memoria.tamano=100\ndisco.tamano=512\ndisco.memoriaVirtual=600\n"
+                "memoria.tamano=100\nmemoria.kernelPorcentaje=20\ndisco.tamano=512\n"
+                + "disco.memoriaVirtual=600\n"
                 + "ejecucion.msPorSegundo=10\n");
 
         ConfiguracionException e = assertThrows(ConfiguracionException.class,
                 () -> new LectorConfiguracion(archivo).cargar());
 
         String mensaje = e.getMessage();
-        assertTrue(mensaje.contains("al menos 160"), mensaje);
+        assertTrue(mensaje.contains("no cabe ningun BCP"), mensaje);
         assertTrue(mensaje.contains("memoria virtual"), mensaje);
         assertTrue(mensaje.contains("50 y 2000"), mensaje);
     }
 
     @Test
-    @DisplayName("La memoria debe alcanzar para el kernel calculado mas 32 posiciones")
+    @DisplayName("El porcentaje del kernel debe dejar lugar para un BCP y 32 posiciones de programas")
     void rechazaMemoriaMenorQueElKernel() {
         ConfiguracionException e = assertThrows(ConfiguracionException.class,
-                () -> new Configuracion(159, 512, 64, 1000, "FCFS"));
-        assertTrue(e.getMessage().contains("128 para el kernel"), e.getMessage());
-        assertDoesNotThrow(() -> new Configuracion(160, 512, 64, 1000, "FCFS"));
+                () -> new Configuracion(160, 90, 512, 64, 1000, "FCFS"));
+        assertTrue(e.getMessage().contains("144 para el kernel y 32 para los programas"),
+                e.getMessage());
+        e = assertThrows(ConfiguracionException.class,
+                () -> new Configuracion(256, 5, 512, 64, 1000, "FCFS"));
+        assertTrue(e.getMessage().contains("entre 10 y 90"), e.getMessage());
+        assertDoesNotThrow(() -> new Configuracion(160, 80, 512, 64, 1000, "FCFS"));
+        assertDoesNotThrow(() -> new Configuracion(256, 20, 512, 64, 1000, "FCFS"));
     }
 
     @Test

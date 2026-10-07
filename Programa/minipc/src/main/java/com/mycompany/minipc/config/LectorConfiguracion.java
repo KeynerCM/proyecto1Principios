@@ -37,6 +37,9 @@ public class LectorConfiguracion {
     /** Clave del tamano de la memoria principal. */
     public static final String CLAVE_MEMORIA = "memoria.tamano";
 
+    /** Clave del porcentaje de la memoria principal que ocupa el kernel. */
+    public static final String CLAVE_PORCENTAJE_KERNEL = "memoria.kernelPorcentaje";
+
     /** Clave del tamano del disco. */
     public static final String CLAVE_DISCO = "disco.tamano";
 
@@ -114,6 +117,8 @@ public class LectorConfiguracion {
         List<String> errores = new ArrayList<>();
         int memoria = leerEntero(propiedades, CLAVE_MEMORIA,
                 porDefecto.getTamanoMemoria(), errores);
+        int porcentajeKernel = leerEntero(propiedades, CLAVE_PORCENTAJE_KERNEL,
+                porDefecto.getPorcentajeKernel(), errores);
         int disco = leerEntero(propiedades, CLAVE_DISCO,
                 porDefecto.getTamanoDisco(), errores);
         int memoriaVirtual = leerEntero(propiedades, CLAVE_MEMORIA_VIRTUAL,
@@ -128,7 +133,8 @@ public class LectorConfiguracion {
             throw new ConfiguracionException(prefijarArchivo(errores));
         }
         try {
-            return new Configuracion(memoria, disco, memoriaVirtual, msPorSegundo, algoritmo);
+            return new Configuracion(memoria, porcentajeKernel, disco, memoriaVirtual,
+                    msPorSegundo, algoritmo);
         } catch (ConfiguracionException e) {
             throw new ConfiguracionException(prefijarArchivo(e.getErrores()));
         }
@@ -149,10 +155,19 @@ public class LectorConfiguracion {
                 "# Configuracion de la minicomputadora",
                 "# Se puede editar a mano; los cambios se aplican al reiniciar el programa.",
                 "",
-                "# Memoria principal: posiciones totales. El kernel no se configura: ocupa "
-                        + TablaBCP.describirFormula() + ", y a los programas les deben"
-                        + " quedar al menos " + Memoria.ESPACIO_USUARIO_MINIMO,
+                "# Memoria principal: posiciones totales",
                 CLAVE_MEMORIA + "=" + configuracion.getTamanoMemoria(),
+                "# Porcentaje de la memoria para el kernel ("
+                        + TablaBCP.PORCENTAJE_KERNEL_MINIMO + " a "
+                        + TablaBCP.PORCENTAJE_KERNEL_MAXIMO + "). Cada BCP ocupa "
+                        + TablaBCP.TAMANO_BCP + " celdas y la cabecera "
+                        + TablaBCP.TAMANO_CABECERA + "; caben hasta "
+                        + TablaBCP.MAX_PROCESOS + " BCP. Con "
+                        + TablaBCP.describirCalculo(configuracion.getTamanoMemoria(),
+                                configuracion.getPorcentajeKernel())
+                        + ". A los programas les deben quedar al menos "
+                        + Memoria.ESPACIO_USUARIO_MINIMO,
+                CLAVE_PORCENTAJE_KERNEL + "=" + configuracion.getPorcentajeKernel(),
                 "",
                 "# Disco: posiciones totales (minimo 64); las primeras 20 son el indice",
                 CLAVE_DISCO + "=" + configuracion.getTamanoDisco(),

@@ -81,7 +81,8 @@ Los valores no quedan en el código: se leen del archivo [`Programa/minipc/confi
 
 | Clave | Por defecto | Significado |
 |---|---:|---|
-| `memoria.tamano` | 256 | Celdas de la memoria principal (mínimo 160: 128 del kernel y 32 para programas) |
+| `memoria.tamano` | 256 | Celdas de la memoria principal (a los programas les deben quedar al menos 32) |
+| `memoria.kernelPorcentaje` | 50 | Porcentaje de la memoria que ocupa el kernel (10 a 90). De su tamaño sale cuántos BCP caben, como máximo 5 |
 | `disco.tamano` | 512 | Celdas del disco (las primeras 20 son el índice) |
 | `disco.memoriaVirtual` | 64 | Celdas al final del disco reservadas para la memoria virtual |
 | `ejecucion.msPorSegundo` | 1000 | Milisegundos reales que dura cada segundo de CPU en la ejecución automática |
@@ -139,7 +140,7 @@ Resumen de la estructura. La explicación completa y el diagrama de paquetes est
     - `archivos`;
   - `gui`: interfaz;
   - `config`: configuración externa.
-- **Memoria y kernel:** la memoria es un arreglo de celdas de texto. El tamaño del kernel se calcula como K = 3 + 5 x 25 = 128 (cabecera + 5 BCP de 25 campos). Los programas van en la zona de usuario (128 a 255).
+- **Memoria y kernel:** la memoria es un arreglo de celdas de texto. El kernel es un porcentaje configurable de la memoria (K = memoria x porcentaje / 100) y de su tamaño se calcula cuántos BCP caben: P = (K - 3) / 25, como máximo 5 (3 celdas de cabecera y 25 por BCP). Con 256 y 50 % el kernel mide 128 celdas (0 a 127), caben los 5 BCP y los programas van en la zona de usuario (128 a 255). Se eligió 50 % porque es el menor porcentaje en el que caben los 5 BCP con la memoria por defecto; con 20 % el kernel mediría 51 celdas y cabría un solo proceso a la vez.
 - **BCP en memoria:** la información de cada proceso vive en las celdas del kernel, no en objetos de Java. Cada elemento de la pila ocupa su propia celda. Los BCP forman una lista enlazada con el campo "siguiente BCP".
 - **Estados:** NUEVO, PREPARADO, EJECUCION, EN_ESPERA, SUSPENDIDO_PREPARADO, SUSPENDIDO_EN_ESPERA y FINALIZADO.
 - **Planificación:** FCFS con el patrón Estrategia, para poder agregar otros algoritmos en el Proyecto 2 sin cambiar el resto del sistema.
@@ -178,7 +179,7 @@ En la carpeta [`Ejemplo/`](Ejemplo/):
 - Carga de uno o varios archivos `.asm`, con validación de sintaxis por expresiones regulares y mensajes claros con número de línea.
 - Programas guardados en el disco, con índice en sus primeras posiciones.
 - Lista de trabajos, planificador de trabajos y lista de procesos enlazada en memoria.
-- BCP completo en la memoria del kernel, con tamaño del kernel calculado: estados, PC, registros AC, AX, BX, CX, DX, IR, pila de 5 con control de desbordamiento, información contable (CPU, tiempo de inicio, tiempo empleado), archivos abiertos, enlace al siguiente BCP, base, alcance y prioridad.
+- BCP completo en la memoria del kernel, con el tamaño del kernel calculado como porcentaje de la memoria: estados, PC, registros AC, AX, BX, CX, DX, IR, pila de 5 con control de desbordamiento, información contable (CPU, tiempo de inicio, tiempo empleado), archivos abiertos, enlace al siguiente BCP, base, alcance y prioridad.
 - Los 7 estados del proceso.
 - Ejecución de las instrucciones según su peso, en los dos modos (Siguiente y Ejecutar).
 - Interrupciones y llamadas al sistema: INT 20H, 10H, 09H y 21H (manejo de archivos completo).

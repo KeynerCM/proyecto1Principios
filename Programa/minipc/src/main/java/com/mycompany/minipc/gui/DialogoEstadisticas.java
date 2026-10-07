@@ -14,7 +14,6 @@ import com.mycompany.minipc.hardware.Disco;
 import com.mycompany.minipc.hardware.Estadisticas;
 import com.mycompany.minipc.hardware.Memoria;
 import com.mycompany.minipc.so.SistemaOperativo;
-import com.mycompany.minipc.so.procesos.TablaBCP;
 import com.mycompany.minipc.so.trabajos.Trabajo;
 
 /**
@@ -162,7 +161,7 @@ public class DialogoEstadisticas extends javax.swing.JDialog {
                 : String.format("%.1f s (%d procesos finalizados)",
                         (double) suma / terminados, terminados));
         modelo.agregar("Kernel", "0 a " + (memoria.getLimiteKernel() - 1) + ": "
-                + TablaBCP.describirFormula());
+                + so.describirKernel());
         modelo.agregar("Zona de usuario", memoria.getLimiteKernel() + " a "
                 + (memoria.getTamano() - 1));
         modelo.agregar("Memoria virtual (disco)", disco.getTamanoMemoriaVirtual() == 0

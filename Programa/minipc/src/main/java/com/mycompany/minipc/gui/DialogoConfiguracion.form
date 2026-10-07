@@ -60,12 +60,12 @@
         </Component>
         <Component class="javax.swing.JLabel" name="lblKernel">
           <Properties>
-            <Property name="text" type="java.lang.String" value="Limite de kernel:"/>
+            <Property name="text" type="java.lang.String" value="Kernel (% de la memoria):"/>
           </Properties>
         </Component>
         <Component class="javax.swing.JSpinner" name="spnKernel">
           <Properties>
-            <Property name="toolTipText" type="java.lang.String" value="Primera direccion de la zona de usuario"/>
+            <Property name="toolTipText" type="java.lang.String" value="Porcentaje de la memoria principal que ocupa el kernel; de el sale cuantos BCP caben"/>
           </Properties>
           <Events>
             <EventHandler event="stateChanged" listener="javax.swing.event.ChangeListener" parameters="javax.swing.event.ChangeEvent" handler="spnKernelStateChanged"/>

@@ -9,19 +9,26 @@ import com.mycompany.minipc.hardware.Memoria;
  * Nombre: TablaBCP
  * Entradas: la memoria principal donde viven la cabecera y los BCP
  * Salidas: no aplica
- * Restricciones: es la unica clase que conoce la formula del kernel; las demas
- *                piden direcciones aqui
- * Descripcion: tecnica de calculo de la memoria del kernel. El kernel guarda
- *              una cabecera de C celdas y una tabla de P ranuras, cada una
- *              con un BCP de B celdas:
+ * Restricciones: es la unica clase que conoce el calculo del kernel; las
+ *                demas piden direcciones aqui
+ * Descripcion: tecnica de calculo de la memoria del kernel. El kernel es un
+ *              porcentaje de la memoria principal, y de su tamano sale
+ *              cuantos BCP caben. El kernel guarda una cabecera de C celdas
+ *              y una tabla de P ranuras, cada una con un BCP de B celdas:
  *
- *                K = C + P x B = 3 + 5 x 25 = 128 celdas
+ *                K = memoria x porcentaje / 100
+ *                P = (K - C) / B, como maximo 5
+ *
+ *                con 256 y 50 %: K = 128, P = (128 - 3) / 25 = 5
  *
  *                0 .. 2      cabecera del sistema operativo
  *                3 .. 27     BCP de la ranura 0
  *                28 .. 52    BCP de la ranura 1
  *                ...
  *                103 .. 127  BCP de la ranura 4
+ *
+ *              Si el porcentaje da menos de 5 ranuras, caben menos procesos a
+ *              la vez; si da celdas de mas, quedan en el kernel sin usar.
  *
  *              La direccion de un campo es base + desplazamiento, como en un
  *              arreglo de registros: dirBCP(i) = C + i x B, y el campo esta en
@@ -33,7 +40,7 @@ import com.mycompany.minipc.hardware.Memoria;
  */
 public class TablaBCP {
 
-    /** Procesos admitidos a la vez: "podra ejecutar hasta 5 procesos". */
+    /** Procesos admitidos a la vez como maximo. */
     public static final int MAX_PROCESOS = 5;
 
     /** C: celdas de la cabecera. */
@@ -42,39 +49,114 @@ public class TablaBCP {
     /** B: celdas de cada BCP. */
     public static final int TAMANO_BCP = CampoBCP.values().length;
 
-    /** K = C + P x B: celdas del kernel. */
-    public static final int TAMANO_KERNEL = TAMANO_CABECERA + MAX_PROCESOS * TAMANO_BCP;
+    /** Celdas que ocupan la cabecera y los 5 BCP: C + 5 x B. */
+    public static final int TAMANO_TABLA_COMPLETA = TAMANO_CABECERA + MAX_PROCESOS * TAMANO_BCP;
+
+    /** Porcentaje de la memoria para el kernel: el menor en que caben 5 BCP con 256. */
+    public static final int PORCENTAJE_KERNEL_POR_DEFECTO = 50;
+
+    /** Menor porcentaje de kernel aceptado. */
+    public static final int PORCENTAJE_KERNEL_MINIMO = 10;
+
+    /** Mayor porcentaje de kernel aceptado. */
+    public static final int PORCENTAJE_KERNEL_MAXIMO = 90;
 
     private final Memoria memoria;
 
     /**
      * Nombre: TablaBCP
-     * Entradas: memoria, memoria principal cuya zona de kernel mide al menos K
+     * Entradas: memoria, memoria principal cuyo kernel tiene lugar para al
+     *           menos un BCP
      * Salidas: la tabla construida, con la cabecera inicializada
-     * Restricciones: lanza IllegalArgumentException si el kernel de la memoria
-     *                es menor que K
+     * Restricciones: lanza IllegalArgumentException si en el kernel de la
+     *                memoria no cabe ningun BCP
      * Descripcion: deja la cabecera en su estado inicial: nada en ejecucion,
      *              lista vacia y cero procesos admitidos.
      */
     public TablaBCP(Memoria memoria) {
-        if (memoria.getLimiteKernel() < TAMANO_KERNEL) {
+        if (ranurasPara(memoria.getLimiteKernel()) < 1) {
             throw new IllegalArgumentException("La zona de kernel mide "
-                    + memoria.getLimiteKernel() + " y la tabla de BCP necesita " + TAMANO_KERNEL);
+                    + memoria.getLimiteKernel() + " y no cabe ningun BCP (se necesitan "
+                    + (TAMANO_CABECERA + TAMANO_BCP) + ")");
         }
         this.memoria = memoria;
         formatear();
     }
 
     /**
-     * Nombre: describirFormula
-     * Entradas: ninguna
-     * Salidas: la formula del kernel con sus valores, en texto
-     * Restricciones: ninguna
-     * Descripcion: se muestra en la configuracion y en la consola.
+     * Nombre: calcularKernel
+     * Entradas: tamanoMemoria, celdas de la memoria principal; porcentaje,
+     *           parte de la memoria que se reserva para el kernel
+     * Salidas: las celdas del kernel
+     * Restricciones: redondea hacia abajo
+     * Descripcion: K = memoria x porcentaje / 100.
      */
-    public static String describirFormula() {
-        return TAMANO_KERNEL + " celdas (" + TAMANO_CABECERA + " de cabecera + "
-                + MAX_PROCESOS + " BCP x " + TAMANO_BCP + ")";
+    public static int calcularKernel(int tamanoMemoria, int porcentaje) {
+        return tamanoMemoria * porcentaje / 100;
+    }
+
+    /**
+     * Nombre: ranurasPara
+     * Entradas: kernel, celdas del kernel
+     * Salidas: cuantos BCP caben, de 0 a 5
+     * Restricciones: ninguna
+     * Descripcion: P = (K - C) / B, como maximo 5.
+     */
+    public static int ranurasPara(int kernel) {
+        int caben = (kernel - TAMANO_CABECERA) / TAMANO_BCP;
+        return Math.max(0, Math.min(MAX_PROCESOS, caben));
+    }
+
+    /**
+     * Nombre: validarKernel
+     * Entradas: tamanoMemoria, celdas de la memoria; porcentaje, del kernel
+     * Salidas: la lista de problemas, vacia si el porcentaje sirve
+     * Restricciones: no revisa la zona de usuario; eso lo hace Memoria
+     * Descripcion: el porcentaje debe estar entre 10 y 90 y dejar lugar para
+     *              al menos un BCP.
+     */
+    public static List<String> validarKernel(int tamanoMemoria, int porcentaje) {
+        List<String> errores = new ArrayList<>();
+        if (porcentaje < PORCENTAJE_KERNEL_MINIMO || porcentaje > PORCENTAJE_KERNEL_MAXIMO) {
+            errores.add("El porcentaje del kernel debe estar entre " + PORCENTAJE_KERNEL_MINIMO
+                    + " y " + PORCENTAJE_KERNEL_MAXIMO + ", se recibio " + porcentaje);
+        } else if (ranurasPara(calcularKernel(tamanoMemoria, porcentaje)) < 1) {
+            errores.add("Con " + porcentaje + " % de " + tamanoMemoria + " el kernel tiene "
+                    + calcularKernel(tamanoMemoria, porcentaje) + " celdas y no cabe ningun"
+                    + " BCP (se necesitan " + (TAMANO_CABECERA + TAMANO_BCP) + ")");
+        }
+        return errores;
+    }
+
+    /**
+     * Nombre: describirCalculo
+     * Entradas: tamanoMemoria, celdas de la memoria; porcentaje, del kernel
+     * Salidas: el calculo del kernel en texto, por ejemplo
+     *          "256 x 50 % = 128 celdas: 3 de cabecera + 5 BCP x 25"
+     * Restricciones: ninguna
+     * Descripcion: se muestra en la consola, la configuracion y las
+     *              estadisticas. Si sobran celdas, lo dice.
+     */
+    public static String describirCalculo(int tamanoMemoria, int porcentaje) {
+        int kernel = calcularKernel(tamanoMemoria, porcentaje);
+        int ranuras = ranurasPara(kernel);
+        int sobran = kernel - TAMANO_CABECERA - ranuras * TAMANO_BCP;
+        return tamanoMemoria + " x " + porcentaje + " % = " + kernel + " celdas: "
+                + TAMANO_CABECERA + " de cabecera + " + ranuras + " BCP x " + TAMANO_BCP
+                + (sobran > 0 ? " + " + sobran + " sin usar" : "");
+    }
+
+    /**
+     * Nombre: getRanuras
+     * Entradas: ninguna
+     * Salidas: cuantos BCP caben en el kernel de la memoria, es decir, cuantos
+     *          procesos se pueden admitir a la vez
+     * Restricciones: ninguna
+     * Descripcion: se calcula con el kernel actual, asi que sigue valiendo si
+     *              la memoria se reconfigura.
+     */
+    public int getRanuras() {
+        return ranurasPara(memoria.getLimiteKernel());
     }
 
     /**
@@ -107,11 +189,12 @@ public class TablaBCP {
      * Entradas: direccion, cualquier direccion de memoria
      * Salidas: la ranura de BCP que contiene esa direccion, o -1 si la
      *          direccion no esta en la tabla de BCP
-     * Restricciones: ninguna
+     * Restricciones: no sabe cuantas ranuras tiene el kernel actual; para eso
+     *                esta getRanuras
      * Descripcion: (dir - C) / B.
      */
     public static int ranuraDe(int direccion) {
-        if (direccion < TAMANO_CABECERA || direccion >= TAMANO_KERNEL) {
+        if (direccion < TAMANO_CABECERA || direccion >= TAMANO_TABLA_COMPLETA) {
             return -1;
         }
         return (direccion - TAMANO_CABECERA) / TAMANO_BCP;
@@ -135,7 +218,8 @@ public class TablaBCP {
      * Nombre: describir
      * Entradas: direccion, cualquier direccion del kernel
      * Salidas: el nombre de lo que guarda esa celda, por ejemplo "SO.Admitidos"
-     *          o "P2.PC"; "BCP libre" si la ranura no se usa; vacio si la
+     *          o "P2.PC"; "BCP libre" si la ranura no se usa; "Kernel sin
+     *          usar" si en esa celda no cabe un BCP completo; vacio si la
      *          direccion no es del kernel
      * Restricciones: ninguna
      * Descripcion: lo usa la tabla de memoria para mostrar donde y como quedo
@@ -145,9 +229,12 @@ public class TablaBCP {
         if (direccion >= 0 && direccion < TAMANO_CABECERA) {
             return "SO." + CampoCabecera.values()[direccion].getEtiqueta();
         }
-        int ranura = ranuraDe(direccion);
-        if (ranura < 0) {
+        if (!memoria.esDireccionKernel(direccion)) {
             return "";
+        }
+        int ranura = ranuraDe(direccion);
+        if (ranura < 0 || ranura >= getRanuras()) {
+            return "Kernel sin usar";
         }
         String pid = leer(direccionBCP(ranura), CampoBCP.PID);
         if (pid.isEmpty()) {
@@ -172,7 +259,7 @@ public class TablaBCP {
         int ranura = primeraRanuraLibre();
         if (ranura < 0) {
             throw new IllegalStateException("No hay ranuras de BCP libres: ya hay "
-                    + MAX_PROCESOS + " procesos admitidos");
+                    + getRanuras() + " procesos admitidos");
         }
         int dir = direccionBCP(ranura);
         for (CampoBCP campo : CampoBCP.values()) {
@@ -222,7 +309,7 @@ public class TablaBCP {
      * Descripcion: vacia la tabla y deja la cabecera en su estado inicial.
      */
     public final void formatear() {
-        for (int i = 0; i < TAMANO_KERNEL; i++) {
+        for (int i = 0; i < memoria.getLimiteKernel(); i++) {
             memoria.escribir(i, Memoria.VACIA);
         }
         memoria.escribirEntero(CampoCabecera.PROCESOS_ADMITIDOS.getDireccion(), 0);
@@ -260,7 +347,7 @@ public class TablaBCP {
      */
     public List<Proceso> getProcesos() {
         List<Proceso> procesos = new ArrayList<>();
-        for (int ranura = 0; ranura < MAX_PROCESOS; ranura++) {
+        for (int ranura = 0; ranura < getRanuras(); ranura++) {
             int dir = direccionBCP(ranura);
             if (!leer(dir, CampoBCP.PID).isEmpty()) {
                 procesos.add(new Proceso(this, dir));
@@ -375,10 +462,10 @@ public class TablaBCP {
      * Entradas: ninguna
      * Salidas: la primera ranura con la celda PID vacia, o -1 si no hay
      * Restricciones: ninguna
-     * Descripcion: primer ajuste sobre las cinco ranuras.
+     * Descripcion: primer ajuste sobre las ranuras que caben en el kernel.
      */
     private int primeraRanuraLibre() {
-        for (int ranura = 0; ranura < MAX_PROCESOS; ranura++) {
+        for (int ranura = 0; ranura < getRanuras(); ranura++) {
             if (leer(direccionBCP(ranura), CampoBCP.PID).isEmpty()) {
                 return ranura;
             }

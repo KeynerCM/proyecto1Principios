@@ -25,7 +25,8 @@ class ListaProcesosTest {
 
     @BeforeEach
     void preparar() {
-        memoria = new Memoria(256, TablaBCP.TAMANO_KERNEL);
+        memoria = new Memoria(256, TablaBCP.calcularKernel(256,
+                TablaBCP.PORCENTAJE_KERNEL_POR_DEFECTO));
         tabla = new TablaBCP(memoria);
         lista = new ListaProcesos(tabla);
         p1 = tabla.crear(1, "a.asm", 130, 2, 0);

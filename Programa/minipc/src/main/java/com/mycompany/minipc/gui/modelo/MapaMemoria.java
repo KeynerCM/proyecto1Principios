@@ -69,8 +69,8 @@ public class MapaMemoria {
         }
         if (memoria.esDireccionKernel(direccion)) {
             int ranura = TablaBCP.ranuraDe(direccion);
-            if (ranura < 0 || tabla.leer(TablaBCP.direccionBCP(ranura),
-                    CampoBCP.PID).isEmpty()) {
+            if (ranura < 0 || ranura >= tabla.getRanuras()
+                    || tabla.leer(TablaBCP.direccionBCP(ranura), CampoBCP.PID).isEmpty()) {
                 return NINGUNA;
             }
             return ranura;
