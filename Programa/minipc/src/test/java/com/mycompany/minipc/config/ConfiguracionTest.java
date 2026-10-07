@@ -28,7 +28,7 @@ class ConfiguracionTest {
     }
 
     @Test
-    @DisplayName("Los valores por defecto son los del enunciado")
+    @DisplayName("Los valores por defecto son memoria 256, disco 512 y memoria virtual 64")
     void valoresPorDefecto() {
         Configuracion c = Configuracion.porDefecto();
         assertEquals(256, c.getTamanoMemoria());

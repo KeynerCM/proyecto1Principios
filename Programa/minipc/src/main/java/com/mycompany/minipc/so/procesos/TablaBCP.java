@@ -139,7 +139,7 @@ public class TablaBCP {
      *          direccion no es del kernel
      * Restricciones: ninguna
      * Descripcion: lo usa la tabla de memoria para mostrar donde y como quedo
-     *              guardado cada BCP, como pide el enunciado.
+     *              guardado cada BCP.
      */
     public String describir(int direccion) {
         if (direccion >= 0 && direccion < TAMANO_CABECERA) {

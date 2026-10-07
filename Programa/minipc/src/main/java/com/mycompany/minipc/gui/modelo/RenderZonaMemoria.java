@@ -15,12 +15,11 @@ import java.awt.Font;
  * Salidas: el componente ya pintado que la tabla dibuja en cada celda
  * Restricciones: solo tiene sentido aplicado a la tabla de memoria, porque
  *                supone que la fila coincide con la direccion
- * Descripcion: pinta la tabla de memoria distinguiendo las zonas. La
- *              cabecera del sistema operativo va en gris; cada ranura de BCP
- *              tiene un color, y el programa del mismo proceso en la zona de
- *              usuario va en una version mas clara de ese color. Asi se ve
- *              donde y como quedo guardado cada proceso, como pide el
- *              enunciado.
+ * Descripcion: pinta la tabla de memoria distinguiendo las zonas. La cabecera
+ *              del sistema operativo va en gris; cada ranura de BCP tiene un
+ *              color, y el programa del mismo proceso en la zona de usuario va
+ *              en una version mas clara de ese color. Asi se ve donde y como
+ *              quedo guardado cada proceso.
  */
 public class RenderZonaMemoria extends DefaultTableCellRenderer {
 

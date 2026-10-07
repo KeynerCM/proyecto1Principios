@@ -4,7 +4,7 @@ package com.mycompany.minipc.isa;
  * Nombre: Interrupcion
  * Entradas: no aplica, es una enumeracion de valores fijos
  * Salidas: no aplica
- * Restricciones: los codigos y pesos son los del enunciado
+ * Restricciones: los codigos y los pesos son fijos
  * Descripcion: los servicios que un programa puede pedir al sistema operativo
  *              con la instruccion INT. Cada uno tiene su propio peso, es
  *              decir, los segundos de CPU que consume. La entrada de teclado

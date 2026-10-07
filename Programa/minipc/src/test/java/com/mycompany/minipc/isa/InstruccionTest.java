@@ -67,7 +67,7 @@ class InstruccionTest {
     }
 
     @Test
-    @DisplayName("Los pesos son los del enunciado")
+    @DisplayName("Cada instruccion tiene el peso esperado")
     void pesos() {
         assertEquals(2, OpCode.LOAD.getPeso());
         assertEquals(2, OpCode.STORE.getPeso());

@@ -21,9 +21,9 @@ import com.mycompany.minipc.so.procesos.Proceso;
  * Restricciones: un error (archivo inexistente, archivo sin abrir, servicio
  *                desconocido) es una EjecucionException: el proceso termina
  *                con ese error
- * Descripcion: atiende INT 21H, el manejo de archivos del enunciado. AH elige
- *              el servicio, DX apunta al nombre del archivo y AL lleva el
- *              byte que se lee o se escribe:
+ * Descripcion: atiende INT 21H, el manejo de archivos. AH elige el servicio, DX
+ *              apunta al nombre del archivo y AL lleva el byte que se lee o se
+ *              escribe:
  *
  *                AH = 3Ch  crear      AH = 3Dh  abrir     AH = 4Dh  leer
  *                AH = 40h  escribir   AH = 41h  eliminar
@@ -109,10 +109,9 @@ public class SistemaArchivos {
      *                nombre lanza EjecucionException
      * Descripcion: DX guarda el desplazamiento del nombre dentro del programa,
      *              que es la celda de la instruccion MOV DX, "nombre". La
-     *              direccion real es base + DX, como en el hardware de
-     *              reubicacion del libro: primero se compara DX con el alcance
-     *              y despues se suma la base. Asi un proceso no puede leer
-     *              datos de otro ni del kernel.
+     *              direccion real es base + DX: primero se compara DX con el
+     *              alcance y despues se suma la base. Asi un proceso no puede
+     *              leer datos de otro ni del kernel.
      */
     private String nombreApuntadoPorDx(Procesador cpu) {
         int dx = cpu.getRegistros().leer(RegistroID.DX);

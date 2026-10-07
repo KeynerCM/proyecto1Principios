@@ -10,10 +10,9 @@ import com.mycompany.minipc.so.procesos.Proceso;
  * Salidas: no aplica
  * Restricciones: no es expropiativo: el proceso usa la CPU hasta terminar o
  *                bloquearse
- * Descripcion: First Come First Served. Stallings (seccion 9.2): "the process
- *              that has been in the ready queue the longest is selected". La
- *              cola de listos llega en orden de llegada, asi que el elegido
- *              es el primero. La prioridad del BCP no se usa.
+ * Descripcion: First Come First Served: elige al proceso que lleva mas tiempo
+ *              en la cola de listos. La cola llega en orden de llegada, asi que
+ *              el elegido es el primero. La prioridad del BCP no se usa.
  */
 public class FCFS implements AlgoritmoPlanificacion {
 

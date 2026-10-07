@@ -20,8 +20,8 @@ import com.mycompany.minipc.excepciones.DiscoException;
  *                inicioVirtual .. fin     memoria virtual (intercambio)
  *
  *              Igual que la memoria, el disco es un arreglo de texto. El
- *              indice vive en las primeras posiciones del propio disco, como
- *              pide el enunciado: cada entrada ocupa una celda con el texto
+ *              indice vive en las primeras posiciones del propio disco: cada
+ *              entrada ocupa una celda con el texto
  *              "nombre|inicio|tamano". No hay una copia aparte del indice;
  *              buscar un archivo es recorrer esas celdas. Los archivos se
  *              guardan de forma contigua, una linea por posicion, con la
@@ -61,7 +61,7 @@ public class Disco {
      * Salidas: el disco construido con la configuracion por defecto
      * Restricciones: ninguna
      * Descripcion: crea un disco de 512 posiciones con 64 de memoria virtual,
-     *              que son los valores por defecto del enunciado.
+     *              los valores por defecto.
      */
     public Disco() {
         this(TAMANO_POR_DEFECTO, MEMORIA_VIRTUAL_POR_DEFECTO);

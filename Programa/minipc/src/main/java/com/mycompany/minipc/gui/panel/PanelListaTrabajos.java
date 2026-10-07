@@ -22,12 +22,11 @@ import com.mycompany.minipc.so.trabajos.ListaTrabajos;
 /**
  * Nombre: PanelListaTrabajos
  * Entradas: el modelo de la tabla de la lista de trabajos
- * Salidas: la tabla "Procesos / Estados" de la maqueta
+ * Salidas: la tabla de trabajos con su estado
  * Restricciones: solo muestra; no cambia ningun trabajo
- * Descripcion: la lista de trabajos con el estado de cada uno, en color.
- *              Cuando un trabajo cambia de estado, su fila destella un momento
- *              para que el cambio se note, como pide el enunciado: "visualizar
- *              la lista de trabajos y su estado, y como va cambiando".
+ * Descripcion: la lista de trabajos con el estado de cada uno, en color. Cuando
+ *              un trabajo cambia de estado, su fila destella un momento para
+ *              que el cambio se note durante la ejecucion.
  */
 public class PanelListaTrabajos extends JPanel {
 

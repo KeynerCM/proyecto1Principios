@@ -15,13 +15,12 @@ import com.mycompany.minipc.so.procesos.TablaBCP;
  * Salidas: no aplica
  * Restricciones: no elige a quien darle la CPU; eso lo decide el planificador
  *                de procesos
- * Descripcion: el "Despachador" del enunciado: le quita la CPU a un proceso y
- *              se la da a otro. Sigue los pasos del cambio de proceso de
- *              Stallings (seccion 3.4): al sacar un proceso guarda su contexto
- *              en el BCP, actualiza su estado y lo mueve a la cola que
- *              corresponde; al darle la CPU a otro, actualiza su estado, carga
- *              sus registros base y alcance y restaura su contexto desde el
- *              BCP en la memoria del kernel. Cada paso queda en la bitacora.
+ * Descripcion: el despachador: le quita la CPU a un proceso y se la da a otro.
+ *              Al sacar un proceso guarda su contexto en el BCP, actualiza su
+ *              estado y lo mueve a la cola que corresponde; al darle la CPU a
+ *              otro, actualiza su estado, carga sus registros base y alcance y
+ *              restaura su contexto desde el BCP en la memoria del kernel. Cada
+ *              paso queda en la bitacora.
  */
 public class Despachador {
 

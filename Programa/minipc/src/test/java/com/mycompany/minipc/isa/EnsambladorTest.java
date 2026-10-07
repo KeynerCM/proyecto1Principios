@@ -16,7 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * Pruebas del ensamblador.
  *
- * La prueba central reproduce el programa de ejemplo del enunciado y
+ * La prueba central reproduce el programa de ejemplo y
  * verifica que las siete lineas den la operacion, el registro y el operando
  * esperados.
  */
@@ -29,8 +29,8 @@ class EnsambladorTest {
         ensamblador = new Ensamblador();
     }
 
-    /** Las siete lineas del archivo de ejemplo del enunciado. */
-    private static List<String> programaDelEnunciado() {
+    /** Las siete lineas del archivo de ejemplo (file.asm). */
+    private static List<String> programaDeEjemplo() {
         return List.of(
                 "MOV AX, 5",
                 "MOV BX, 3",
@@ -42,9 +42,9 @@ class EnsambladorTest {
     }
 
     @Test
-    @DisplayName("El programa del enunciado produce las siete instrucciones esperadas")
-    void ensamblaElProgramaDelEnunciado() throws SintaxisException {
-        List<Instruccion> programa = ensamblador.ensamblar(programaDelEnunciado());
+    @DisplayName("El programa de ejemplo produce las siete instrucciones esperadas")
+    void ensamblaElProgramaDeEjemplo() throws SintaxisException {
+        List<Instruccion> programa = ensamblador.ensamblar(programaDeEjemplo());
 
         assertEquals(7, programa.size());
         verificar(programa.get(0), OpCode.MOV, RegistroID.AX, 5);
@@ -66,7 +66,7 @@ class EnsambladorTest {
     @Test
     @DisplayName("Cada instruccion recuerda su numero de linea en el archivo")
     void conservaElNumeroDeLinea() throws SintaxisException {
-        List<Instruccion> programa = ensamblador.ensamblar(programaDelEnunciado());
+        List<Instruccion> programa = ensamblador.ensamblar(programaDeEjemplo());
         for (int i = 0; i < programa.size(); i++) {
             assertEquals(i + 1, programa.get(i).getNumeroLinea());
         }
@@ -106,7 +106,7 @@ class EnsambladorTest {
     }
 
     @Test
-    @DisplayName("El archivo de errores del enunciado reporta los tres problemas juntos")
+    @DisplayName("Un archivo con tres errores los reporta juntos")
     void reportaTodosLosErroresDeUnaVez() {
         SintaxisException e = assertThrows(SintaxisException.class,
                 () -> ensamblador.ensamblar(List.of(

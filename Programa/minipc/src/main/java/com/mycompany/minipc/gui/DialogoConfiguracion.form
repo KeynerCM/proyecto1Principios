@@ -52,7 +52,7 @@
         </Component>
         <Component class="javax.swing.JSpinner" name="spnTamano">
           <Properties>
-            <Property name="toolTipText" type="java.lang.String" value="Cantidad total de posiciones. El enunciado exige un minimo de 128"/>
+            <Property name="toolTipText" type="java.lang.String" value="Cantidad total de posiciones. Minimo 160: 128 del kernel y 32 para programas"/>
           </Properties>
           <Events>
             <EventHandler event="stateChanged" listener="javax.swing.event.ChangeListener" parameters="javax.swing.event.ChangeEvent" handler="spnTamanoStateChanged"/>

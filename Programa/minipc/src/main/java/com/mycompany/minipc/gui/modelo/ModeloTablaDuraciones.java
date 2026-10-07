@@ -14,12 +14,11 @@ import com.mycompany.minipc.so.trabajos.Trabajo;
  * Entradas: los trabajos de la lista de trabajos
  * Salidas: una fila por trabajo con sus tiempos
  * Restricciones: toma una foto de los trabajos al construirse
- * Descripcion: la tabla de estadisticas que pide el enunciado: "Proceso,
- *              hora:minuto de inicio, hora:minuto final y duracion en
- *              segundos". Todo se mide con el reloj simulado, donde cada
- *              segundo es una unidad de peso (seccion 9.9 del plan). Ademas
- *              muestra el tiempo de CPU (la suma de los pesos que ejecuto) y
- *              la espera, que es la diferencia: el tiempo que paso en la cola,
+ * Descripcion: la tabla de estadisticas: proceso, hora:minuto de inicio,
+ *              hora:minuto final y duracion en segundos. Todo se mide con el
+ *              reloj simulado, donde cada segundo es una unidad de peso. Ademas
+ *              muestra el tiempo de CPU (la suma de los pesos que ejecuto) y la
+ *              espera, que es la diferencia: el tiempo que paso en la cola,
  *              esperando el teclado o suspendido.
  */
 public class ModeloTablaDuraciones extends AbstractTableModel {

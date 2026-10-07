@@ -18,7 +18,7 @@ import com.mycompany.minipc.gui.Tema;
  * Nombre: PanelPantalla
  * Entradas: las lineas de la pantalla del Mini PC y quien recibe lo que se
  *           escribe en el teclado
- * Salidas: la "Pantalla" de la maqueta, con la linea de teclado abajo
+ * Salidas: la pantalla del Mini PC, con la linea de teclado abajo
  * Restricciones: el teclado solo se habilita cuando un proceso ejecuto
  *                INT 09H
  * Descripcion: la pantalla es de fondo oscuro con letra de ancho fijo, como

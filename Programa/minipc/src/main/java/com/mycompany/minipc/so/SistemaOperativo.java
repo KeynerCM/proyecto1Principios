@@ -199,9 +199,9 @@ public class SistemaOperativo {
         planificadorTrabajos.admitir(reloj);
         Proceso actual = tabla.getEnEjecucion();
         if (actual == null) {
-            // Proyecto 1 (indicacion del profesor): mientras un proceso espera
-            // el teclado, la CPU lo espera a el y no pasa a otro proceso. Los
-            // procesos se ejecutan de uno en uno, en orden de llegada.
+            // Mientras un proceso espera el teclado, la CPU lo espera a el y
+            // no pasa a otro proceso. Los procesos se ejecutan de uno en uno,
+            // en orden de llegada.
             if (interrupciones.hayEsperaTeclado()) {
                 return tickOcioso();
             }

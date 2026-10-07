@@ -17,13 +17,13 @@ import com.mycompany.minipc.isa.RegistroID;
  * Restricciones: es solo hardware: no conoce procesos, BCP ni estados. El
  *                sistema operativo le carga un contexto (registros, base y
  *                alcance) antes de ejecutar y se lo lleva al BCP despues
- * Descripcion: la CPU del Mini PC. Implementa el ciclo de instruccion: traer
- *              la instruccion que apunta el PC (fetch) e interpretarla y
+ * Descripcion: la CPU del Mini PC. Implementa el ciclo de instruccion: traer la
+ *              instruccion que apunta el PC (fetch) e interpretarla y
  *              ejecutarla (execute). La memoria guarda cada instruccion como
  *              texto; el IR recibe ese texto y la CPU lo decodifica antes de
- *              ejecutarlo. Los registros base y alcance delimitan la region
- *              del proceso en ejecucion: un salto fuera de ella es una
- *              interrupcion de programa (Stallings, figura 7.8).
+ *              ejecutarlo. Los registros base y alcance delimitan la region del
+ *              proceso en ejecucion: un salto o un PC fuera de ella es un error
+ *              que termina el proceso.
  */
 public class Procesador {
 
@@ -73,9 +73,8 @@ public class Procesador {
     private int ac;
 
     /**
-     * Bandera de cero: resultado de la ultima comparacion CMP. Es el codigo
-     * de condicion que Stallings ubica en la palabra de estado (PSW) y que
-     * consultan JE y JNE.
+     * Bandera de cero: resultado de la ultima comparacion CMP. La consultan
+     * JE y JNE.
      */
     private boolean zf;
 
@@ -121,12 +120,12 @@ public class Procesador {
      *                instruccion provoca un error, que es una interrupcion de
      *                programa que atiende el sistema operativo
      * Descripcion: un segundo de CPU. Cada instruccion dura tantos segundos
-     *              como su peso: en el primero se hace el fetch (el texto de
-     *              la celda del PC pasa al IR, se decodifica y el PC avanza,
-     *              como en el libro) y en el ultimo se aplica su efecto. Asi
-     *              ADD, de peso 3, necesita tres llamadas. INT 09H tiene peso
-     *              variable: dura un segundo y despues el proceso espera al
-     *              teclado, cosa que decide el sistema operativo.
+     *              como su peso: en el primero se hace el fetch (el texto de la
+     *              celda del PC pasa al IR, se decodifica y el PC avanza) y en
+     *              el ultimo se aplica su efecto. Asi ADD, de peso 3, necesita
+     *              tres llamadas. INT 09H tiene peso variable: dura un segundo
+     *              y despues el proceso espera al teclado, cosa que decide el
+     *              sistema operativo.
      */
     public Resultado paso() {
         if (alcance <= 0) {
@@ -304,8 +303,8 @@ public class Procesador {
      *           decrementar
      * Salidas: ninguna
      * Restricciones: ninguna
-     * Descripcion: sin operandos actua sobre el AC; con un registro, sobre
-     *              ese registro, como pide el enunciado.
+     * Descripcion: sin operandos actua sobre el AC; con un registro, sobre ese
+     *              registro.
      */
     private void sumarUno(Instruccion instruccion, int delta) {
         if (instruccion.getForma() == Forma.SIN_OPERANDOS) {
@@ -324,11 +323,10 @@ public class Procesador {
      *                de la region del proceso
      * Descripcion: el desplazamiento se suma al PC, que ya apunta a la
      *              instruccion siguiente porque avanzo en la etapa de fetch.
-     *              Antes de saltar se compara el destino con la direccion
-     *              base y el limite del proceso, como hace el hardware de
-     *              reubicacion del libro (Stallings, figura 7.8): un salto
-     *              fuera de la region genera una interrupcion hacia el
-     *              sistema operativo.
+     *              Antes de saltar se compara el destino con la direccion base
+     *              y el limite del proceso: un salto fuera de la region es un
+     *              error que el sistema operativo atiende terminando el
+     *              proceso.
      */
     private void saltar(Instruccion instruccion) {
         int destino = pc + instruccion.getValor(0);
@@ -367,11 +365,10 @@ public class Procesador {
      * Entradas: instruccion, INT con su codigo
      * Salidas: ninguna
      * Restricciones: la CPU no atiende el servicio: solo lo anota
-     * Descripcion: INT es una llamada al sistema (Stallings, tabla 3.8, "supervisor
-     *              call"): la CPU deja anotado que servicio se pidio y paso()
-     *              devuelve LLAMADA_SISTEMA para que lo atienda el sistema
-     *              operativo, que es quien maneja la pantalla, el teclado, los
-     *              archivos y el fin del programa.
+     * Descripcion: INT es una llamada al sistema: la CPU deja anotado que
+     *              servicio se pidio y paso() devuelve LLAMADA_SISTEMA para que
+     *              lo atienda el sistema operativo, que es quien maneja la
+     *              pantalla, el teclado, los archivos y el fin del programa.
      */
     private void interrumpir(Instruccion instruccion) {
         interrupcionPendiente = instruccion.getInterrupcion();

@@ -51,8 +51,7 @@ import com.mycompany.minipc.so.procesos.TablaBCP;
  * Salidas: no aplica
  * Restricciones: solo dibuja; toda la logica la coordina el controlador, que
  *                le habla a traves de VistaPrincipal
- * Descripcion: la ventana del Gestor de Procesos, segun la maqueta de la
- *              pagina 8 del enunciado y la seccion 8 del plan:
+ * Descripcion: la ventana del Gestor de Procesos:
  *
  *                barra de titulo  nombre, reloj simulado, algoritmo y CPU
  *                menu y barra     Cargar archivos | Ejecutar, Siguiente,
@@ -293,8 +292,8 @@ public class VentanaPrincipal extends javax.swing.JFrame implements VistaPrincip
      * Entradas: ninguna
      * Salidas: el menu Archivo, Ejecucion, Configuracion y Ayuda
      * Restricciones: ninguna
-     * Descripcion: el enunciado pide un menu o medio de configuracion; el
-     *              menu repite las acciones de los botones con atajos.
+     * Descripcion: el menu repite las acciones de los botones, con atajos de
+     *              teclado, y da acceso a la configuracion.
      */
     private JMenuBar crearMenu() {
         JMenuBar barra = new JMenuBar();

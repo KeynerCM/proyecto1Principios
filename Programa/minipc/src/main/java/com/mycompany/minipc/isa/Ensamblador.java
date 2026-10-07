@@ -101,9 +101,9 @@ public class Ensamblador {
      * Descripcion: comprueba que el destino de cada JMP, JE y JNE quede dentro
      *              del programa. El desplazamiento se cuenta desde la
      *              instruccion siguiente, porque el PC ya avanzo al traer la
-     *              instruccion (Stallings, seccion 1.3). Salir del programa
-     *              es el desbordamiento que pide controlar el enunciado; el
-     *              procesador lo vuelve a revisar al ejecutar.
+     *              instruccion. Un salto que sale del programa es un
+     *              desbordamiento; el procesador lo vuelve a revisar al
+     *              ejecutar.
      */
     private void validarSaltos(List<Instruccion> programa, List<String> errores) {
         for (int i = 0; i < programa.size(); i++) {

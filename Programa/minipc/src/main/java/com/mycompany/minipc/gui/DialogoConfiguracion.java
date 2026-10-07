@@ -73,8 +73,8 @@ public class DialogoConfiguracion extends javax.swing.JDialog {
         spnVelocidad.setModel(new SpinnerNumberModel(actual.getMsPorSegundo(),
                 Configuracion.MS_POR_SEGUNDO_MINIMO, Configuracion.MS_POR_SEGUNDO_MAXIMO, 50));
 
-        // El algoritmo se elige de los que conoce la fabrica; en este proyecto
-        // solo FCFS, y en el proyecto 2 apareceran los demas sin tocar esto.
+        // El algoritmo se elige de los que conoce la fabrica: si se agrega uno
+        // nuevo, aparece aqui sin tocar este codigo.
         cmbAlgoritmo = new JComboBox<>(FabricaAlgoritmos.disponibles().toArray(new String[0]));
         cmbAlgoritmo.setSelectedItem(actual.getAlgoritmo());
         cmbAlgoritmo.setToolTipText("Algoritmo de planificacion de procesos");
@@ -214,7 +214,7 @@ public class DialogoConfiguracion extends javax.swing.JDialog {
         lblTamano.setText("Tamano de memoria:");
         pnlParametros.add(lblTamano);
 
-        spnTamano.setToolTipText("Cantidad total de posiciones. El enunciado exige un minimo de 128");
+        spnTamano.setToolTipText("Cantidad total de posiciones. Minimo 160: 128 del kernel y 32 para programas");
         spnTamano.addChangeListener(new javax.swing.event.ChangeListener() {
             public void stateChanged(javax.swing.event.ChangeEvent evt) {
                 spnTamanoStateChanged(evt);

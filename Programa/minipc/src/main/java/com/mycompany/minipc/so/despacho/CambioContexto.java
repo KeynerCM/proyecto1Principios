@@ -12,11 +12,10 @@ import com.mycompany.minipc.so.procesos.Proceso;
  * Entradas: la CPU y el proceso cuyo BCP se lee o se escribe
  * Salidas: no aplica
  * Restricciones: no decide nada: solo copia registros entre la CPU y el BCP
- * Descripcion: el "cambio de contexto" del enunciado. El contexto de un
- *              proceso es lo que la CPU necesita para continuarlo donde quedo:
- *              PC, IR, AC, AX a DX, la bandera ZF y la pila (Stallings,
- *              figuras 1.10 y 1.11). Guardar copia esos registros de la CPU a
- *              las celdas del BCP en memoria; restaurar hace lo contrario y
+ * Descripcion: el cambio de contexto. El contexto de un proceso es lo que la
+ *              CPU necesita para continuarlo donde quedo: PC, IR, AC, AX a DX,
+ *              la bandera ZF y la pila. Guardar copia esos registros de la CPU
+ *              a las celdas del BCP en memoria; restaurar hace lo contrario y
  *              ademas carga los registros base y alcance del proceso.
  */
 public class CambioContexto {

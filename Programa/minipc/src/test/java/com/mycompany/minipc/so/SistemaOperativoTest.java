@@ -314,7 +314,7 @@ class SistemaOperativoTest {
     }
 
     @Test
-    @DisplayName("La fabrica solo conoce FCFS en este proyecto")
+    @DisplayName("La fabrica solo conoce FCFS")
     void fabricaDeAlgoritmos() {
         assertEquals("FCFS", FabricaAlgoritmos.crear("fcfs").getNombre());
         assertThrows(IllegalArgumentException.class, () -> FabricaAlgoritmos.crear("RR"));

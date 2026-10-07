@@ -18,8 +18,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Pruebas del intercambio entre la memoria principal y la memoria virtual.
- * En el Proyecto 1 solo se trae a los suspendidos; suspender a un proceso en
- * espera queda listo para el Proyecto 2 y se prueba aqui directamente.
+ * Durante la ejecucion solo se trae a los suspendidos; suspender a un
+ * proceso en espera se prueba aqui directamente.
  */
 class IntercambioTest {
 
@@ -71,7 +71,7 @@ class IntercambioTest {
     }
 
     @Test
-    @DisplayName("equilibrar no suspende a un proceso EN_ESPERA en el Proyecto 1")
+    @DisplayName("equilibrar no suspende a un proceso EN_ESPERA")
     void equilibrarNoSuspende() {
         Proceso p = crear(1, 30);
         p.setEstado(EstadoProceso.EN_ESPERA);

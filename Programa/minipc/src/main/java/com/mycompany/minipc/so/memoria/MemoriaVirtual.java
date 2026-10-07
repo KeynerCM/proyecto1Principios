@@ -11,13 +11,13 @@ import com.mycompany.minipc.hardware.Disco;
  * Salidas: no aplica
  * Restricciones: solo usa el area de memoria virtual del disco; el indice y
  *                los archivos no se tocan
- * Descripcion: administra el area de intercambio (swap) del disco, la
- *              "extension de la memoria principal" que describe Stallings
- *              (seccion 1.5). Funciona igual que el GestorMemoria pero sobre
- *              el disco: cada imagen de proceso ocupa un bloque contiguo,
- *              ubicado con primer ajuste, y una celda libre es una celda
- *              vacia. Las imagenes no tienen entrada en el indice porque no
- *              son archivos: el BCP del proceso guarda donde quedo (BASE).
+ * Descripcion: administra el area de intercambio (swap) del disco, donde se
+ *              guardan los programas que no caben en la memoria principal.
+ *              Funciona igual que el GestorMemoria pero sobre el disco: cada
+ *              imagen de proceso ocupa un bloque contiguo, ubicado con primer
+ *              ajuste, y una celda libre es una celda vacia. Las imagenes no
+ *              tienen entrada en el indice porque no son archivos: el BCP del
+ *              proceso guarda donde quedo (BASE).
  */
 public class MemoriaVirtual {
 

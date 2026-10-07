@@ -6,10 +6,10 @@ package com.mycompany.minipc.so.procesos;
  * Salidas: no aplica
  * Restricciones: el BCP guarda el nombre del estado como texto en su celda,
  *                asi que los nombres no deben cambiar
- * Descripcion: los siete estados del enunciado, que son los del modelo de
- *              siete estados de Stallings (seccion 3.2, figura 3.9b). El
- *              "suspendido" del enunciado se parte en dos, segun el proceso
- *              este esperando un evento o no:
+ * Descripcion: los siete estados de un proceso. Hay dos estados suspendidos,
+ *              segun el proceso este esperando un evento o no; en los dos su
+ *              programa esta en la memoria virtual del disco. Al lado, el
+ *              nombre en ingles de cada estado:
  *
  *                NUEVO                 New
  *                PREPARADO             Ready

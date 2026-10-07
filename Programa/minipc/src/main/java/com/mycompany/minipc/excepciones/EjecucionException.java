@@ -7,12 +7,11 @@ package com.mycompany.minipc.excepciones;
  * Restricciones: es una excepcion no verificada, porque se origina en medio
  *                del ciclo de instruccion, dentro de Procesador.paso(), cuyo
  *                contrato no declara excepciones
- * Descripcion: error de un programa en ejecucion, lo que Stallings llama una
- *              interrupcion de programa o trap (tabla 1.1 y tabla 3.8): una
- *              condicion causada por la propia instruccion, como un salto
- *              fuera del programa o una pila desbordada. El procesador deja
- *              el proceso en BLOQUEADO_ERROR y el controlador de la interfaz
- *              la atrapa para informar al usuario.
+ * Descripcion: error de un programa en ejecucion (interrupcion de programa o
+ *              trap): una condicion causada por la propia instruccion, como un
+ *              salto fuera del programa o una pila desbordada. El sistema
+ *              operativo la atrapa, termina ese proceso como FINALIZADO con el
+ *              mensaje de error y los demas siguen.
  */
 public class EjecucionException extends RuntimeException {
 

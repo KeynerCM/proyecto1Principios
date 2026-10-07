@@ -36,7 +36,7 @@ class DiscoTest {
     }
 
     @Test
-    @DisplayName("La configuracion por defecto es la del enunciado")
+    @DisplayName("La configuracion por defecto es de 512 posiciones con 64 de memoria virtual")
     void configuracionPorDefecto() {
         assertEquals(512, disco.getTamano());
         assertEquals(64, disco.getTamanoMemoriaVirtual());

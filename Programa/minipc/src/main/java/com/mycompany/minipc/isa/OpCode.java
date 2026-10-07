@@ -6,7 +6,7 @@ import java.util.List;
  * Nombre: OpCode
  * Entradas: no aplica, es una enumeracion de valores fijos
  * Salidas: no aplica
- * Restricciones: los pesos son los del enunciado
+ * Restricciones: los pesos son fijos
  * Descripcion: juego de instrucciones del Mini PC. Cada operacion declara su
  *              peso, es decir, cuantos segundos de CPU consume, y las formas
  *              en que se pueden escribir sus operandos. El ensamblador solo

@@ -9,14 +9,13 @@ import java.util.List;
  * Salidas: no aplica
  * Restricciones: no guarda los procesos en una coleccion de Java; la lista
  *                existe solo en memoria, en los enlaces entre BCP
- * Descripcion: la "Estructura de Lista de Proceso" del enunciado. Es una lista
- *              enlazada: la cabecera del sistema operativo guarda la direccion
- *              del primer BCP y cada BCP guarda en su campo SIGUIENTE la
- *              direccion del que sigue. Recorrerla es seguir esas direcciones
- *              en memoria. El orden es el de llegada a la lista, y un proceso
- *              que vuelve a quedar PREPARADO pasa al final, de modo que el
- *              orden de los PREPARADO es el de llegada a la cola de listos
- *              que usa FCFS.
+ * Descripcion: la lista de procesos admitidos. Es una lista enlazada: la
+ *              cabecera del sistema operativo guarda la direccion del primer
+ *              BCP y cada BCP guarda en su campo SIGUIENTE la direccion del que
+ *              sigue. Recorrerla es seguir esas direcciones en memoria. El
+ *              orden es el de llegada a la lista, y un proceso que vuelve a
+ *              quedar PREPARADO pasa al final, de modo que el orden de los
+ *              PREPARADO es el de llegada a la cola de listos que usa FCFS.
  */
 public class ListaProcesos {
 

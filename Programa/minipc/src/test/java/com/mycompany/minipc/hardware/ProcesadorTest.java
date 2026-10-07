@@ -23,7 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Pruebas del ciclo de instruccion de la CPU como hardware: se le carga un
  * programa en memoria y sus registros base y alcance, sin sistema operativo.
  *
- * La prueba central recorre el programa de ejemplo del enunciado paso a
+ * La prueba central recorre el programa de ejemplo paso a
  * paso y compara AC, AX y BX contra la tabla de la lamina 6.
  */
 class ProcesadorTest {
@@ -87,8 +87,8 @@ class ProcesadorTest {
     }
 
     @Test
-    @DisplayName("El programa del enunciado reproduce la tabla AC, AX, BX paso a paso")
-    void reproduceLaTablaDelEnunciado() throws Exception {
+    @DisplayName("El programa de ejemplo reproduce la tabla AC, AX, BX paso a paso")
+    void reproduceLaTablaPasoAPaso() throws Exception {
         cargarEjemplo();
 
         // Estados esperados despues de cada instruccion: {AC, AX, BX}

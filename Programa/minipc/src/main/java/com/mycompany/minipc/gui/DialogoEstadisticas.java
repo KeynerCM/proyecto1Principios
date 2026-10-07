@@ -23,12 +23,11 @@ import com.mycompany.minipc.so.trabajos.Trabajo;
  * Salidas: la presentacion en pantalla de las estadisticas de la ejecucion
  * Restricciones: toma una foto de los datos al abrirse; si la ejecucion
  *                continua despues, hay que volver a abrirlo para verla
- * Descripcion: las estadisticas que pide el enunciado al final de la
- *              ejecucion: por cada proceso, su hora de inicio, su hora final
- *              y su duracion en segundos, medidas con el reloj simulado (un
- *              segundo por unidad de peso, como lo confirmo el profesor).
- *              Arriba va un resumen (trabajos, reloj, uso de la CPU y de la
- *              memoria) y abajo los contadores de la CPU.
+ * Descripcion: las estadisticas al final de la ejecucion: por cada proceso, su
+ *              hora de inicio, su hora final y su duracion en segundos, medidas
+ *              con el reloj simulado (un segundo por unidad de peso). Arriba va
+ *              un resumen (trabajos, reloj, uso de la CPU y de la memoria) y
+ *              abajo los contadores de la CPU.
  */
 public class DialogoEstadisticas extends javax.swing.JDialog {
 

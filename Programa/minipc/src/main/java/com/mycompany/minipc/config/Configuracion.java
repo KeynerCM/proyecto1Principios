@@ -17,12 +17,11 @@ import com.mycompany.minipc.so.planificacion.FabricaAlgoritmos;
  * Salidas: no aplica
  * Restricciones: es inmutable; si el objeto existe, todos sus valores son
  *                validos
- * Descripcion: parametros de la minicomputadora que el enunciado pide que no
- *              queden en el codigo, sino en un archivo externo. La lectura y
- *              escritura de ese archivo la hace LectorConfiguracion; esta
- *              clase solo guarda los valores y verifica que sean coherentes.
- *              El tamano del kernel no esta aqui porque no se configura: lo
- *              calcula la tabla de BCP.
+ * Descripcion: parametros de la minicomputadora, que se guardan en un archivo
+ *              externo y no en el codigo. La lectura y escritura de ese archivo
+ *              la hace LectorConfiguracion; esta clase solo guarda los valores
+ *              y verifica que sean coherentes. El tamano del kernel no esta
+ *              aqui porque no se configura: lo calcula la tabla de BCP.
  */
 public final class Configuracion {
 
@@ -86,7 +85,7 @@ public final class Configuracion {
     /**
      * Nombre: porDefecto
      * Entradas: ninguna
-     * Salidas: la configuracion con los valores por defecto del enunciado
+     * Salidas: la configuracion con los valores por defecto
      * Restricciones: ninguna
      * Descripcion: memoria de 256, disco de 512 con 64 de memoria virtual,
      *              un segundo real por segundo de CPU y FCFS. Es la que se

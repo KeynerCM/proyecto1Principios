@@ -22,12 +22,12 @@ import com.mycompany.minipc.so.procesos.TablaBCP;
  * Restricciones: el archivo es de texto en formato clave=valor (properties);
  *                las lineas que empiezan con # son comentarios
  * Descripcion: lee y escribe el archivo externo con los parametros de la
- *              minicomputadora, que es lo que pide el enunciado para que la
- *              configuracion no quede en el codigo. Si el archivo no existe,
- *              lo crea con los valores por defecto para que el usuario tenga
- *              un punto de partida que editar. Una clave ausente toma su
- *              valor por defecto; un valor que no es numero o que queda fuera
- *              de rango se reporta, y se reportan todos juntos.
+ *              minicomputadora, para que la configuracion no quede en el
+ *              codigo. Si el archivo no existe, lo crea con los valores por
+ *              defecto para que el usuario tenga un punto de partida que
+ *              editar. Una clave ausente toma su valor por defecto; un valor
+ *              que no es numero o que queda fuera de rango se reporta, y se
+ *              reportan todos juntos.
  */
 public class LectorConfiguracion {
 

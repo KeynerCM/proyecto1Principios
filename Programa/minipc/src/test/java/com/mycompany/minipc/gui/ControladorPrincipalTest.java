@@ -186,7 +186,7 @@ class ControladorPrincipalTest {
         return archivo.toFile();
     }
 
-    private File ejemploDelEnunciado(Path carpeta) throws IOException {
+    private File programaDeEjemplo(Path carpeta) throws IOException {
         return crearAsm(carpeta, "file.asm",
                 "MOV AX, 5\nMOV BX, 3\nLOAD AX\nADD BX\nSUB AX\nSTORE AX\nMOV BX, -8\n");
     }
@@ -217,7 +217,7 @@ class ControladorPrincipalTest {
     @Test
     @DisplayName("Cargar un archivo valido lo deja en la lista de trabajos y admitido")
     void cargaUnProgramaValido(@TempDir Path carpeta) throws Exception {
-        vista.entregar(ejemploDelEnunciado(carpeta));
+        vista.entregar(programaDeEjemplo(carpeta));
 
         controlador.alCargarArchivos();
 
@@ -235,7 +235,7 @@ class ControladorPrincipalTest {
     @Test
     @DisplayName("El programa cargado queda guardado en el disco y en su indice")
     void elProgramaQuedaEnElDisco(@TempDir Path carpeta) throws Exception {
-        vista.entregar(ejemploDelEnunciado(carpeta));
+        vista.entregar(programaDeEjemplo(carpeta));
 
         controlador.alCargarArchivos();
 
@@ -291,7 +291,7 @@ class ControladorPrincipalTest {
     @Test
     @DisplayName("Cargar dos veces el mismo archivo guarda una copia numerada")
     void mismoArchivoDosVeces(@TempDir Path carpeta) throws Exception {
-        File archivo = ejemploDelEnunciado(carpeta);
+        File archivo = programaDeEjemplo(carpeta);
         vista.entregar(archivo, archivo);
 
         controlador.alCargarArchivos();
@@ -369,7 +369,7 @@ class ControladorPrincipalTest {
     @Test
     @DisplayName("Siguiente despacha el proceso, ejecuta un segundo y mueve el resaltado")
     void pasoAPasoAvanza(@TempDir Path carpeta) throws Exception {
-        vista.entregar(ejemploDelEnunciado(carpeta));
+        vista.entregar(programaDeEjemplo(carpeta));
         controlador.alCargarArchivos();
         assertEquals(-1, vista.filaResaltada, "Todavia no hay proceso en la CPU");
 
@@ -390,9 +390,9 @@ class ControladorPrincipalTest {
     }
 
     @Test
-    @DisplayName("El programa completo deja el resultado del enunciado en su BCP")
+    @DisplayName("El programa de ejemplo completo deja el resultado esperado en su BCP")
     void ejecucionCompleta(@TempDir Path carpeta) throws Exception {
-        vista.entregar(ejemploDelEnunciado(carpeta));
+        vista.entregar(programaDeEjemplo(carpeta));
         controlador.alCargarArchivos();
 
         // Pesos: MOV 1, MOV 1, LOAD 2, ADD 3, SUB 3, STORE 2 = 12 s; MOV BX, -8 = 1 s.
@@ -439,7 +439,7 @@ class ControladorPrincipalTest {
     @DisplayName("Al terminar la ejecucion automatica los botones vuelven a habilitarse")
     void ejecucionAutomaticaRehabilitaBotones(@TempDir Path carpeta) throws Exception {
         controlador.alConfigurar(config(256, 50));
-        vista.entregar(ejemploDelEnunciado(carpeta));
+        vista.entregar(programaDeEjemplo(carpeta));
         controlador.alCargarArchivos();
 
         controlador.alEjecutar();
@@ -473,7 +473,7 @@ class ControladorPrincipalTest {
     @Test
     @DisplayName("Reiniciar devuelve los trabajos a PREPARADO y el reloj a cero")
     void reiniciarConservaElPrograma(@TempDir Path carpeta) throws Exception {
-        vista.entregar(ejemploDelEnunciado(carpeta));
+        vista.entregar(programaDeEjemplo(carpeta));
         controlador.alCargarArchivos();
         controlador.alPasoAPaso();
         controlador.alPasoAPaso();
@@ -491,7 +491,7 @@ class ControladorPrincipalTest {
     @Test
     @DisplayName("Limpiar descarga todo y vacia las tablas")
     void limpiarDescargaTodo(@TempDir Path carpeta) throws Exception {
-        vista.entregar(ejemploDelEnunciado(carpeta));
+        vista.entregar(programaDeEjemplo(carpeta));
         controlador.alCargarArchivos();
         controlador.alPasoAPaso();
 
@@ -509,7 +509,7 @@ class ControladorPrincipalTest {
     @Test
     @DisplayName("Configurar cambia la memoria, el disco y la velocidad")
     void configurarCambiaLaMemoria(@TempDir Path carpeta) throws Exception {
-        vista.entregar(ejemploDelEnunciado(carpeta));
+        vista.entregar(programaDeEjemplo(carpeta));
         controlador.alCargarArchivos();
 
         controlador.alConfigurar(new Configuracion(512, 1024, 128, 250, "FCFS"));
@@ -589,7 +589,7 @@ class ControladorPrincipalTest {
     @Test
     @DisplayName("La tabla de memoria nombra la cabecera, los campos del BCP y el programa")
     void modeloDeMemoriaRefleja(@TempDir Path carpeta) throws Exception {
-        vista.entregar(ejemploDelEnunciado(carpeta));
+        vista.entregar(programaDeEjemplo(carpeta));
         controlador.alCargarArchivos();
 
         assertEquals(256, controlador.getModeloMemoria().getRowCount());
@@ -609,7 +609,7 @@ class ControladorPrincipalTest {
     @Test
     @DisplayName("Las estadisticas quedan disponibles al terminar")
     void estadisticasDisponibles(@TempDir Path carpeta) throws Exception {
-        vista.entregar(ejemploDelEnunciado(carpeta));
+        vista.entregar(programaDeEjemplo(carpeta));
         controlador.alCargarArchivos();
         for (int i = 0; i < 13; i++) {
             controlador.alPasoAPaso();
@@ -653,7 +653,7 @@ class ControladorPrincipalTest {
     @DisplayName("Pausar detiene la ejecucion automatica y se puede seguir con Siguiente")
     void pausarLaEjecucionAutomatica(@TempDir Path carpeta) throws Exception {
         controlador.alConfigurar(config(256, 2000));
-        vista.entregar(ejemploDelEnunciado(carpeta));
+        vista.entregar(programaDeEjemplo(carpeta));
         controlador.alCargarArchivos();
 
         controlador.alEjecutar();

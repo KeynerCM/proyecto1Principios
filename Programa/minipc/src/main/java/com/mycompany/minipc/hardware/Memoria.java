@@ -22,7 +22,7 @@ import java.util.List;
  */
 public class Memoria {
 
-    /** Tamano con el que arranca la aplicacion, el que fija el enunciado. */
+    /** Tamano con el que arranca la aplicacion. */
     public static final int TAMANO_POR_DEFECTO = 256;
 
     /** Minimo de posiciones que deben quedar para los programas. */

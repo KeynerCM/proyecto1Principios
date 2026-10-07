@@ -14,9 +14,8 @@ import com.mycompany.minipc.so.procesos.Proceso;
  * Restricciones: nunca mueve al proceso en ejecucion; el BCP se queda siempre
  *                en el kernel y solo viaja la imagen del programa
  * Descripcion: el intercambio (swapping) entre la memoria principal y la
- *              memoria virtual, que Stallings asigna al planificador de
- *              mediano plazo (secciones 3.2 y 9.1). Aplica las transiciones
- *              de la figura 3.9b:
+ *              memoria virtual, que hace el planificador de mediano plazo.
+ *              Aplica estas transiciones:
  *
  *                EN_ESPERA            -> SUSPENDIDO_EN_ESPERA (suspender)
  *                SUSPENDIDO_PREPARADO -> PREPARADO            (traer)
@@ -27,9 +26,9 @@ import com.mycompany.minipc.so.procesos.Proceso;
  *              cuando llega el valor del teclado. Al mover la imagen se
  *              reubica el proceso: cambian su BASE y su PC.
  *
- *              En el Proyecto 1 la CPU espera al proceso que pidio el
- *              teclado, asi que solo se usa traer: suspender a un proceso
- *              EN_ESPERA queda listo para el Proyecto 2 (ver equilibrar).
+ *              Como la CPU espera al proceso que pidio el teclado,
+ *              equilibrar solo usa traer; suspender no se llama durante la
+ *              ejecucion (ver equilibrar).
  */
 public class Intercambio {
 
@@ -60,13 +59,10 @@ public class Intercambio {
      * Entradas: ninguna
      * Salidas: ninguna
      * Restricciones: se llama en cada segundo, despues de admitir trabajos
-     * Descripcion: trae los SUSPENDIDO_PREPARADO que quepan. El libro
-     *              tambien suspende a un proceso bloqueado cuando no hay
-     *              procesos listos (p. 146), pero en el Proyecto 1 la CPU
-     *              espera al proceso que pidio el teclado y nadie mas puede
-     *              ejecutarse mientras tanto, asi que sacarlo de memoria no
-     *              ayudaria. Esa transicion queda en suspender() para cuando
-     *              la CPU pueda pasar a otro proceso (Proyecto 2).
+     * Descripcion: trae los SUSPENDIDO_PREPARADO que quepan. No suspende a un
+     *              proceso bloqueado para hacer lugar: la CPU espera al proceso
+     *              que pidio el teclado y nadie mas puede ejecutarse mientras
+     *              tanto, asi que sacarlo de memoria no ayudaria.
      */
     public void equilibrar() {
         traerSuspendidos();

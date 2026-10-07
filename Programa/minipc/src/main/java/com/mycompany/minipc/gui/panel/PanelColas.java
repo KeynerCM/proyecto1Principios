@@ -27,10 +27,9 @@ import com.mycompany.minipc.so.procesos.TablaBCP;
  * Descripcion: muestra la estructura de lista de procesos como la guarda la
  *              memoria: la cabecera del sistema operativo apunta al primer BCP
  *              y cada BCP al siguiente, en una tabla que dice donde esta cada
- *              BCP y cada programa. Debajo, la misma lista agrupada por
- *              estado: quien tiene la CPU, la cola de listos que usa FCFS y
- *              los que esperan. Cubre "despachador, planificador, lista de
- *              trabajos y cambio de contexto" de la rubrica.
+ *              BCP y cada programa. Debajo, la misma lista agrupada por estado:
+ *              quien tiene la CPU, la cola de listos que usa FCFS, los que
+ *              esperan el teclado y los suspendidos.
  */
 public class PanelColas extends JPanel {
 

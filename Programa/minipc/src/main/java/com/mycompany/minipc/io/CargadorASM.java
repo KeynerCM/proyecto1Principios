@@ -20,7 +20,7 @@ import java.util.List;
  */
 public class CargadorASM {
 
-    /** Unica extension aceptada, como pide el enunciado. */
+    /** Unica extension aceptada. */
     public static final String EXTENSION = "asm";
 
     /**

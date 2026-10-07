@@ -20,21 +20,20 @@ import com.mycompany.minipc.so.procesos.TablaBCP;
  * Salidas: no aplica
  * Restricciones: admite en orden de llegada y sin saltarse trabajos: si el
  *                primero no cabe, los siguientes tambien esperan
- * Descripcion: el "Planificador de trabajos" del enunciado, que Stallings
- *              llama planificador de largo plazo (seccion 9.1): decide que
- *              programas de la lista de trabajos entran al sistema, y asi
- *              controla el grado de multiprogramacion, que aqui es 5. Para
- *              admitir un trabajo lee el programa del disco, le busca lugar,
- *              crea su BCP en el kernel y lo enlaza al final de la lista de
- *              procesos. El lugar es, en este orden (seccion 9.6 del plan):
+ * Descripcion: planificador de trabajos (de largo plazo): decide que programas
+ *              de la lista de trabajos entran al sistema, y asi controla el
+ *              grado de multiprogramacion, que aqui es 5. Para admitir un
+ *              trabajo lee el programa del disco, le busca lugar, crea su BCP
+ *              en el kernel y lo enlaza al final de la lista de procesos. El
+ *              lugar es, en este orden:
  *
  *                1. la memoria principal          -> PREPARADO
  *                2. la memoria virtual del disco  -> SUSPENDIDO_PREPARADO
  *                3. ninguno: sigue NUEVO en la lista de trabajos
  *
- *              El paso 2 es la transicion New -> Ready/Suspend del libro
- *              (figura 3.9b): "there would often be insufficient room in main
- *              memory for a new process" (p. 147).
+ *              El paso 2 sirve cuando la memoria principal esta llena: el
+ *              proceso se admite igual y espera en el disco hasta que haya
+ *              lugar.
  */
 public class PlanificadorTrabajos {
 

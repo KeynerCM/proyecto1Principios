@@ -14,10 +14,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Pruebas del juego completo de instrucciones del enunciado: que cada forma
- * valida se reconozca con sus operandos, y que cada linea mal escrita se
- * rechace. Los casos rechazados y aceptados son los de la seccion 7 del
- * plan ("Validacion con regex").
+ * Pruebas del juego completo de instrucciones: que cada forma valida se
+ * reconozca con sus operandos, y que cada linea mal escrita se rechace con
+ * la validacion por expresiones regulares.
  */
 class JuegoInstruccionesTest {
 
@@ -100,7 +99,7 @@ class JuegoInstruccionesTest {
     }
 
     @ParameterizedTest(name = "acepta \"{0}\"")
-    @DisplayName("Las lineas bien escritas del plan se aceptan")
+    @DisplayName("Las lineas bien escritas se aceptan")
     @ValueSource(strings = {
         "mov bx,5", "MOV   BX ,   5", "MOV BX, -8", "INC", "INC AX", "JNE +2",
         "PARAM 7", "PARAM 1,2,3", "INT 09H", "LOAD AX", "STORE BX", "ADD CX", "SUB DX",
@@ -115,7 +114,7 @@ class JuegoInstruccionesTest {
     }
 
     @ParameterizedTest(name = "rechaza \"{0}\"")
-    @DisplayName("Las lineas mal escritas del plan se rechazan")
+    @DisplayName("Las lineas mal escritas se rechazan")
     @ValueSource(strings = {
         "MOV AX,,, 5", "MOV AX , , 5", "MOV, AX, 5", "ADD BX,", ",LOAD AX", "MOV AX 5",
         "MOV AX, BX, CX", "PARAM 1,,2", "PARAM 1, 2, 3, 4", "PARAM", "JMP +-3", "JMP 3,",

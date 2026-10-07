@@ -10,17 +10,16 @@ import com.mycompany.minipc.excepciones.DesbordamientoException;
  * Nombre: Pila
  * Entradas: los valores que el programa guarda con PUSH y PARAM
  * Salidas: los valores que el programa saca con POP
- * Restricciones: tiene capacidad fija de 5 valores, como pide el enunciado;
- *                superarla, o sacar de una pila vacia, es un error de
- *                ejecucion
- * Descripcion: la pila del proceso, de tipo LIFO: el ultimo valor que entra
- *              es el primero que sale. El libro la describe como parte del
- *              contexto del proceso (Stallings, tabla 3.5, "Stack Pointers"),
- *              usada para parametros y llamadas.
+ * Restricciones: tiene capacidad fija de 5 valores; superarla, o sacar de una
+ *                pila vacia, es un error de ejecucion
+ * Descripcion: la pila del proceso, de tipo LIFO: el ultimo valor que entra es
+ *              el primero que sale. Forma parte del contexto del proceso: se
+ *              guarda en el BCP en cada cambio de contexto. La usan PUSH, POP y
+ *              PARAM.
  */
 public class Pila {
 
-    /** Capacidad de la pila, fijada por el enunciado. */
+    /** Capacidad de la pila. */
     public static final int CAPACIDAD = 5;
 
     private final List<Integer> valores;

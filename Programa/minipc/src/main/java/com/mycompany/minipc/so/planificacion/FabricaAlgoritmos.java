@@ -6,10 +6,9 @@ import java.util.List;
  * Nombre: FabricaAlgoritmos
  * Entradas: el nombre de un algoritmo, tal como viene de la configuracion
  * Salidas: el algoritmo correspondiente
- * Restricciones: en este proyecto solo existe FCFS
+ * Restricciones: por ahora solo existe FCFS
  * Descripcion: el unico lugar que conoce las implementaciones. Agregar un
- *              algoritmo en el proyecto 2 es crear su clase y agregar una
- *              linea aqui.
+ *              algoritmo es crear su clase y agregar una linea aqui.
  */
 public final class FabricaAlgoritmos {
 

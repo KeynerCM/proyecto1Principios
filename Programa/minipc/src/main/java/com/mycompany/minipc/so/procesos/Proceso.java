@@ -15,10 +15,10 @@ import com.mycompany.minipc.isa.RegistroID;
  *                BCP. Deja de ser valido cuando el BCP se libera
  * Descripcion: la entidad proceso. Todo lo que se consulta o cambia de un
  *              proceso (estado, PC, registros, pila, base, alcance, enlace al
- *              siguiente) se lee o se escribe directamente en las celdas de
- *              su BCP en la memoria del kernel, que es donde el enunciado pide
- *              que viva esa informacion. Dos objetos Proceso con la misma
- *              direccion son el mismo proceso.
+ *              siguiente) se lee o se escribe directamente en las celdas de su
+ *              BCP en la memoria del kernel; el objeto no guarda ningun dato
+ *              propio. Dos objetos Proceso con la misma direccion son el mismo
+ *              proceso.
  */
 public final class Proceso {
 
@@ -314,10 +314,9 @@ public final class Proceso {
      * Restricciones: el proceso no debe estar en ejecucion
      * Descripcion: cuando el intercambio mueve la imagen entre la memoria
      *              principal y la memoria virtual cambia la base, y el PC se
-     *              corrige con el mismo desplazamiento: PC nuevo = base nueva
-     *              + (PC - base vieja). DX no se toca porque ya es relativo a
-     *              la base. Es la reubicacion dinamica del libro (Stallings,
-     *              seccion 7.2).
+     *              corrige con el mismo desplazamiento: PC nuevo = base nueva +
+     *              (PC - base vieja). DX no se toca porque ya es relativo a la
+     *              base.
      */
     public void reubicar(int nuevaBase) {
         int desplazamiento = getPc() - getBase();
@@ -344,7 +343,7 @@ public final class Proceso {
      * Entradas: ninguna
      * Salidas: la CPU donde se ejecuta, o vacio si no esta en ejecucion
      * Restricciones: ninguna
-     * Descripcion: parte de la informacion contable del enunciado.
+     * Descripcion: lee el campo CPU del BCP (informacion contable).
      */
     public String getCpu() {
         return tabla.leer(direccionBCP, CampoBCP.CPU);
@@ -366,7 +365,7 @@ public final class Proceso {
      * Entradas: ninguna
      * Salidas: el segundo simulado en que el proceso fue admitido
      * Restricciones: ninguna
-     * Descripcion: parte de la informacion contable del enunciado.
+     * Descripcion: lee el campo TIEMPO_INICIO del BCP (informacion contable).
      */
     public int getTiempoInicio() {
         return entero(CampoBCP.TIEMPO_INICIO);
@@ -377,7 +376,7 @@ public final class Proceso {
      * Entradas: ninguna
      * Salidas: los segundos de CPU que lleva el proceso
      * Restricciones: ninguna
-     * Descripcion: parte de la informacion contable del enunciado.
+     * Descripcion: lee el campo TIEMPO_EMPLEADO del BCP (informacion contable).
      */
     public int getTiempoEmpleado() {
         return entero(CampoBCP.TIEMPO_EMPLEADO);

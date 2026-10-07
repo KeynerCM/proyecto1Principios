@@ -7,13 +7,13 @@ package com.mycompany.minipc.so.procesos;
  * Restricciones: el orden de las constantes es el orden de las celdas del BCP
  *                en memoria; cambiarlo cambia el mapa de memoria
  * Descripcion: los campos del Bloque de Control de Proceso, uno por celda de
- *              memoria. Son los que pide el enunciado (estado, PC, registros,
- *              pila de 5, contabilidad, archivos abiertos, enlace al
- *              siguiente BCP, base, alcance y prioridad), mas el PID, el
- *              nombre del programa y la bandera ZF de CMP. El desplazamiento
- *              de cada campo dentro del BCP es su posicion en esta lista, y
- *              el tamano del BCP es la cantidad de constantes: si se agrega
- *              un campo, el tamano del BCP y del kernel se recalculan solos.
+ *              memoria: PID, nombre del programa, estado, prioridad, PC, IR,
+ *              AC, AX a DX, la bandera ZF de CMP, el SP y la pila (cada
+ *              elemento en su propia celda), base, alcance, CPU, tiempos,
+ *              archivos abiertos y enlace al siguiente BCP. El desplazamiento
+ *              de cada campo dentro del BCP es su posicion en esta lista, y el
+ *              tamano del BCP es la cantidad de constantes: si se agrega un
+ *              campo, el tamano del BCP y del kernel se recalculan solos.
  */
 public enum CampoBCP {
 

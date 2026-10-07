@@ -11,9 +11,9 @@ import com.mycompany.minipc.so.trabajos.Trabajo;
  * Entradas: la lista de trabajos del sistema operativo
  * Salidas: las filas de la tabla "Lista de trabajos"
  * Restricciones: solo lee; no cambia ningun trabajo
- * Descripcion: muestra la lista de trabajos y el estado de cada uno, como
- *              pide el enunciado. El estado de un trabajo admitido se lee del
- *              BCP en memoria, asi que la tabla refleja cada cambio de estado.
+ * Descripcion: muestra la lista de trabajos y el estado de cada uno. El estado
+ *              de un trabajo admitido se lee del BCP en memoria, asi que la
+ *              tabla refleja cada cambio de estado.
  */
 public class ModeloTablaTrabajos extends AbstractTableModel {
 

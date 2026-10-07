@@ -12,14 +12,13 @@ import com.mycompany.minipc.so.procesos.EstadoProceso;
  * Salidas: no aplica
  * Restricciones: admite como maximo 20 trabajos, igual que las entradas del
  *                indice del disco
- * Descripcion: la "Lista de Trabajos" y "cola de trabajo" del enunciado: los
- *              programas cargados desde el disco, en orden de llegada, con su
- *              estado. Los NUEVO esperan a que el planificador de trabajos
- *              los admita como procesos.
+ * Descripcion: la lista de trabajos: los programas cargados desde el disco, en
+ *              orden de llegada, con su estado. Los NUEVO esperan a que el
+ *              planificador de trabajos los admita como procesos.
  */
 public class ListaTrabajos {
 
-    /** Capacidad de la lista: "20 procesos" en la pizarra del profesor. */
+    /** Capacidad de la lista: 20 trabajos. */
     public static final int CAPACIDAD = 20;
 
     private final List<Trabajo> trabajos = new ArrayList<>();

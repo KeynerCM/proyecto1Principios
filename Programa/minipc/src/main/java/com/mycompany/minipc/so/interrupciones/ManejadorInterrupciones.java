@@ -22,15 +22,14 @@ import com.mycompany.minipc.so.procesos.Proceso;
  * Salidas: no aplica
  * Restricciones: solo INT 09H bloquea al proceso; los demas servicios se
  *                atienden sin quitarle la CPU
- * Descripcion: atiende las dos clases de interrupcion que usa el Mini PC
- *              (Stallings, tablas 1.1 y 3.8):
+ * Descripcion: atiende las dos clases de interrupcion que usa el Mini PC:
  *
  *                llamadas al sistema (INT, "supervisor call"):
  *                  INT 20H  fin del programa
  *                  INT 10H  imprime DX en la pantalla
  *                  INT 09H  pide un valor al teclado: el proceso pasa a
- *                           EN_ESPERA y la CPU lo espera hasta el ENTER
- *                           (en el Proyecto 1 no pasa a otro proceso)
+ *                           EN_ESPERA y la CPU lo espera hasta el ENTER,
+ *                           sin pasar a otro proceso
  *                  INT 21H  manejo de archivos (SistemaArchivos)
  *
  *                interrupcion de entrada y salida:
@@ -127,15 +126,15 @@ public class ManejadorInterrupciones {
      * Salidas: el proceso que recibio el valor
      * Restricciones: lanza IllegalArgumentException si no es un numero de 0 a
      *                255, e IllegalStateException si nadie espera el teclado
-     * Descripcion: la interrupcion de entrada y salida del teclado. El valor
-     *              va al DX del BCP del proceso que espera, que conserva su
-     *              lugar en la lista para que FCFS le devuelva la CPU antes
-     *              que a los demas. Si estaba en memoria vuelve a PREPARADO; si estaba suspendido pasa a SUSPENDIDO_PREPARADO
-     *              ("when the event for which it has been waiting occurs",
-     *              Stallings p. 147) y el intercambio lo trae cuando haya
-     *              espacio. El BCP nunca sale del kernel, por eso se puede
-     *              escribir DX aunque el programa este en el disco. El valor
-     *              se muestra como eco al final de la linea del aviso.
+     * Descripcion: la interrupcion de entrada y salida del teclado. El valor va
+     *              al DX del BCP del proceso que espera, que conserva su lugar
+     *              en la lista para que FCFS le devuelva la CPU antes que a los
+     *              demas. Si estaba en memoria vuelve a PREPARADO; si estaba
+     *              suspendido pasa a SUSPENDIDO_PREPARADO y el intercambio lo
+     *              trae cuando haya espacio. El BCP nunca sale del kernel, por
+     *              eso se puede escribir DX aunque el programa este en el
+     *              disco. El valor se muestra como eco al final de la linea del
+     *              aviso.
      */
     public Proceso entradaTeclado(String texto) {
         String valorTexto = texto == null ? "" : texto.trim();

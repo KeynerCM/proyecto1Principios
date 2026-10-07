@@ -11,9 +11,9 @@ import com.mycompany.minipc.so.procesos.Proceso;
  * Restricciones: una implementacion solo decide; no cambia estados ni toca la
  *                CPU, eso lo hace el despachador
  * Descripcion: el punto intercambiable del planificador de procesos (patron
- *              Estrategia). En este proyecto la unica implementacion es FCFS;
- *              en el proyecto 2 se agregan SPN, SRT, RR y HRRN como clases
- *              nuevas, sin cambiar el planificador ni el despachador.
+ *              Estrategia). La implementacion actual es FCFS; otro algoritmo
+ *              (por ejemplo SPN, SRT, RR o HRRN) se agrega como una clase
+ *              nueva, sin cambiar el planificador ni el despachador.
  */
 public interface AlgoritmoPlanificacion {
 
@@ -43,8 +43,8 @@ public interface AlgoritmoPlanificacion {
      *           listos
      * Salidas: true si hay que quitarle la CPU al proceso en ejecucion
      * Restricciones: ninguna
-     * Descripcion: los algoritmos no expropiativos, como FCFS, nunca quitan
-     *              la CPU; RR y SRT lo redefiniran en el proyecto 2.
+     * Descripcion: los algoritmos no expropiativos, como FCFS, nunca quitan la
+     *              CPU; un algoritmo expropiativo, como RR o SRT, lo redefine.
      */
     default boolean debeExpropiar(Proceso enEjecucion, List<Proceso> preparados) {
         return false;

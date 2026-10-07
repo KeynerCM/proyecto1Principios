@@ -29,10 +29,9 @@ import com.mycompany.minipc.so.procesos.Proceso;
  * Salidas: el panel "BCP actual - CPU 1"
  * Restricciones: no guarda datos del proceso: cada vez que se muestra, lee
  *                las celdas del BCP en memoria a traves de Proceso
- * Descripcion: todos los campos del BCP que pide el enunciado, agrupados en
- *              Proceso, Registros, Pila, Memoria, Contabilidad y E/S. Dice
- *              tambien en que celdas del kernel quedo guardado el BCP, que es
- *              lo que pide "visualizar donde y como se almaceno".
+ * Descripcion: todos los campos del BCP, agrupados en Proceso, Registros, Pila,
+ *              Memoria, Contabilidad y E/S. Dice tambien en que celdas del
+ *              kernel quedo guardado el BCP.
  */
 public class PanelBCP extends JPanel {
 
@@ -161,7 +160,8 @@ public class PanelBCP extends JPanel {
      *          "2 (130)  ->  \"datos.txt\""
      * Restricciones: si el proceso esta suspendido solo muestra el numero,
      *                porque su programa esta en el disco
-     * Descripcion: asi se ve que DX "contiene" el nombre del archivo (9.3).
+     * Descripcion: muestra el nombre del archivo al que apunta DX, para que se
+     *              vea que DX "contiene" ese nombre.
      */
     private static String textoDx(Proceso proceso, Memoria memoria) {
         int valor = proceso.getRegistro(RegistroID.DX);

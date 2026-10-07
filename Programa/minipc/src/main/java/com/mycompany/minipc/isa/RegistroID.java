@@ -6,8 +6,8 @@ import java.util.List;
  * Nombre: RegistroID
  * Entradas: no aplica, es una enumeracion de valores fijos
  * Salidas: no aplica
- * Restricciones: AH y AL no son registros aparte: son la parte alta y la
- *                parte baja de AX (confirmado por el profesor)
+ * Restricciones: AH y AL no son registros aparte: son la parte alta y la parte
+ *                baja de AX
  * Descripcion: los nombres de registro que acepta el ensamblador. AX, BX, CX
  *              y DX son los cuatro registros de proposito general; AH y AL
  *              permiten leer y escribir un byte de AX, como en el x86, y los

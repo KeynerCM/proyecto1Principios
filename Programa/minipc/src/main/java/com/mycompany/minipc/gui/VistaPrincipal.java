@@ -106,8 +106,8 @@ public interface VistaPrincipal {
     /**
      * Nombre: actualizarBotones
      * Entradas: hayPrograma, si hay un programa cargado; enEjecucion, si la
-     *           ejecucion automatica esta en marcha; termino, si el programa
-     *           llego al final o quedo bloqueado
+     *           ejecucion automatica esta en marcha; termino, si el programa ya
+     *           finalizaron todos los trabajos
      * Salidas: ninguna
      * Restricciones: ninguna
      * Descripcion: habilita o deshabilita los botones segun la situacion
@@ -143,9 +143,8 @@ public interface VistaPrincipal {
      * Restricciones: debe filtrar por la extension .asm y permitir elegir
      *                varios archivos a la vez
      * Descripcion: pide al usuario que elija uno o varios archivos de codigo
-     *              ensamblador, como pide el enunciado. Devolver una lista
-     *              vacia al cancelar permite al controlador distinguir esa
-     *              situacion de un error real.
+     *              ensamblador. Devolver una lista vacia al cancelar permite al
+     *              controlador distinguir esa situacion de un error real.
      */
     List<File> seleccionarArchivosAsm();
 
@@ -176,7 +175,7 @@ public interface VistaPrincipal {
      * Entradas: reloj, tiempo simulado como hora:minuto:segundo
      * Salidas: ninguna
      * Restricciones: ninguna
-     * Descripcion: muestra el tiempo de ejecucion, que pide el enunciado.
+     * Descripcion: muestra el tiempo de ejecucion del reloj simulado.
      */
     void mostrarReloj(String reloj);
 
@@ -206,8 +205,7 @@ public interface VistaPrincipal {
      * Entradas: ninguna
      * Salidas: ninguna
      * Restricciones: se llama una vez, cuando finaliza el ultimo trabajo
-     * Descripcion: el enunciado pide las estadisticas "al final de la
-     *              ejecucion de los procesos".
+     * Descripcion: abre las estadisticas cuando terminan todos los procesos.
      */
     void mostrarEstadisticas();
 }

@@ -9,9 +9,9 @@ import com.mycompany.minipc.so.procesos.Proceso;
  * Entradas: la lista de procesos y el algoritmo de planificacion
  * Salidas: no aplica
  * Restricciones: solo conoce la interfaz AlgoritmoPlanificacion, nunca FCFS
- * Descripcion: el "Planificador de procesos" del enunciado (planificador de
- *              corto plazo). Arma la cola de listos a partir de la lista de
- *              procesos en memoria y le pregunta al algoritmo cual sigue.
+ * Descripcion: planificador de procesos (de corto plazo). Arma la cola de
+ *              listos a partir de la lista de procesos en memoria y le pregunta
+ *              al algoritmo cual sigue.
  */
 public class PlanificadorProcesos {
 

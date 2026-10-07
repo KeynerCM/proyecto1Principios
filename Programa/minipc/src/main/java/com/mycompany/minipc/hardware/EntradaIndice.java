@@ -7,11 +7,10 @@ package com.mycompany.minipc.hardware;
  * Restricciones: es inmutable; el nombre no puede ser vacio ni contener el
  *                separador, la direccion no puede ser negativa y el tamano
  *                debe ser de al menos uno
- * Descripcion: una fila del indice de archivos del disco. El enunciado pide
- *              que el indice guarde el nombre y la direccion donde se
- *              almacena cada archivo; se agrega el tamano para saber cuantas
- *              posiciones leer sin tener que recorrer el disco. En el disco
- *              la fila se guarda como texto, por ejemplo "file.asm|20|7";
+ * Descripcion: una fila del indice de archivos del disco: el nombre del
+ *              archivo, la direccion donde empieza y su tamano, para saber
+ *              cuantas posiciones leer sin tener que recorrer el disco. En el
+ *              disco la fila se guarda como texto, por ejemplo "file.asm|20|7";
  *              esta clase solo sirve para leer y armar ese texto, no guarda
  *              nada por su cuenta.
  */

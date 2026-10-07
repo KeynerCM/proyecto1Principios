@@ -8,8 +8,8 @@ package com.mycompany.minipc.excepciones;
  *                con ese error y los demas siguen
  * Descripcion: un proceso intento usar memoria fuera de su region (base y
  *              alcance), leer la zona del kernel o tocar un archivo que no le
- *              corresponde. Es la interrupcion de programa por "reference
- *              outside a user's allowed memory space" (Stallings, tabla 1.1).
+ *              corresponde. Es una interrupcion de programa: el proceso termina
+ *              con este error.
  */
 public class ViolacionProteccionException extends EjecucionException {
 
