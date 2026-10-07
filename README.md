@@ -4,10 +4,6 @@
 
 ### Estado del proyecto: 1
 ### Enlace del video: [Ver en YouTube](https://youtu.be/fQ6zucnVZGE)
-
-**Curso:** IC-6600 Principios de Sistemas Operativos, Centro Académico Limón
-**Profesor:** Ing. Cristian Campos Agüero
-
 ---
 
 ## Descripción
@@ -191,14 +187,11 @@ En la carpeta [`Ejemplo/`](Ejemplo/):
 - Visualización del BCP actual, de cómo se guardan los BCP en memoria, de los registros (IR, AC, PC), de la lista de trabajos y su estado, y del tiempo de ejecución.
 - Configuración externa en un archivo y menú de configuración.
 - Estadísticas al final: proceso, hora de inicio, hora final y duración en segundos, además del tiempo de CPU, la espera y la ocupación máxima de la memoria.
-- 280 pruebas automáticas con JUnit 5.
 
 ## Objetivos no alcanzados
 
 Todos los requisitos del enunciado están implementados.
 
-- Por indicación del profesor, en este proyecto la CPU espera al proceso que pidió el teclado en lugar de pasar a otro. Por eso la transición EN_ESPERA -> SUSPENDIDO_EN_ESPERA (suspender un proceso bloqueado para traer otro) está implementada y probada, pero no se usa todavía; queda lista para el Proyecto 2.
-- Los algoritmos SPN, SRT, RR y HRRN corresponden al Proyecto 2; el diseño ya permite agregarlos.
 
 ## Referencia
 
