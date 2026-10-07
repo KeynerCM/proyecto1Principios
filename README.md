@@ -3,7 +3,7 @@
 ### 2024108270 Keyner Cerdas Morales
 
 ### Estado del proyecto: 1
-### Enlace del video: PENDIENTE (agregar el enlace de YouTube)
+### Enlace del video: [Ver en YouTube](https://youtu.be/fQ6zucnVZGE)
 
 **Curso:** IC-6600 Principios de Sistemas Operativos, Centro Académico Limón
 **Profesor:** Ing. Cristian Campos Agüero
