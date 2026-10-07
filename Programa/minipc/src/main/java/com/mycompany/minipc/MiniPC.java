@@ -38,14 +38,25 @@ public class MiniPC {
      * Nombre: aplicarApariencia
      * Entradas: ninguna
      * Salidas: ninguna
-     * Restricciones: si la apariencia del sistema no esta disponible se sigue
-     *                con la que Java trae por defecto, sin interrumpir el
-     *                arranque
-     * Descripcion: usa la apariencia nativa del sistema operativo en lugar de
-     *              Metal, que es la que Java aplica si no se indica otra y que
-     *              hace que la ventana se vea ajena al escritorio.
+     * Restricciones: si FlatLaf no esta en el classpath (por ejemplo, al
+     *                ejecutar el jar sin sus dependencias) se usa la apariencia
+     *                del sistema, y si esa tambien falla, la de Java; nunca se
+     *                interrumpe el arranque
+     * Descripcion: usa FlatLaf en su tema claro, que da un aspecto plano y
+     *              moderno, con esquinas redondeadas suaves. Los colores de la
+     *              ventana los pone gui.Tema encima de esta apariencia.
      */
-    private static void aplicarApariencia() {
+    public static void aplicarApariencia() {
+        try {
+            javax.swing.UIManager.put("Component.arc", 6);
+            javax.swing.UIManager.put("Button.arc", 6);
+            javax.swing.UIManager.put("ScrollBar.width", 11);
+            javax.swing.UIManager.put("TabbedPane.showTabSeparators", true);
+            com.formdev.flatlaf.FlatLightLaf.setup();
+            return;
+        } catch (LinkageError e) {
+            // FlatLaf no esta disponible: se sigue con la del sistema.
+        }
         try {
             javax.swing.UIManager.setLookAndFeel(
                     javax.swing.UIManager.getSystemLookAndFeelClassName());

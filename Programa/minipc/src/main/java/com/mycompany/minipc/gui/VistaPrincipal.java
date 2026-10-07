@@ -1,7 +1,6 @@
 package com.mycompany.minipc.gui;
 
-import com.mycompany.minipc.core.BCP;
-import com.mycompany.minipc.isa.Instruccion;
+import com.mycompany.minipc.so.procesos.Proceso;
 
 import java.io.File;
 import java.util.List;
@@ -22,14 +21,14 @@ public interface VistaPrincipal {
 
     /**
      * Nombre: mostrarInstrucciones
-     * Entradas: programa, instrucciones traducidas en orden
+     * Entradas: programa, texto de cada instruccion en orden
      * Salidas: ninguna
      * Restricciones: el modelo de la tabla lo mantiene el controlador, de modo
      *                que la vista solo debe ocuparse de la presentacion
      * Descripcion: avisa a la vista de que la tabla de instrucciones tiene
      *              contenido nuevo que mostrar.
      */
-    void mostrarInstrucciones(List<Instruccion> programa);
+    void mostrarInstrucciones(List<String> programa);
 
     /**
      * Nombre: resaltarInstruccion
@@ -53,15 +52,26 @@ public interface VistaPrincipal {
     void refrescarMemoria();
 
     /**
-     * Nombre: mostrarBCP
-     * Entradas: bcp, bloque a mostrar, o nulo para dejar el panel en blanco
+     * Nombre: refrescarDisco
+     * Entradas: ninguna
      * Salidas: ninguna
-     * Restricciones: debe tolerar el valor nulo, que ocurre tras descargar el
-     *                programa
-     * Descripcion: vuelca los atributos del bloque de control de proceso en el
-     *              panel correspondiente.
+     * Restricciones: ninguna
+     * Descripcion: vuelve a dibujar la tabla del disco, cuyo contenido
+     *              cambio. Igual que la memoria, el modelo lee directamente
+     *              del disco, por eso no recibe datos.
      */
-    void mostrarBCP(BCP bcp);
+    void refrescarDisco();
+
+    /**
+     * Nombre: mostrarBCP
+     * Entradas: proceso, proceso en ejecucion, o nulo si la CPU esta libre
+     * Salidas: ninguna
+     * Restricciones: debe tolerar el valor nulo
+     * Descripcion: vuelca los campos del BCP en el panel correspondiente. El
+     *              proceso no guarda datos: cada valor se lee de las celdas
+     *              de su BCP en la memoria del kernel.
+     */
+    void mostrarBCP(Proceso proceso);
 
     /**
      * Nombre: escribirEnConsola
@@ -96,8 +106,8 @@ public interface VistaPrincipal {
     /**
      * Nombre: actualizarBotones
      * Entradas: hayPrograma, si hay un programa cargado; enEjecucion, si la
-     *           ejecucion automatica esta en marcha; termino, si el programa
-     *           llego al final o quedo bloqueado
+     *           ejecucion automatica esta en marcha; termino, si el programa ya
+     *           finalizaron todos los trabajos
      * Salidas: ninguna
      * Restricciones: ninguna
      * Descripcion: habilita o deshabilita los botones segun la situacion
@@ -127,13 +137,75 @@ public interface VistaPrincipal {
     void actualizarUsoMemoria(int porcentaje);
 
     /**
-     * Nombre: seleccionarArchivoAsm
+     * Nombre: seleccionarArchivosAsm
      * Entradas: ninguna
-     * Salidas: el archivo elegido, o nulo si el usuario cancelo
-     * Restricciones: debe filtrar por la extension .asm
-     * Descripcion: pide al usuario que elija un archivo de codigo ensamblador.
-     *              Devolver nulo al cancelar permite al controlador distinguir
-     *              esa situacion de un error real.
+     * Salidas: los archivos elegidos, o una lista vacia si el usuario cancelo
+     * Restricciones: debe filtrar por la extension .asm y permitir elegir
+     *                varios archivos a la vez
+     * Descripcion: pide al usuario que elija uno o varios archivos de codigo
+     *              ensamblador. Devolver una lista vacia al cancelar permite al
+     *              controlador distinguir esa situacion de un error real.
      */
-    File seleccionarArchivoAsm();
+    List<File> seleccionarArchivosAsm();
+
+    /**
+     * Nombre: mostrarPantalla
+     * Entradas: lineas, contenido de la pantalla del Mini PC
+     * Salidas: ninguna
+     * Restricciones: ninguna
+     * Descripcion: dibuja la salida de INT 10H, el aviso de INT 09H y el eco
+     *              del teclado.
+     */
+    void mostrarPantalla(List<String> lineas);
+
+    /**
+     * Nombre: habilitarTeclado
+     * Entradas: habilitado, true si algun proceso espera un valor; destino,
+     *           el proceso que recibira el proximo valor, o nulo
+     * Salidas: ninguna
+     * Restricciones: ninguna
+     * Descripcion: el teclado solo se puede usar cuando un proceso ejecuto
+     *              INT 09H y esta esperando. Junto al campo se muestra a
+     *              quien le llega el ENTER.
+     */
+    void habilitarTeclado(boolean habilitado, String destino);
+
+    /**
+     * Nombre: mostrarReloj
+     * Entradas: reloj, tiempo simulado como hora:minuto:segundo
+     * Salidas: ninguna
+     * Restricciones: ninguna
+     * Descripcion: muestra el tiempo de ejecucion del reloj simulado.
+     */
+    void mostrarReloj(String reloj);
+
+    /**
+     * Nombre: mostrarColas
+     * Entradas: procesos, la lista de procesos en el orden de sus enlaces en
+     *           memoria
+     * Salidas: ninguna
+     * Restricciones: ninguna
+     * Descripcion: muestra la estructura de lista de procesos y las colas que
+     *              salen de ella (en CPU, preparados, en espera).
+     */
+    void mostrarColas(List<Proceso> procesos);
+
+    /**
+     * Nombre: mostrarResumen
+     * Entradas: usoDisco, porcentaje ocupado del area de archivos del disco;
+     *           admitidos, procesos con BCP en este momento
+     * Salidas: ninguna
+     * Restricciones: ninguna
+     * Descripcion: datos de la barra de estado.
+     */
+    void mostrarResumen(int usoDisco, int admitidos);
+
+    /**
+     * Nombre: mostrarEstadisticas
+     * Entradas: ninguna
+     * Salidas: ninguna
+     * Restricciones: se llama una vez, cuando finaliza el ultimo trabajo
+     * Descripcion: abre las estadisticas cuando terminan todos los procesos.
+     */
+    void mostrarEstadisticas();
 }

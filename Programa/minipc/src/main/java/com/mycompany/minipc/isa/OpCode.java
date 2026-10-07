@@ -1,71 +1,140 @@
 package com.mycompany.minipc.isa;
 
+import java.util.List;
+
 /**
  * Nombre: OpCode
  * Entradas: no aplica, es una enumeracion de valores fijos
  * Salidas: no aplica
- * Restricciones: los codigos son los del enunciado y no deben cambiarse, ya
- *                que determinan el binario que se guarda en memoria
- * Descripcion: juego de instrucciones del Mini PC. se usa la version de cuatro bits, que es
- *              la consistente con la figura 1.3d de Stallings
+ * Restricciones: los pesos son fijos
+ * Descripcion: juego de instrucciones del Mini PC. Cada operacion declara su
+ *              peso, es decir, cuantos segundos de CPU consume, y las formas
+ *              en que se pueden escribir sus operandos. El ensamblador solo
+ *              acepta una linea si coincide completa con alguna de ellas. El
+ *              peso de INT depende del codigo de interrupcion, por eso se
+ *              toma de Interrupcion.
  */
 public enum OpCode {
 
-    /** Carga un valor inmediato en un registro. Rx recibe el operando. */
-    MOV(0b0011, true),
+    /** AC recibe el valor del registro. */
+    LOAD(2, Forma.REGISTRO),
 
-    /** Copia el contenido de un registro al acumulador. AC recibe Rx. */
-    LOAD(0b0001, false),
+    /** El registro recibe el valor del AC. */
+    STORE(2, Forma.REGISTRO),
 
-    /** Copia el acumulador a un registro. Rx recibe AC. */
-    STORE(0b0010, false),
+    /** El registro destino recibe otro registro, un valor inmediato o la direccion de un texto. */
+    MOV(1, Forma.REGISTRO_REGISTRO, Forma.REGISTRO_NUMERO, Forma.REGISTRO_TEXTO),
 
-    /** Suma un registro al acumulador. AC recibe AC mas Rx. */
-    ADD(0b0101, false),
+    /** AC recibe AC mas el registro. */
+    ADD(3, Forma.REGISTRO),
 
-    /** Resta un registro del acumulador. AC recibe AC menos Rx. */
-    SUB(0b0100, false);
+    /** AC recibe AC menos el registro. */
+    SUB(3, Forma.REGISTRO),
 
-    private final int codigo;
-    private final boolean requiereInmediato;
+    /** Incrementa en 1 el AC, o el registro indicado. */
+    INC(1, Forma.SIN_OPERANDOS, Forma.REGISTRO),
+
+    /** Decrementa en 1 el AC, o el registro indicado. */
+    DEC(1, Forma.SIN_OPERANDOS, Forma.REGISTRO),
+
+    /** Intercambia los valores de dos registros. */
+    SWAP(1, Forma.REGISTRO_REGISTRO),
+
+    /** Pide un servicio al sistema operativo; el peso depende del codigo. */
+    INT(OpCode.PESO_DE_LA_INTERRUPCION, Forma.INTERRUPCION),
+
+    /** Salta segun el desplazamiento. */
+    JMP(2, Forma.DESPLAZAMIENTO),
+
+    /** Compara dos registros y deja el resultado para JE y JNE. */
+    CMP(2, Forma.REGISTRO_REGISTRO),
+
+    /** Salta si la ultima comparacion dio igual. */
+    JE(2, Forma.DESPLAZAMIENTO),
+
+    /** Salta si la ultima comparacion dio distinto. */
+    JNE(2, Forma.DESPLAZAMIENTO),
+
+    /** Guarda en la pila de uno a tres valores de entrada. */
+    PARAM(3, Forma.PARAMETROS),
+
+    /** Guarda en la pila el valor del registro. */
+    PUSH(1, Forma.REGISTRO),
+
+    /** Saca el valor del tope de la pila y lo guarda en el registro. */
+    POP(1, Forma.REGISTRO);
+
+    /** Marca del peso de INT, que no es fijo sino que depende del codigo. */
+    public static final int PESO_DE_LA_INTERRUPCION = 0;
+
+    private final int peso;
+    private final List<Forma> formas;
 
     /**
      * Nombre: OpCode
-     * Entradas: codigo, nibble que identifica la operacion;
-     *           requiereInmediato, si la sintaxis exige un valor literal
+     * Entradas: peso, segundos de CPU que consume; formas, maneras validas
+     *           de escribir los operandos
      * Salidas: la constante construida
      * Restricciones: privado, solo lo invoca la propia enumeracion
-     * Descripcion: asocia a cada operacion su codigo binario y si lleva o no
-     *              un operando inmediato.
+     * Descripcion: asocia a cada operacion su peso y sus formas validas.
      */
-    OpCode(int codigo, boolean requiereInmediato) {
-        this.codigo = codigo;
-        this.requiereInmediato = requiereInmediato;
+    OpCode(int peso, Forma... formas) {
+        this.peso = peso;
+        this.formas = List.of(formas);
     }
 
     /**
-     * Nombre: getCodigo
+     * Nombre: getPeso
      * Entradas: ninguna
-     * Salidas: el nibble de cuatro bits que identifica la operacion
-     * Restricciones: ninguna
-     * Descripcion: lo usa Instruccion.aPalabra() para armar los bits 15 a 12
-     *              de la palabra de memoria.
+     * Salidas: los segundos de CPU que consume la operacion
+     * Restricciones: para INT devuelve PESO_DE_LA_INTERRUPCION; el peso real
+     *                se obtiene de la instruccion, que conoce el codigo
+     * Descripcion: acceso de solo lectura al campo correspondiente.
      */
-    public int getCodigo() {
-        return codigo;
+    public int getPeso() {
+        return peso;
     }
 
     /**
-     * Nombre: requiereInmediato
+     * Nombre: getFormas
      * Entradas: ninguna
-     * Salidas: true si la instruccion lleva un valor inmediato
-     * Restricciones: ninguna
-     * Descripcion: solo MOV lo lleva; el resto operan unicamente sobre
-     *              registros y dejan el campo de operando en cero. El
-     *              ensamblador lo consulta para saber cuantos tokens esperar.
+     * Salidas: las formas validas de la operacion, en orden
+     * Restricciones: la lista es inmutable
+     * Descripcion: el ensamblador prueba la linea contra cada una.
      */
-    public boolean requiereInmediato() {
-        return requiereInmediato;
+    public List<Forma> getFormas() {
+        return formas;
+    }
+
+    /**
+     * Nombre: esSalto
+     * Entradas: ninguna
+     * Salidas: true si la operacion cambia el PC con un desplazamiento
+     * Restricciones: ninguna
+     * Descripcion: el ensamblador la usa para validar que el destino de los
+     *              saltos quede dentro del programa.
+     */
+    public boolean esSalto() {
+        return formas.contains(Forma.DESPLAZAMIENTO);
+    }
+
+    /**
+     * Nombre: describirFormas
+     * Entradas: ninguna
+     * Salidas: las formas validas en texto, por ejemplo "MOV REG, NUMERO"
+     * Restricciones: ninguna
+     * Descripcion: se usa en los mensajes de error para decir que se
+     *              esperaba; si hay varias formas se unen con " o ".
+     */
+    public String describirFormas() {
+        StringBuilder texto = new StringBuilder();
+        for (Forma forma : formas) {
+            if (texto.length() > 0) {
+                texto.append(" o ");
+            }
+            texto.append('"').append(forma.describir(this)).append('"');
+        }
+        return texto.toString();
     }
 
     /**
@@ -88,25 +157,5 @@ public enum OpCode {
             }
         }
         throw new IllegalArgumentException("Operacion desconocida: " + mnemonico);
-    }
-
-    /**
-     * Nombre: desdeCodigo
-     * Entradas: nibble, codigo de cuatro bits leido de la palabra en memoria
-     * Salidas: la operacion correspondiente
-     * Restricciones: si el codigo no corresponde a ninguna operacion lanza
-     *                IllegalArgumentException
-     * Descripcion: operacion inversa de getCodigo. La usa el procesador en la
-     *              etapa de decodificacion, tras extraer los bits 15 a 12 del
-     *              registro de instruccion.
-     */
-    public static OpCode desdeCodigo(int nibble) {
-        for (OpCode op : values()) {
-            if (op.codigo == nibble) {
-                return op;
-            }
-        }
-        throw new IllegalArgumentException(
-                "Codigo de operacion desconocido: " + Integer.toBinaryString(nibble));
     }
 }

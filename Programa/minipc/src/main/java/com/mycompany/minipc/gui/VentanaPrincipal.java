@@ -1,217 +1,394 @@
 package com.mycompany.minipc.gui;
 
-import com.mycompany.minipc.core.BCP;
-import com.mycompany.minipc.isa.Instruccion;
-import com.mycompany.minipc.isa.RegistroID;
-
-import javax.swing.BorderFactory;
-import javax.swing.JButton;
-import javax.swing.JFileChooser;
-import javax.swing.JOptionPane;
-import javax.swing.filechooser.FileNameExtensionFilter;
-import javax.swing.table.AbstractTableModel;
-import javax.swing.table.TableColumnModel;
+import java.awt.BorderLayout;
 import java.awt.Color;
-import java.beans.PropertyChangeEvent;
-import java.beans.PropertyChangeListener;
+import java.awt.Dimension;
+import java.awt.FlowLayout;
+import java.awt.GridLayout;
+import java.awt.event.ActionEvent;
+import java.awt.event.InputEvent;
+import java.awt.event.KeyEvent;
 import java.io.File;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
+import java.util.function.Consumer;
+
+import javax.swing.BorderFactory;
+import javax.swing.JButton;
+import javax.swing.JComponent;
+import javax.swing.JFileChooser;
+import javax.swing.JLabel;
+import javax.swing.JMenu;
+import javax.swing.JMenuBar;
+import javax.swing.JMenuItem;
+import javax.swing.JOptionPane;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.JSplitPane;
+import javax.swing.JTabbedPane;
+import javax.swing.JTable;
+import javax.swing.JTextArea;
+import javax.swing.KeyStroke;
+import javax.swing.SwingUtilities;
+import javax.swing.filechooser.FileNameExtensionFilter;
+import javax.swing.table.AbstractTableModel;
+
+import com.mycompany.minipc.config.LectorConfiguracion;
+import com.mycompany.minipc.gui.panel.PanelBCP;
+import com.mycompany.minipc.gui.panel.PanelColas;
+import com.mycompany.minipc.gui.panel.PanelListaTrabajos;
+import com.mycompany.minipc.gui.panel.PanelPantalla;
+import com.mycompany.minipc.gui.panel.Tablas;
+import com.mycompany.minipc.so.procesos.Proceso;
 
 /**
  * Nombre: VentanaPrincipal
- * Entradas: las acciones que el usuario pulsa sobre sus controles
- * Salidas: la representacion en pantalla del estado del simulador
- * Restricciones: no contiene logica de simulacion; cada boton delega en una
- *                sola llamada al controlador
- * Descripcion: ventana principal del simulador Mini PC. Implementa
- *              VistaPrincipal, de modo que el controlador le pide que muestre
- *              cosas y ella solo dibuja. Reune la barra de herramientas, la
- *              tabla de instrucciones, la tabla de memoria, el panel del BCP y
- *              la consola de actividad.
+ * Entradas: no aplica, es la ventana de la aplicacion
+ * Salidas: no aplica
+ * Restricciones: solo dibuja; toda la logica la coordina el controlador, que
+ *                le habla a traves de VistaPrincipal
+ * Descripcion: la ventana del Gestor de Procesos:
+ *
+ *                barra de titulo  nombre, reloj simulado, algoritmo y CPU
+ *                menu y barra     Cargar archivos | Ejecutar, Siguiente,
+ *                                 Pausar | Reiniciar, Limpiar | Estadisticas
+ *                izquierda        lista de trabajos y colas de procesos
+ *                centro           BCP actual de la CPU 1
+ *                derecha          memoria principal y disco, lado a lado
+ *                abajo            pantalla con teclado, consola del SO y el
+ *                                 programa en ejecucion
+ *                barra de estado  uso de memoria y disco, procesos admitidos
+ *
+ *              Cada seccion es su propia clase en gui/panel. El archivo .form
+ *              solo tiene el marco de la ventana; el resto se arma aqui, asi
+ *              el codigo generado por NetBeans no se mezcla con el del tema.
  */
 public class VentanaPrincipal extends javax.swing.JFrame implements VistaPrincipal {
 
     private static final long serialVersionUID = 1L;
 
-    /** Formato de la hora que precede cada linea de la consola. */
     private static final DateTimeFormatter HORA = DateTimeFormatter.ofPattern("HH:mm:ss");
 
-    /** Carpetas donde buscar los programas de ejemplo al abrir el dialogo. */
     private static final String[] CARPETAS_EJEMPLO = {"../../Ejemplo", "../Ejemplo", "Ejemplo"};
 
-    /** Accion de entrada: traer un programa del disco. */
-    private static final Color COLOR_CARGA = new Color(41, 98, 155);
-
-    /** Acciones que hacen avanzar el ciclo de instruccion. */
-    private static final Color COLOR_EJECUCION = new Color(34, 124, 78);
-
-    /** Accion que devuelve el procesador al inicio. */
-    private static final Color COLOR_REINICIO = new Color(176, 122, 24);
-
-    /** Accion destructiva: descarta lo cargado. */
-    private static final Color COLOR_LIMPIEZA = new Color(163, 58, 48);
-
-    /** Acciones auxiliares que no alteran la ejecucion. */
-    private static final Color COLOR_UTILIDAD = new Color(84, 95, 110);
-
-    private static final Color FONDO_DESHABILITADO = new Color(206, 208, 211);
-    private static final Color TEXTO_DESHABILITADO = new Color(128, 131, 136);
-
-    /** Estado del proceso mientras avanza con normalidad. */
-    private static final Color ESTADO_ACTIVO = new Color(34, 124, 78);
-
-    /** Estado del proceso cuando se detuvo por un error. */
-    private static final Color ESTADO_ERROR = new Color(163, 58, 48);
-
-    /** Estado del proceso cuando no hay nada cargado. */
-    private static final Color ESTADO_NEUTRO = new Color(96, 100, 106);
-
     private final ControladorPrincipal controlador;
+
+    // Barra de titulo y barra de herramientas
+    private final JLabel lblReloj = etiquetaTitulo("00:00:00");
+    private final JLabel lblAlgoritmo = etiquetaTitulo("FCFS");
+    private final JLabel lblEnCpu = new JLabel();
+    private final JButton btnCargar = new JButton("Cargar archivos");
+    private final JButton btnEjecutar = new JButton("Ejecutar");
+    private final JButton btnSiguiente = new JButton("Siguiente");
+    private final JButton btnPausar = new JButton("Pausar");
+    private final JButton btnReiniciar = new JButton("Reiniciar");
+    private final JButton btnLimpiar = new JButton("Limpiar");
+    private final JButton btnEstadisticas = new JButton("Estadisticas");
+    private final JButton btnConfigurar = new JButton("Configuracion");
+
+    // Secciones
+    private final PanelListaTrabajos panelTrabajos;
+    private final PanelColas panelColas = new PanelColas();
+    private final PanelBCP panelBCP = new PanelBCP();
+    private final PanelPantalla panelPantalla;
+    private final JTable tblMemoria;
+    private final JTable tblDisco;
+    private final JTable tblPrograma;
+    private final JTextArea txtConsola = new JTextArea();
+
+    // Barra de estado
+    private final JLabel lblMemoria = etiquetaEstado();
+    private final JLabel lblDisco = etiquetaEstado();
+    private final JLabel lblAdmitidos = etiquetaEstado();
+    private final JLabel lblModo = etiquetaEstado();
 
     /**
      * Nombre: VentanaPrincipal
      * Entradas: ninguna
      * Salidas: la ventana construida y lista para mostrarse
-     * Restricciones: debe crearse dentro del hilo de despacho de eventos de
-     *                Swing
-     * Descripcion: arma los componentes, crea el controlador, le asigna a cada
-     *              tabla su modelo y su renderer, ajusta los anchos de columna
-     *              y pide al controlador que deje la vista en su estado
-     *              inicial.
+     * Restricciones: debe construirse en el hilo de eventos de Swing
+     * Descripcion: crea el controlador, arma todas las secciones con los
+     *              modelos y renderers que el controlador provee y deja la
+     *              vista en su estado inicial.
      */
     public VentanaPrincipal() {
         initComponents();
-        this.controlador = new ControladorPrincipal(this);
+        this.controlador = new ControladorPrincipal(this, new LectorConfiguracion());
 
-        tblInstrucciones.setModel(controlador.getModeloInstrucciones());
-        tblInstrucciones.setDefaultRenderer(Object.class, controlador.getRenderInstrucciones());
-        ajustarAnchos(tblInstrucciones.getColumnModel(), new int[]{40, 160, 190});
+        panelTrabajos = new PanelListaTrabajos(controlador.getModeloTrabajos());
+        panelPantalla = new PanelPantalla(controlador::alEnviarTeclado);
 
-        tblMemoria.setModel(controlador.getModeloMemoria());
+        tblMemoria = new JTable(controlador.getModeloMemoria());
+        Tablas.estilo(tblMemoria, new int[]{44, 120, 170});
         tblMemoria.setDefaultRenderer(Object.class, controlador.getRenderMemoria());
-        ajustarAnchos(tblMemoria.getColumnModel(), new int[]{50, 70, 130, 150});
 
-        pintarBotones();
+        tblDisco = new JTable(controlador.getModeloDisco());
+        Tablas.estilo(tblDisco, new int[]{44, 70, 170});
+        tblDisco.setDefaultRenderer(Object.class, controlador.getRenderDisco());
+
+        tblPrograma = new JTable(controlador.getModeloInstrucciones());
+        Tablas.estilo(tblPrograma, new int[]{40, 300});
+        tblPrograma.setDefaultRenderer(Object.class, controlador.getRenderInstrucciones());
+
+        txtConsola.setEditable(false);
+        txtConsola.setFont(Tema.FUENTE_MONO);
+        txtConsola.setLineWrap(true);
+        txtConsola.setWrapStyleWord(true);
+
+        armarVentana();
         controlador.inicializarVista();
     }
 
     /**
-     * Nombre: pintarBotones
+     * Nombre: armarVentana
+     * Entradas: ninguna
+     * Salidas: ninguna
+     * Restricciones: se llama una vez, desde el constructor
+     * Descripcion: ubica las secciones segun la distribucion de la clase.
+     */
+    private void armarVentana() {
+        getContentPane().setBackground(Tema.FONDO);
+        setJMenuBar(crearMenu());
+
+        JPanel norte = new JPanel(new BorderLayout());
+        norte.add(crearBarraTitulo(), BorderLayout.NORTH);
+        norte.add(crearBarraHerramientas(), BorderLayout.SOUTH);
+        getContentPane().add(norte, BorderLayout.NORTH);
+
+        JSplitPane izquierda = dividir(JSplitPane.VERTICAL_SPLIT,
+                Tema.seccion("Lista de trabajos", panelTrabajos),
+                Tema.seccion("Colas de procesos", panelColas), 0.62);
+
+        JPanel almacenamiento = new JPanel(new GridLayout(1, 2, 6, 0));
+        almacenamiento.setBackground(Tema.FONDO);
+        almacenamiento.add(Tema.seccion("Memoria principal", conLeyenda(tblMemoria,
+                Tablas.leyenda(Tema.CABECERA_SO, "SO", Tema.colorProceso(0), "BCP",
+                        Tema.colorProcesoClaro(0), "Programa", Tema.RESALTADO, "PC"))));
+        almacenamiento.add(Tema.seccion("Disco", conLeyenda(tblDisco,
+                Tablas.leyenda(new Color(255, 228, 196), "Indice", new Color(214, 234, 248),
+                        "Archivos", new Color(232, 232, 232), "Virtual"))));
+
+        JSplitPane derecha = dividir(JSplitPane.HORIZONTAL_SPLIT,
+                Tema.seccion("BCP actual - CPU 1", panelBCP), almacenamiento, 0.36);
+        JSplitPane centro = dividir(JSplitPane.HORIZONTAL_SPLIT, izquierda, derecha, 0.27);
+
+        JTabbedPane consolas = new JTabbedPane();
+        consolas.setFont(Tema.FUENTE);
+        consolas.addTab("Consola del SO", new JScrollPane(txtConsola));
+        consolas.addTab("Programa en ejecucion", new JScrollPane(tblPrograma));
+        JPanel inferior = new JPanel(new GridLayout(1, 2, 6, 0));
+        inferior.setBackground(Tema.FONDO);
+        inferior.add(Tema.seccion("Pantalla", panelPantalla));
+        inferior.add(Tema.seccion("Sistema operativo", consolas));
+        inferior.setPreferredSize(new Dimension(100, 210));
+
+        JSplitPane general = dividir(JSplitPane.VERTICAL_SPLIT, centro, inferior, 0.70);
+        general.setBorder(BorderFactory.createEmptyBorder(6, 6, 0, 6));
+        getContentPane().add(general, BorderLayout.CENTER);
+        getContentPane().add(crearBarraEstado(), BorderLayout.SOUTH);
+
+        setSize(1366, 768);
+        setMinimumSize(new Dimension(1100, 650));
+        setLocationRelativeTo(null);
+        setExtendedState(MAXIMIZED_BOTH);
+    }
+
+    /**
+     * Nombre: crearBarraTitulo
+     * Entradas: ninguna
+     * Salidas: la franja menta con el nombre del programa y el reloj
+     * Restricciones: ninguna
+     * Descripcion: a la derecha muestra el reloj simulado, el algoritmo y la
+     *              CPU, que son datos que conviene ver siempre.
+     */
+    private JComponent crearBarraTitulo() {
+        JPanel barra = new JPanel(new BorderLayout());
+        barra.setBackground(Tema.MENTA);
+        barra.setBorder(BorderFactory.createEmptyBorder(8, 14, 8, 14));
+        JLabel titulo = new JLabel("Proyecto 1 de SO - Gestor de Procesos");
+        titulo.setFont(Tema.FUENTE_TITULO);
+        titulo.setForeground(Tema.TEXTO_SOBRE_MENTA);
+        barra.add(titulo, BorderLayout.WEST);
+
+        JPanel datos = new JPanel(new FlowLayout(FlowLayout.RIGHT, 14, 0));
+        datos.setOpaque(false);
+        datos.add(etiquetaTitulo("Reloj"));
+        datos.add(lblReloj);
+        datos.add(etiquetaTitulo("|"));
+        datos.add(etiquetaTitulo("Planificacion"));
+        datos.add(lblAlgoritmo);
+        datos.add(etiquetaTitulo("|"));
+        datos.add(etiquetaTitulo("CPU 1"));
+        lblReloj.setFont(Tema.FUENTE_TITULO);
+        lblReloj.setForeground(Tema.TEXTO_SOBRE_MENTA);
+        lblAlgoritmo.setFont(Tema.FUENTE_NEGRITA);
+        lblAlgoritmo.setForeground(Tema.TEXTO_SOBRE_MENTA);
+        barra.add(datos, BorderLayout.EAST);
+        return barra;
+    }
+
+    /**
+     * Nombre: crearBarraHerramientas
+     * Entradas: ninguna
+     * Salidas: los botones agrupados por funcion y el proceso en la CPU
+     * Restricciones: ninguna
+     * Descripcion: cargar | ejecutar, siguiente, pausar | reiniciar, limpiar
+     *              | estadisticas, configuracion; cada grupo con su color.
+     */
+    private JComponent crearBarraHerramientas() {
+        Tema.pintarBoton(btnCargar, Tema.BOTON_CARGAR);
+        Tema.pintarBoton(btnEjecutar, Tema.BOTON_EJECUTAR);
+        Tema.pintarBoton(btnSiguiente, Tema.BOTON_EJECUTAR);
+        Tema.pintarBoton(btnPausar, Tema.BOTON_PAUSA);
+        Tema.pintarBoton(btnReiniciar, Tema.BOTON_PAUSA);
+        Tema.pintarBoton(btnLimpiar, Tema.BOTON_LIMPIAR);
+        Tema.pintarBoton(btnEstadisticas, Tema.BOTON_UTILIDAD);
+        Tema.pintarBoton(btnConfigurar, Tema.BOTON_UTILIDAD);
+
+        btnCargar.addActionListener(e -> controlador.alCargarArchivos());
+        btnEjecutar.addActionListener(e -> controlador.alEjecutar());
+        btnSiguiente.addActionListener(e -> controlador.alPasoAPaso());
+        btnPausar.addActionListener(e -> controlador.alPausar());
+        btnReiniciar.addActionListener(e -> controlador.alReiniciar());
+        btnLimpiar.addActionListener(e -> controlador.alLimpiar());
+        btnEstadisticas.addActionListener(e -> abrirEstadisticas());
+        btnConfigurar.addActionListener(e -> abrirConfiguracion());
+
+        btnSiguiente.setToolTipText("Un segundo de CPU (F8)");
+        btnEjecutar.setToolTipText("Ejecuta todos los procesos hasta terminar (F5)");
+        btnCargar.setToolTipText("Carga uno o varios archivos .asm (Ctrl+O)");
+
+        JPanel botones = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
+        botones.setOpaque(false);
+        botones.add(btnCargar);
+        botones.add(separador());
+        botones.add(btnEjecutar);
+        botones.add(btnSiguiente);
+        botones.add(btnPausar);
+        botones.add(separador());
+        botones.add(btnReiniciar);
+        botones.add(btnLimpiar);
+        botones.add(separador());
+        botones.add(btnEstadisticas);
+        botones.add(btnConfigurar);
+
+        lblEnCpu.setFont(Tema.FUENTE_NEGRITA);
+        JPanel barra = new JPanel(new BorderLayout());
+        barra.setBackground(Tema.TARJETA);
+        barra.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createMatteBorder(0, 0, 1, 0, Tema.BORDE),
+                BorderFactory.createEmptyBorder(6, 8, 6, 14)));
+        barra.add(botones, BorderLayout.WEST);
+        barra.add(lblEnCpu, BorderLayout.EAST);
+        return barra;
+    }
+
+    /**
+     * Nombre: crearMenu
+     * Entradas: ninguna
+     * Salidas: el menu Archivo, Ejecucion, Configuracion y Ayuda
+     * Restricciones: ninguna
+     * Descripcion: el menu repite las acciones de los botones, con atajos de
+     *              teclado, y da acceso a la configuracion.
+     */
+    private JMenuBar crearMenu() {
+        JMenuBar barra = new JMenuBar();
+        JMenu archivo = new JMenu("Archivo");
+        archivo.add(item("Cargar archivos...", KeyStroke.getKeyStroke(KeyEvent.VK_O,
+                InputEvent.CTRL_DOWN_MASK), e -> controlador.alCargarArchivos()));
+        archivo.addSeparator();
+        archivo.add(item("Salir", null, e -> dispose()));
+
+        JMenu ejecucion = new JMenu("Ejecucion");
+        ejecucion.add(item("Ejecutar", KeyStroke.getKeyStroke(KeyEvent.VK_F5, 0),
+                e -> controlador.alEjecutar()));
+        ejecucion.add(item("Siguiente", KeyStroke.getKeyStroke(KeyEvent.VK_F8, 0),
+                e -> controlador.alPasoAPaso()));
+        ejecucion.add(item("Pausar", null, e -> controlador.alPausar()));
+        ejecucion.addSeparator();
+        ejecucion.add(item("Reiniciar", null, e -> controlador.alReiniciar()));
+        ejecucion.add(item("Limpiar", null, e -> controlador.alLimpiar()));
+        ejecucion.addSeparator();
+        ejecucion.add(item("Estadisticas", null, e -> abrirEstadisticas()));
+
+        JMenu configuracion = new JMenu("Configuracion");
+        configuracion.add(item("Memoria, disco y planificacion...", null,
+                e -> abrirConfiguracion()));
+
+        JMenu ayuda = new JMenu("Ayuda");
+        ayuda.add(item("Acerca de", null, e -> JOptionPane.showMessageDialog(this,
+                "Proyecto 1 - Gestor de Procesos\nIC-6600 Principios de Sistemas Operativos\n"
+                + "Kernel: " + controlador.getSistemaOperativo().describirKernel()
+                + "\nPlanificacion: FCFS",
+                "Acerca de", JOptionPane.INFORMATION_MESSAGE)));
+
+        barra.add(archivo);
+        barra.add(ejecucion);
+        barra.add(configuracion);
+        barra.add(ayuda);
+        return barra;
+    }
+
+    /**
+     * Nombre: crearBarraEstado
+     * Entradas: ninguna
+     * Salidas: la franja inferior con los datos de uso
+     * Restricciones: ninguna
+     * Descripcion: memoria de usuario, disco, procesos admitidos y modo.
+     */
+    private JComponent crearBarraEstado() {
+        JPanel barra = new JPanel(new FlowLayout(FlowLayout.LEFT, 16, 3));
+        barra.setBackground(Tema.TARJETA);
+        barra.setBorder(BorderFactory.createMatteBorder(1, 0, 0, 0, Tema.BORDE));
+        barra.add(lblMemoria);
+        barra.add(lblDisco);
+        barra.add(lblAdmitidos);
+        barra.add(lblModo);
+        return barra;
+    }
+
+    /**
+     * Nombre: abrirEstadisticas
      * Entradas: ninguna
      * Salidas: ninguna
      * Restricciones: ninguna
-     * Descripcion: asigna a cada boton el color de su grupo de acciones, de
-     *              modo que el usuario distinga de un vistazo lo que carga, lo
-     *              que ejecuta, lo que reinicia y lo que descarta.
+     * Descripcion: muestra el dialogo de estadisticas.
      */
-    private void pintarBotones() {
-        pintarBoton(btnCargar, COLOR_CARGA);
-        pintarBoton(btnEjecutar, COLOR_EJECUCION);
-        pintarBoton(btnPaso, COLOR_EJECUCION);
-        pintarBoton(btnReiniciar, COLOR_REINICIO);
-        pintarBoton(btnLimpiar, COLOR_LIMPIEZA);
-        pintarBoton(btnConfig, COLOR_UTILIDAD);
-        pintarBoton(btnEstadisticas, COLOR_UTILIDAD);
+    private void abrirEstadisticas() {
+        new DialogoEstadisticas(this, true, controlador).setVisible(true);
     }
 
     /**
-     * Nombre: pintarBoton
-     * Entradas: boton, control a pintar; color, fondo cuando este habilitado
-     * Salidas: ninguna
-     * Restricciones: hay que apagar el relleno propio de la apariencia del
-     *                sistema, porque de lo contrario Windows dibuja su propia
-     *                superficie encima y el color asignado no se ve
-     * Descripcion: pinta el boton y le agrega un oyente que vuelve a aplicar
-     *              el color cada vez que cambia su habilitacion. Sin ese
-     *              oyente, un boton deshabilitado conservaria su color vivo y
-     *              parecería disponible cuando no lo esta.
-     */
-    private void pintarBoton(final JButton boton, final Color color) {
-        boton.setContentAreaFilled(false);
-        boton.setOpaque(true);
-        boton.setBorderPainted(false);
-        boton.setFocusPainted(false);
-        boton.setBorder(BorderFactory.createEmptyBorder(7, 14, 7, 14));
-        aplicarColor(boton, color);
-        boton.addPropertyChangeListener("enabled", new PropertyChangeListener() {
-            @Override
-            public void propertyChange(PropertyChangeEvent evt) {
-                aplicarColor(boton, color);
-            }
-        });
-    }
-
-    /**
-     * Nombre: aplicarColor
-     * Entradas: boton, control a pintar; color, fondo para el estado habilitado
+     * Nombre: abrirConfiguracion
+     * Entradas: ninguna
      * Salidas: ninguna
      * Restricciones: ninguna
-     * Descripcion: aplica el color vivo con texto blanco si el boton esta
-     *              habilitado, y un gris apagado si no lo esta.
+     * Descripcion: muestra el dialogo de configuracion.
      */
-    private void aplicarColor(JButton boton, Color color) {
-        if (boton.isEnabled()) {
-            boton.setBackground(color);
-            boton.setForeground(Color.WHITE);
-        } else {
-            boton.setBackground(FONDO_DESHABILITADO);
-            boton.setForeground(TEXTO_DESHABILITADO);
-        }
+    private void abrirConfiguracion() {
+        new DialogoConfiguracion(this, true, controlador).setVisible(true);
     }
 
-    /**
-     * Nombre: colorDelEstado
-     * Entradas: estado, nombre del estado del proceso
-     * Salidas: el color con que debe mostrarse ese estado
-     * Restricciones: ninguna
-     * Descripcion: rojo si el proceso quedo bloqueado por un error, gris si no
-     *              hay programa cargado, y verde en cualquier otro caso, que
-     *              son los estados en que el proceso avanza con normalidad.
-     */
-    private Color colorDelEstado(String estado) {
-        if ("BLOQUEADO_ERROR".equals(estado)) {
-            return ESTADO_ERROR;
-        }
-        if ("SIN PROGRAMA".equals(estado) || "-".equals(estado)) {
-            return ESTADO_NEUTRO;
-        }
-        return ESTADO_ACTIVO;
-    }
+    // ------------------------------------------------------------------
+    // VistaPrincipal
+    // ------------------------------------------------------------------
 
-    /**
-     * Nombre: ajustarAnchos
-     * Entradas: columnas, modelo de columnas de la tabla; anchos, ancho
-     *           deseado para cada una en pixeles
-     * Salidas: ninguna
-     * Restricciones: si el arreglo tiene mas entradas que columnas, las de mas
-     *                se ignoran
-     * Descripcion: fija el ancho preferido de cada columna, para que la
-     *              posicion no ocupe lo mismo que el binario.
-     */
-    private void ajustarAnchos(TableColumnModel columnas, int[] anchos) {
-        for (int i = 0; i < anchos.length && i < columnas.getColumnCount(); i++) {
-            columnas.getColumn(i).setPreferredWidth(anchos[i]);
-        }
-    }
-
- 
     /**
      * Nombre: mostrarInstrucciones
-     * Entradas: programa, instrucciones traducidas en orden
+     * Entradas: programa, texto de cada instruccion en orden
      * Salidas: ninguna
      * Restricciones: no usa el parametro, porque el modelo de la tabla lo
      *                mantiene el controlador
-     * Descripcion: devuelve la tabla al principio de la lista y la redibuja,
-     *              que es lo unico que le corresponde hacer a la vista cuando
-     *              hay un programa nuevo.
+     * Descripcion: vuelve la tabla del programa al principio y la redibuja.
      */
     @Override
-    public void mostrarInstrucciones(List<Instruccion> programa) {
-        tblInstrucciones.clearSelection();
-        tblInstrucciones.scrollRectToVisible(tblInstrucciones.getCellRect(0, 0, true));
-        tblInstrucciones.repaint();
+    public void mostrarInstrucciones(List<String> programa) {
+        tblPrograma.clearSelection();
+        tblPrograma.scrollRectToVisible(tblPrograma.getCellRect(0, 0, true));
+        tblPrograma.repaint();
     }
 
     /**
@@ -219,16 +396,13 @@ public class VentanaPrincipal extends javax.swing.JFrame implements VistaPrincip
      * Entradas: indiceFila, fila a resaltar, o -1 para no resaltar ninguna
      * Salidas: ninguna
      * Restricciones: un indice fuera de rango se ignora sin fallar
-     * Descripcion: redibuja la tabla, cuyo renderer ya sabe que fila destacar,
-     *              y desplaza la vista para que esa fila quede visible aunque
-     *              el programa sea mas largo que la ventana.
+     * Descripcion: redibuja la tabla del programa y la desplaza a la fila.
      */
     @Override
     public void resaltarInstruccion(int indiceFila) {
-        tblInstrucciones.repaint();
-        if (indiceFila >= 0 && indiceFila < tblInstrucciones.getRowCount()) {
-            tblInstrucciones.scrollRectToVisible(
-                    tblInstrucciones.getCellRect(indiceFila, 0, true));
+        tblPrograma.repaint();
+        if (indiceFila >= 0 && indiceFila < tblPrograma.getRowCount()) {
+            tblPrograma.scrollRectToVisible(tblPrograma.getCellRect(indiceFila, 0, true));
         }
     }
 
@@ -237,91 +411,63 @@ public class VentanaPrincipal extends javax.swing.JFrame implements VistaPrincip
      * Entradas: ninguna
      * Salidas: ninguna
      * Restricciones: ninguna
-     * Descripcion: avisa al modelo de que su contenido cambio y desplaza la
-     *              tabla hasta la posicion que apunta el PC, para que el
-     *              usuario siga la ejecucion sin tener que buscarla entre las
-     *              256 filas.
+     * Descripcion: redibuja la tabla de memoria y la desplaza hasta la
+     *              instruccion del proceso en ejecucion.
      */
     @Override
     public void refrescarMemoria() {
         ((AbstractTableModel) tblMemoria.getModel()).fireTableDataChanged();
-        int direccion = controlador.getProcesador().getPc();
-        if (controlador.getProcesador().hayPrograma()
-                && direccion < tblMemoria.getRowCount()) {
+        Proceso actual = controlador.getSistemaOperativo().getEnEjecucion();
+        int direccion = actual == null ? -1 : actual.getPc();
+        if (direccion >= 0 && direccion < tblMemoria.getRowCount()) {
             tblMemoria.scrollRectToVisible(tblMemoria.getCellRect(direccion, 0, true));
         }
     }
 
     /**
-     * Nombre: mostrarBCP
-     * Entradas: bcp, bloque a mostrar, o nulo si no hay proceso
-     * Salidas: ninguna
-     * Restricciones: tolera el valor nulo, que ocurre tras descargar el
-     *                programa
-     * Descripcion: vuelca los catorce atributos del bloque de control en las
-     *              etiquetas del panel correspondiente.
-     */
-    @Override
-    public void mostrarBCP(BCP bcp) {
-        if (bcp == null) {
-            limpiarBCP();
-            return;
-        }
-        lblPidValor.setText(String.valueOf(bcp.getPid()));
-        lblProgramaValor.setText(bcp.getNombrePrograma());
-        lblEstadoBcpValor.setText(bcp.getEstado().name());
-        lblEstadoBcpValor.setForeground(colorDelEstado(bcp.getEstado().name()));
-        lblPcValor.setText(String.valueOf(bcp.getPc()));
-        lblIrBinValor.setText(bcp.getIrBinario());
-        lblIrTextoValor.setText(bcp.getIrTexto().isEmpty() ? "-" : bcp.getIrTexto());
-        lblAcValor.setText(String.valueOf(bcp.getAc()));
-        lblAxValor.setText(String.valueOf(bcp.getRegistro(RegistroID.AX)));
-        lblBxValor.setText(String.valueOf(bcp.getRegistro(RegistroID.BX)));
-        lblCxValor.setText(String.valueOf(bcp.getRegistro(RegistroID.CX)));
-        lblDxValor.setText(String.valueOf(bcp.getRegistro(RegistroID.DX)));
-        lblBaseValor.setText(String.valueOf(bcp.getDireccionBase()));
-        lblLimiteValor.setText(bcp.getLimite() + " posiciones");
-        lblEjecutadasValor.setText(String.valueOf(bcp.getInstruccionesEjecutadas()));
-        lblCiclosValor.setText(String.valueOf(bcp.getCiclosReloj()));
-        lblHoraCreacionValor.setText(bcp.getHoraCreacion().format(HORA));
-    }
-
-    /**
-     * Nombre: limpiarBCP
+     * Nombre: refrescarDisco
      * Entradas: ninguna
      * Salidas: ninguna
      * Restricciones: ninguna
-     * Descripcion: deja los catorce campos del BCP en su valor de reposo,
-     *              cuando no hay ningun proceso cargado.
+     * Descripcion: redibuja la tabla del disco.
      */
-    private void limpiarBCP() {
-        lblPidValor.setText("-");
-        lblProgramaValor.setText("-");
-        lblEstadoBcpValor.setText("-");
-        lblEstadoBcpValor.setForeground(ESTADO_NEUTRO);
-        lblPcValor.setText("-");
-        lblIrBinValor.setText("-");
-        lblIrTextoValor.setText("-");
-        lblAcValor.setText("0");
-        lblAxValor.setText("0");
-        lblBxValor.setText("0");
-        lblCxValor.setText("0");
-        lblDxValor.setText("0");
-        lblBaseValor.setText("-");
-        lblLimiteValor.setText("-");
-        lblEjecutadasValor.setText("0");
-        lblCiclosValor.setText("0");
-        lblHoraCreacionValor.setText("-");
+    @Override
+    public void refrescarDisco() {
+        ((AbstractTableModel) tblDisco.getModel()).fireTableDataChanged();
+    }
+
+    /**
+     * Nombre: mostrarBCP
+     * Entradas: proceso, proceso en ejecucion, o nulo si la CPU esta libre
+     * Salidas: ninguna
+     * Restricciones: tolera el valor nulo
+     * Descripcion: el panel del BCP lee cada campo de su celda en memoria.
+     */
+    @Override
+    public void mostrarBCP(Proceso proceso) {
+        panelBCP.mostrar(proceso, controlador.getProcesador(),
+                controlador.getSistemaOperativo().getMemoria());
+    }
+
+    /**
+     * Nombre: mostrarColas
+     * Entradas: procesos, la lista de procesos en el orden de los enlaces
+     * Salidas: ninguna
+     * Restricciones: ninguna
+     * Descripcion: actualiza el panel de colas y la lista de trabajos.
+     */
+    @Override
+    public void mostrarColas(List<Proceso> procesos) {
+        panelColas.mostrar(procesos);
+        panelTrabajos.refrescar();
     }
 
     /**
      * Nombre: escribirEnConsola
-     * Entradas: mensaje, texto a registrar
+     * Entradas: mensaje, texto a agregar
      * Salidas: ninguna
      * Restricciones: ninguna
-     * Descripcion: agrega la linea precedida de la hora y desplaza el cursor
-     *              al final, para que lo ultimo escrito quede siempre a la
-     *              vista.
+     * Descripcion: agrega la linea con la hora real y baja hasta el final.
      */
     @Override
     public void escribirEnConsola(String mensaje) {
@@ -334,7 +480,7 @@ public class VentanaPrincipal extends javax.swing.JFrame implements VistaPrincip
      * Entradas: ninguna
      * Salidas: ninguna
      * Restricciones: ninguna
-     * Descripcion: vacia el area de texto del registro de actividad.
+     * Descripcion: vacia la consola.
      */
     @Override
     public void limpiarConsola() {
@@ -345,92 +491,195 @@ public class VentanaPrincipal extends javax.swing.JFrame implements VistaPrincip
      * Nombre: mostrarErrores
      * Entradas: titulo, encabezado del cuadro; mensajes, errores a mostrar
      * Salidas: ninguna
-     * Restricciones: bloquea la ventana hasta que el usuario cierre el cuadro
-     * Descripcion: muestra todos los errores juntos, uno por linea, en un
-     *              cuadro de dialogo modal.
+     * Restricciones: el cuadro es modal
+     * Descripcion: muestra todos los errores juntos, uno por linea.
      */
     @Override
     public void mostrarErrores(String titulo, List<String> mensajes) {
-        JOptionPane.showMessageDialog(this, String.join("\n", mensajes),
-                titulo, JOptionPane.ERROR_MESSAGE);
+        JOptionPane.showMessageDialog(this, String.join("\n", mensajes), titulo,
+                JOptionPane.ERROR_MESSAGE);
     }
 
     /**
      * Nombre: actualizarBotones
-     * Entradas: hayPrograma, enEjecucion y termino, que describen la situacion
+     * Entradas: hayPrograma, si hay trabajos cargados; enEjecucion, si corre
+     *           la ejecucion automatica; termino, si ya no quedan pendientes
      * Salidas: ninguna
      * Restricciones: ninguna
-     * Descripcion: decide la habilitacion de los siete botones. Durante la
-     *              ejecucion automatica se bloquea todo menos lo que no
-     *              interfiere, y al terminar se vuelven a habilitar reiniciar,
-     *              limpiar y estadisticas.
+     * Descripcion: deshabilita lo que no aplica.
      */
     @Override
     public void actualizarBotones(boolean hayPrograma, boolean enEjecucion, boolean termino) {
         btnCargar.setEnabled(!enEjecucion);
-        btnConfig.setEnabled(!enEjecucion);
+        btnConfigurar.setEnabled(!enEjecucion);
         btnEjecutar.setEnabled(hayPrograma && !enEjecucion && !termino);
-        btnPaso.setEnabled(hayPrograma && !enEjecucion && !termino);
+        btnSiguiente.setEnabled(hayPrograma && !enEjecucion && !termino);
+        btnPausar.setEnabled(enEjecucion);
         btnReiniciar.setEnabled(hayPrograma && !enEjecucion);
         btnLimpiar.setEnabled(hayPrograma && !enEjecucion);
         btnEstadisticas.setEnabled(hayPrograma && !enEjecucion);
+        lblModo.setText("Modo: " + (enEjecucion ? "automatico" : "paso a paso"));
     }
 
     /**
      * Nombre: actualizarBarraContexto
-     * Entradas: nombreArchivo, archivo cargado; estado, estado del proceso
+     * Entradas: nombreArchivo, programa en la CPU; estado, estado del sistema
      * Salidas: ninguna
      * Restricciones: ninguna
-     * Descripcion: actualiza las dos etiquetas de la linea de contexto.
+     * Descripcion: muestra a la derecha de la barra de herramientas que
+     *              programa tiene la CPU.
      */
     @Override
     public void actualizarBarraContexto(String nombreArchivo, String estado) {
-        lblArchivoValor.setText(nombreArchivo);
-        lblEstadoValor.setText(estado);
-        lblEstadoValor.setForeground(colorDelEstado(estado));
+        lblEnCpu.setText("En CPU: " + nombreArchivo + "   |   " + estado);
+        lblEnCpu.setForeground("EJECUCION".equals(estado) ? Tema.BOTON_EJECUTAR
+                : Tema.TEXTO_SUAVE);
     }
 
     /**
      * Nombre: actualizarUsoMemoria
-     * Entradas: porcentaje, ocupacion de la zona de usuario de 0 a 100
+     * Entradas: porcentaje, ocupacion de la zona de usuario
      * Salidas: ninguna
      * Restricciones: ninguna
-     * Descripcion: mueve la barra de progreso y escribe el porcentaje encima.
+     * Descripcion: actualiza la barra de estado.
      */
     @Override
     public void actualizarUsoMemoria(int porcentaje) {
-        pbUsoMemoria.setValue(porcentaje);
-        pbUsoMemoria.setString(porcentaje + " %");
+        lblMemoria.setText("Memoria de usuario: " + porcentaje + " %");
     }
 
     /**
-     * Nombre: seleccionarArchivoAsm
-     * Entradas: ninguna
-     * Salidas: el archivo elegido, o nulo si el usuario cancelo
-     * Restricciones: el selector solo ofrece archivos con extension .asm
-     * Descripcion: abre el selector de archivos ya posicionado en la carpeta
-     *              de ejemplos, para que el usuario no tenga que buscarla.
+     * Nombre: mostrarResumen
+     * Entradas: usoDisco, porcentaje ocupado del area de archivos;
+     *           admitidos, procesos con BCP
+     * Salidas: ninguna
+     * Restricciones: ninguna
+     * Descripcion: actualiza la barra de estado y el algoritmo del titulo.
      */
     @Override
-    public File seleccionarArchivoAsm() {
+    public void mostrarResumen(int usoDisco, int admitidos) {
+        lblDisco.setText("Disco: " + usoDisco + " %");
+        lblAdmitidos.setText("Procesos admitidos: " + admitidos + " de "
+                + controlador.getSistemaOperativo().getTablaBCP().getRanuras());
+        lblAlgoritmo.setText(controlador.getSistemaOperativo().getAlgoritmo().getNombre());
+    }
+
+    /**
+     * Nombre: mostrarEstadisticas
+     * Entradas: ninguna
+     * Salidas: ninguna
+     * Restricciones: se difiere con invokeLater para que la ventana termine
+     *                de refrescarse antes de abrir el dialogo modal
+     * Descripcion: ver VistaPrincipal.
+     */
+    @Override
+    public void mostrarEstadisticas() {
+        SwingUtilities.invokeLater(this::abrirEstadisticas);
+    }
+
+    /**
+     * Nombre: mostrarPantalla
+     * Entradas: lineas, contenido de la pantalla del Mini PC
+     * Salidas: ninguna
+     * Restricciones: ninguna
+     * Descripcion: delega en el panel de la pantalla.
+     */
+    @Override
+    public void mostrarPantalla(List<String> lineas) {
+        panelPantalla.mostrar(lineas);
+    }
+
+    /**
+     * Nombre: habilitarTeclado
+     * Entradas: habilitado, true si algun proceso espera un valor; destino,
+     *           el proceso que recibira el valor, o nulo
+     * Salidas: ninguna
+     * Restricciones: ninguna
+     * Descripcion: delega en el panel de la pantalla.
+     */
+    @Override
+    public void habilitarTeclado(boolean habilitado, String destino) {
+        panelPantalla.habilitarTeclado(habilitado, destino);
+    }
+
+    /**
+     * Nombre: mostrarReloj
+     * Entradas: reloj, tiempo simulado como hora:minuto:segundo
+     * Salidas: ninguna
+     * Restricciones: ninguna
+     * Descripcion: actualiza el reloj de la barra de titulo.
+     */
+    @Override
+    public void mostrarReloj(String reloj) {
+        lblReloj.setText(reloj);
+    }
+
+    /**
+     * Nombre: seleccionarArchivosAsm
+     * Entradas: ninguna
+     * Salidas: los archivos elegidos, o una lista vacia si el usuario cancelo
+     * Restricciones: el selector solo ofrece archivos con extension .asm
+     * Descripcion: abre el selector en la carpeta de ejemplos. Se pueden
+     *              elegir varios con Ctrl o Shift, o todos los de la carpeta
+     *              con el boton "Seleccionar todos los .asm", que los deja en
+     *              orden alfabetico.
+     */
+    @Override
+    public List<File> seleccionarArchivosAsm() {
         JFileChooser selector = new JFileChooser(carpetaInicial());
-        selector.setDialogTitle("Seleccionar programa en ensamblador");
+        selector.setDialogTitle("Seleccionar programas en ensamblador");
+        selector.setMultiSelectionEnabled(true);
         selector.setAcceptAllFileFilterUsed(false);
         selector.setFileFilter(new FileNameExtensionFilter(
                 "Archivos de ensamblador (*.asm)", "asm"));
-        return selector.showOpenDialog(this) == JFileChooser.APPROVE_OPTION
-                ? selector.getSelectedFile() : null;
+        selector.setAccessory(accesorioSelector(selector));
+        if (selector.showOpenDialog(this) != JFileChooser.APPROVE_OPTION) {
+            return Collections.emptyList();
+        }
+        return Arrays.asList(selector.getSelectedFiles());
     }
+
+    /**
+     * Nombre: accesorioSelector
+     * Entradas: selector, el selector de archivos abierto
+     * Salidas: el panel lateral con la ayuda y el boton
+     * Restricciones: ninguna
+     * Descripcion: el boton marca todos los .asm de la carpeta que se esta
+     *              viendo, para no tener que usar Ctrl en cada archivo.
+     */
+    private static JPanel accesorioSelector(JFileChooser selector) {
+        JButton todos = new JButton("Seleccionar todos los .asm");
+        todos.addActionListener(e -> {
+            File[] archivos = selector.getCurrentDirectory().listFiles(
+                    archivo -> archivo.isFile()
+                    && archivo.getName().toLowerCase().endsWith(".asm"));
+            if (archivos != null && archivos.length > 0) {
+                Arrays.sort(archivos);
+                selector.setSelectedFiles(archivos);
+            }
+        });
+        JLabel ayuda = new JLabel("<html>Para elegir varios:<br>Ctrl + clic, uno por uno;<br>"
+                + "Shift + clic, un rango.<br><br>Volver a usar Cargar archivos<br>"
+                + "agrega mas trabajos.</html>");
+        ayuda.setFont(Tema.FUENTE);
+        JPanel panel = new JPanel(new BorderLayout(0, 8));
+        panel.setBorder(BorderFactory.createEmptyBorder(0, 10, 0, 0));
+        panel.add(todos, BorderLayout.NORTH);
+        panel.add(ayuda, BorderLayout.CENTER);
+        return panel;
+    }
+
+    // ------------------------------------------------------------------
+    // Ayudas
+    // ------------------------------------------------------------------
 
     /**
      * Nombre: carpetaInicial
      * Entradas: ninguna
      * Salidas: la primera carpeta de ejemplos que exista, o nulo
-     * Restricciones: devolver nulo hace que el selector abra en la carpeta del
-     *                usuario, que es un valor de respaldo aceptable
-     * Descripcion: prueba varias rutas relativas porque la carpeta de trabajo
-     *              cambia segun se ejecute desde el entorno de desarrollo o
-     *              desde el jar empaquetado.
+     * Restricciones: nulo hace que el selector abra en la carpeta del usuario
+     * Descripcion: prueba varias rutas porque la carpeta de trabajo cambia
+     *              segun se ejecute desde NetBeans o desde el jar.
      */
     private File carpetaInicial() {
         for (String ruta : CARPETAS_EJEMPLO) {
@@ -443,574 +692,110 @@ public class VentanaPrincipal extends javax.swing.JFrame implements VistaPrincip
     }
 
     /**
+     * Nombre: conLeyenda
+     * Entradas: tabla; leyenda, fila de colores
+     * Salidas: la tabla con su leyenda abajo
+     * Restricciones: ninguna
+     * Descripcion: para la memoria y el disco.
+     */
+    private static JComponent conLeyenda(JTable tabla, JComponent leyenda) {
+        JPanel panel = new JPanel(new BorderLayout(0, 4));
+        panel.setBackground(Tema.TARJETA);
+        panel.add(new JScrollPane(tabla), BorderLayout.CENTER);
+        panel.add(leyenda, BorderLayout.SOUTH);
+        return panel;
+    }
+
+    /**
+     * Nombre: dividir
+     * Entradas: orientacion; primero y segundo, los dos lados; proporcion,
+     *           espacio inicial del primero, de 0 a 1
+     * Salidas: el divisor, que el usuario puede mover
+     * Restricciones: ninguna
+     * Descripcion: los divisores dejan acomodar la ventana a la pantalla.
+     */
+    private static JSplitPane dividir(int orientacion, JComponent primero, JComponent segundo,
+            double proporcion) {
+        JSplitPane divisor = new JSplitPane(orientacion, primero, segundo);
+        divisor.setResizeWeight(proporcion);
+        divisor.setDividerSize(6);
+        divisor.setBorder(null);
+        divisor.setBackground(Tema.FONDO);
+        return divisor;
+    }
+
+    /**
+     * Nombre: item
+     * Entradas: texto; atajo, combinacion de teclas o nulo; accion
+     * Salidas: el elemento de menu
+     * Restricciones: ninguna
+     * Descripcion: atajo para armar el menu.
+     */
+    private static JMenuItem item(String texto, KeyStroke atajo, Consumer<ActionEvent> accion) {
+        JMenuItem item = new JMenuItem(texto);
+        item.setAccelerator(atajo);
+        item.addActionListener(accion::accept);
+        return item;
+    }
+
+    /**
+     * Nombre: separador
+     * Entradas: ninguna
+     * Salidas: una linea vertical entre grupos de botones
+     * Restricciones: ninguna
+     * Descripcion: separa los grupos de la barra de herramientas.
+     */
+    private static JComponent separador() {
+        JPanel linea = new JPanel();
+        linea.setBackground(Tema.BORDE);
+        linea.setPreferredSize(new Dimension(1, 24));
+        return linea;
+    }
+
+    /**
+     * Nombre: etiquetaTitulo
+     * Entradas: texto
+     * Salidas: una etiqueta para la barra de titulo
+     * Restricciones: ninguna
+     * Descripcion: todas las etiquetas de la barra con el mismo estilo.
+     */
+    private static JLabel etiquetaTitulo(String texto) {
+        JLabel etiqueta = new JLabel(texto);
+        etiqueta.setFont(Tema.FUENTE);
+        etiqueta.setForeground(Tema.TEXTO_SUAVE_SOBRE_MENTA);
+        return etiqueta;
+    }
+
+    /**
+     * Nombre: etiquetaEstado
+     * Entradas: ninguna
+     * Salidas: una etiqueta para la barra de estado
+     * Restricciones: ninguna
+     * Descripcion: todas las etiquetas de la barra con el mismo estilo.
+     */
+    private static JLabel etiquetaEstado() {
+        JLabel etiqueta = new JLabel();
+        etiqueta.setFont(Tema.FUENTE);
+        etiqueta.setForeground(Tema.TEXTO_SUAVE);
+        return etiqueta;
+    }
+
+    /**
      * Nombre: initComponents
      * Entradas: ninguna
      * Salidas: ninguna
      * Restricciones: NO editar a mano. El disenador visual de NetBeans
-     *                regenera este metodo completo a partir del archivo .form
-     *                cada vez que se modifica la ventana, de modo que
-     *                cualquier cambio manual se pierde
-     * Descripcion: crea los componentes de la ventana, les fija sus
-     *              propiedades, los ubica en sus contenedores y conecta los
-     *              eventos de los siete botones.
+     *                regenera este metodo a partir del archivo .form
+     * Descripcion: crea el marco de la ventana: titulo, cierre y distribucion.
+     *              Las secciones se agregan en armarVentana.
      */
     @SuppressWarnings("unchecked")
     // <editor-fold defaultstate="collapsed" desc="Generated Code">//GEN-BEGIN:initComponents
     private void initComponents() {
 
-        pnlSuperior = new javax.swing.JPanel();
-        tbBarra = new javax.swing.JToolBar();
-        btnCargar = new javax.swing.JButton();
-        sepEjecucion = new javax.swing.JToolBar.Separator();
-        btnEjecutar = new javax.swing.JButton();
-        btnPaso = new javax.swing.JButton();
-        btnReiniciar = new javax.swing.JButton();
-        btnLimpiar = new javax.swing.JButton();
-        sepConfiguracion = new javax.swing.JToolBar.Separator();
-        btnConfig = new javax.swing.JButton();
-        btnEstadisticas = new javax.swing.JButton();
-        pnlContexto = new javax.swing.JPanel();
-        lblArchivo = new javax.swing.JLabel();
-        lblArchivoValor = new javax.swing.JLabel();
-        lblSepA = new javax.swing.JLabel();
-        lblEstado = new javax.swing.JLabel();
-        lblEstadoValor = new javax.swing.JLabel();
-        lblSepB = new javax.swing.JLabel();
-        lblUsoMemoria = new javax.swing.JLabel();
-        pbUsoMemoria = new javax.swing.JProgressBar();
-        spPrincipal = new javax.swing.JSplitPane();
-        pnlInstrucciones = new javax.swing.JPanel();
-        scrInstrucciones = new javax.swing.JScrollPane();
-        tblInstrucciones = new javax.swing.JTable();
-        spSecundario = new javax.swing.JSplitPane();
-        pnlMemoria = new javax.swing.JPanel();
-        scrMemoria = new javax.swing.JScrollPane();
-        tblMemoria = new javax.swing.JTable();
-        pnlBCP = new javax.swing.JPanel();
-        scrBcp = new javax.swing.JScrollPane();
-        pnlBcpInterior = new javax.swing.JPanel();
-        pnlBcpCampos = new javax.swing.JPanel();
-        pnlProceso = new javax.swing.JPanel();
-        jLabel1 = new javax.swing.JLabel();
-        lblPidValor = new javax.swing.JLabel();
-        jLabel2 = new javax.swing.JLabel();
-        lblProgramaValor = new javax.swing.JLabel();
-        jLabel3 = new javax.swing.JLabel();
-        lblEstadoBcpValor = new javax.swing.JLabel();
-        pnlContextoCpu = new javax.swing.JPanel();
-        jLabel4 = new javax.swing.JLabel();
-        lblPcValor = new javax.swing.JLabel();
-        jLabel5 = new javax.swing.JLabel();
-        lblIrBinValor = new javax.swing.JLabel();
-        jLabel6 = new javax.swing.JLabel();
-        lblIrTextoValor = new javax.swing.JLabel();
-        jLabel7 = new javax.swing.JLabel();
-        lblAcValor = new javax.swing.JLabel();
-        pnlRegistros = new javax.swing.JPanel();
-        jLabel8 = new javax.swing.JLabel();
-        lblAxValor = new javax.swing.JLabel();
-        jLabel9 = new javax.swing.JLabel();
-        lblBxValor = new javax.swing.JLabel();
-        jLabel10 = new javax.swing.JLabel();
-        lblCxValor = new javax.swing.JLabel();
-        jLabel11 = new javax.swing.JLabel();
-        lblDxValor = new javax.swing.JLabel();
-        pnlMemoriaProceso = new javax.swing.JPanel();
-        jLabel12 = new javax.swing.JLabel();
-        lblBaseValor = new javax.swing.JLabel();
-        jLabel13 = new javax.swing.JLabel();
-        lblLimiteValor = new javax.swing.JLabel();
-        pnlContabilidad = new javax.swing.JPanel();
-        jLabel14 = new javax.swing.JLabel();
-        lblEjecutadasValor = new javax.swing.JLabel();
-        jLabel15 = new javax.swing.JLabel();
-        lblCiclosValor = new javax.swing.JLabel();
-        jLabel16 = new javax.swing.JLabel();
-        lblHoraCreacionValor = new javax.swing.JLabel();
-        pnlConsola = new javax.swing.JPanel();
-        scrConsola = new javax.swing.JScrollPane();
-        txtConsola = new javax.swing.JTextArea();
-
         setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
-        setTitle("Mini PC - Simulador del ciclo de instruccion");
-        getContentPane().setLayout(new java.awt.BorderLayout());
-
-        pnlSuperior.setLayout(new javax.swing.BoxLayout(pnlSuperior, javax.swing.BoxLayout.Y_AXIS));
-
-        tbBarra.setFloatable(false);
-        tbBarra.setRollover(true);
-
-        btnCargar.setText("Cargar .asm");
-        btnCargar.setToolTipText("Selecciona un archivo de codigo ensamblador y lo carga en memoria");
-        btnCargar.setFocusable(false);
-        btnCargar.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                btnCargarActionPerformed(evt);
-            }
-        });
-        tbBarra.add(btnCargar);
-        tbBarra.add(sepEjecucion);
-
-        btnEjecutar.setText("Ejecutar");
-        btnEjecutar.setToolTipText("Ejecuta el programa completo de forma automatica");
-        btnEjecutar.setEnabled(false);
-        btnEjecutar.setFocusable(false);
-        btnEjecutar.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                btnEjecutarActionPerformed(evt);
-            }
-        });
-        tbBarra.add(btnEjecutar);
-
-        btnPaso.setText("Paso a paso");
-        btnPaso.setToolTipText("Ejecuta una sola instruccion");
-        btnPaso.setEnabled(false);
-        btnPaso.setFocusable(false);
-        btnPaso.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                btnPasoActionPerformed(evt);
-            }
-        });
-        tbBarra.add(btnPaso);
-
-        btnReiniciar.setText("Reiniciar");
-        btnReiniciar.setToolTipText("Vuelve el procesador al inicio del programa sin descargarlo");
-        btnReiniciar.setEnabled(false);
-        btnReiniciar.setFocusable(false);
-        btnReiniciar.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                btnReiniciarActionPerformed(evt);
-            }
-        });
-        tbBarra.add(btnReiniciar);
-
-        btnLimpiar.setText("Limpiar");
-        btnLimpiar.setToolTipText("Vacia la memoria de usuario, los registros, las tablas y la consola");
-        btnLimpiar.setEnabled(false);
-        btnLimpiar.setFocusable(false);
-        btnLimpiar.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                btnLimpiarActionPerformed(evt);
-            }
-        });
-        tbBarra.add(btnLimpiar);
-        tbBarra.add(sepConfiguracion);
-
-        btnConfig.setText("Configurar");
-        btnConfig.setToolTipText("Tamano de memoria, limite de kernel y velocidad de ejecucion");
-        btnConfig.setFocusable(false);
-        btnConfig.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                btnConfigActionPerformed(evt);
-            }
-        });
-        tbBarra.add(btnConfig);
-
-        btnEstadisticas.setText("Estadisticas");
-        btnEstadisticas.setToolTipText("Resumen de la ejecucion");
-        btnEstadisticas.setEnabled(false);
-        btnEstadisticas.setFocusable(false);
-        btnEstadisticas.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                btnEstadisticasActionPerformed(evt);
-            }
-        });
-        tbBarra.add(btnEstadisticas);
-
-        pnlSuperior.add(tbBarra);
-
-        pnlContexto.setLayout(new java.awt.FlowLayout(java.awt.FlowLayout.LEFT));
-
-        lblArchivo.setText("Archivo:");
-        pnlContexto.add(lblArchivo);
-
-        lblArchivoValor.setFont(new java.awt.Font("Segoe UI", 1, 12)); // NOI18N
-        lblArchivoValor.setText("(ninguno)");
-        pnlContexto.add(lblArchivoValor);
-
-        lblSepA.setText("     |     ");
-        pnlContexto.add(lblSepA);
-
-        lblEstado.setText("Estado:");
-        pnlContexto.add(lblEstado);
-
-        lblEstadoValor.setFont(new java.awt.Font("Segoe UI", 1, 12)); // NOI18N
-        lblEstadoValor.setText("SIN PROGRAMA");
-        pnlContexto.add(lblEstadoValor);
-
-        lblSepB.setText("     |     ");
-        pnlContexto.add(lblSepB);
-
-        lblUsoMemoria.setText("Uso de memoria:");
-        pnlContexto.add(lblUsoMemoria);
-
-        pbUsoMemoria.setToolTipText("Porcentaje ocupado de la zona de usuario");
-        pbUsoMemoria.setPreferredSize(new java.awt.Dimension(170, 18));
-        pbUsoMemoria.setStringPainted(true);
-        pnlContexto.add(pbUsoMemoria);
-
-        pnlSuperior.add(pnlContexto);
-
-        getContentPane().add(pnlSuperior, java.awt.BorderLayout.NORTH);
-
-        spPrincipal.setDividerLocation(400);
-        spPrincipal.setOneTouchExpandable(true);
-
-        pnlInstrucciones.setBorder(javax.swing.BorderFactory.createTitledBorder("Instrucciones"));
-        pnlInstrucciones.setLayout(new java.awt.BorderLayout());
-
-        scrInstrucciones.setPreferredSize(new java.awt.Dimension(390, 430));
-
-        tblInstrucciones.setAutoResizeMode(javax.swing.JTable.AUTO_RESIZE_ALL_COLUMNS);
-        tblInstrucciones.setRowHeight(22);
-        tblInstrucciones.setSelectionMode(javax.swing.ListSelectionModel.SINGLE_SELECTION);
-        tblInstrucciones.setShowVerticalLines(false);
-        scrInstrucciones.setViewportView(tblInstrucciones);
-
-        pnlInstrucciones.add(scrInstrucciones, java.awt.BorderLayout.CENTER);
-
-        spPrincipal.setLeftComponent(pnlInstrucciones);
-
-        spSecundario.setDividerLocation(340);
-        spSecundario.setOneTouchExpandable(true);
-
-        pnlMemoria.setBorder(javax.swing.BorderFactory.createTitledBorder("Memoria"));
-        pnlMemoria.setLayout(new java.awt.BorderLayout());
-
-        scrMemoria.setPreferredSize(new java.awt.Dimension(330, 430));
-
-        tblMemoria.setAutoResizeMode(javax.swing.JTable.AUTO_RESIZE_ALL_COLUMNS);
-        tblMemoria.setRowHeight(22);
-        tblMemoria.setSelectionMode(javax.swing.ListSelectionModel.SINGLE_SELECTION);
-        tblMemoria.setShowVerticalLines(false);
-        scrMemoria.setViewportView(tblMemoria);
-
-        pnlMemoria.add(scrMemoria, java.awt.BorderLayout.CENTER);
-
-        spSecundario.setLeftComponent(pnlMemoria);
-
-        pnlBCP.setBorder(javax.swing.BorderFactory.createTitledBorder("BCP actual - CPU 1"));
-        pnlBCP.setLayout(new java.awt.BorderLayout());
-
-        scrBcp.setPreferredSize(new java.awt.Dimension(320, 430));
-
-        pnlBcpInterior.setLayout(new java.awt.BorderLayout());
-
-        pnlBcpCampos.setLayout(new javax.swing.BoxLayout(pnlBcpCampos, javax.swing.BoxLayout.Y_AXIS));
-
-        pnlProceso.setBorder(javax.swing.BorderFactory.createTitledBorder("Proceso"));
-        pnlProceso.setLayout(new java.awt.GridLayout(0, 2, 8, 4));
-
-        jLabel1.setText("PID:");
-        pnlProceso.add(jLabel1);
-
-        lblPidValor.setText("-");
-        pnlProceso.add(lblPidValor);
-
-        jLabel2.setText("Programa:");
-        pnlProceso.add(jLabel2);
-
-        lblProgramaValor.setText("-");
-        pnlProceso.add(lblProgramaValor);
-
-        jLabel3.setText("Estado:");
-        pnlProceso.add(jLabel3);
-
-        lblEstadoBcpValor.setFont(new java.awt.Font("Segoe UI", 1, 12)); // NOI18N
-        lblEstadoBcpValor.setText("-");
-        pnlProceso.add(lblEstadoBcpValor);
-
-        pnlBcpCampos.add(pnlProceso);
-
-        pnlContextoCpu.setBorder(javax.swing.BorderFactory.createTitledBorder("Contexto del CPU"));
-        pnlContextoCpu.setLayout(new java.awt.GridLayout(0, 2, 8, 4));
-
-        jLabel4.setText("PC:");
-        pnlContextoCpu.add(jLabel4);
-
-        lblPcValor.setFont(new java.awt.Font("Segoe UI", 1, 12)); // NOI18N
-        lblPcValor.setText("-");
-        pnlContextoCpu.add(lblPcValor);
-
-        jLabel5.setText("IR (binario):");
-        pnlContextoCpu.add(jLabel5);
-
-        lblIrBinValor.setFont(new java.awt.Font("Monospaced", 1, 12)); // NOI18N
-        lblIrBinValor.setText("-");
-        pnlContextoCpu.add(lblIrBinValor);
-
-        jLabel6.setText("IR (texto):");
-        pnlContextoCpu.add(jLabel6);
-
-        lblIrTextoValor.setText("-");
-        pnlContextoCpu.add(lblIrTextoValor);
-
-        jLabel7.setText("AC:");
-        pnlContextoCpu.add(jLabel7);
-
-        lblAcValor.setFont(new java.awt.Font("Segoe UI", 1, 12)); // NOI18N
-        lblAcValor.setText("0");
-        pnlContextoCpu.add(lblAcValor);
-
-        pnlBcpCampos.add(pnlContextoCpu);
-
-        pnlRegistros.setBorder(javax.swing.BorderFactory.createTitledBorder("Registros de proposito general"));
-        pnlRegistros.setLayout(new java.awt.GridLayout(0, 2, 8, 4));
-
-        jLabel8.setText("AX:");
-        pnlRegistros.add(jLabel8);
-
-        lblAxValor.setFont(new java.awt.Font("Segoe UI", 1, 12)); // NOI18N
-        lblAxValor.setText("0");
-        pnlRegistros.add(lblAxValor);
-
-        jLabel9.setText("BX:");
-        pnlRegistros.add(jLabel9);
-
-        lblBxValor.setFont(new java.awt.Font("Segoe UI", 1, 12)); // NOI18N
-        lblBxValor.setText("0");
-        pnlRegistros.add(lblBxValor);
-
-        jLabel10.setText("CX:");
-        pnlRegistros.add(jLabel10);
-
-        lblCxValor.setFont(new java.awt.Font("Segoe UI", 1, 12)); // NOI18N
-        lblCxValor.setText("0");
-        pnlRegistros.add(lblCxValor);
-
-        jLabel11.setText("DX:");
-        pnlRegistros.add(jLabel11);
-
-        lblDxValor.setFont(new java.awt.Font("Segoe UI", 1, 12)); // NOI18N
-        lblDxValor.setText("0");
-        pnlRegistros.add(lblDxValor);
-
-        pnlBcpCampos.add(pnlRegistros);
-
-        pnlMemoriaProceso.setBorder(javax.swing.BorderFactory.createTitledBorder("Memoria del proceso"));
-        pnlMemoriaProceso.setLayout(new java.awt.GridLayout(0, 2, 8, 4));
-
-        jLabel12.setText("Direccion base:");
-        pnlMemoriaProceso.add(jLabel12);
-
-        lblBaseValor.setText("-");
-        pnlMemoriaProceso.add(lblBaseValor);
-
-        jLabel13.setText("Limite:");
-        pnlMemoriaProceso.add(jLabel13);
-
-        lblLimiteValor.setText("-");
-        pnlMemoriaProceso.add(lblLimiteValor);
-
-        pnlBcpCampos.add(pnlMemoriaProceso);
-
-        pnlContabilidad.setBorder(javax.swing.BorderFactory.createTitledBorder("Contabilidad"));
-        pnlContabilidad.setLayout(new java.awt.GridLayout(0, 2, 8, 4));
-
-        jLabel14.setText("Instrucciones ejec.:");
-        pnlContabilidad.add(jLabel14);
-
-        lblEjecutadasValor.setText("0");
-        pnlContabilidad.add(lblEjecutadasValor);
-
-        jLabel15.setText("Ciclos de reloj:");
-        pnlContabilidad.add(jLabel15);
-
-        lblCiclosValor.setText("0");
-        pnlContabilidad.add(lblCiclosValor);
-
-        jLabel16.setText("Hora de creacion:");
-        pnlContabilidad.add(jLabel16);
-
-        lblHoraCreacionValor.setText("-");
-        pnlContabilidad.add(lblHoraCreacionValor);
-
-        pnlBcpCampos.add(pnlContabilidad);
-
-        pnlBcpInterior.add(pnlBcpCampos, java.awt.BorderLayout.NORTH);
-
-        scrBcp.setViewportView(pnlBcpInterior);
-
-        pnlBCP.add(scrBcp, java.awt.BorderLayout.CENTER);
-
-        spSecundario.setRightComponent(pnlBCP);
-
-        spPrincipal.setRightComponent(spSecundario);
-
-        getContentPane().add(spPrincipal, java.awt.BorderLayout.CENTER);
-
-        pnlConsola.setBorder(javax.swing.BorderFactory.createTitledBorder("Consola"));
-        pnlConsola.setLayout(new java.awt.BorderLayout());
-
-        txtConsola.setEditable(false);
-        txtConsola.setColumns(20);
-        txtConsola.setFont(new java.awt.Font("Monospaced", 0, 12)); // NOI18N
-        txtConsola.setLineWrap(true);
-        txtConsola.setRows(6);
-        txtConsola.setWrapStyleWord(true);
-        scrConsola.setViewportView(txtConsola);
-
-        pnlConsola.add(scrConsola, java.awt.BorderLayout.CENTER);
-
-        getContentPane().add(pnlConsola, java.awt.BorderLayout.SOUTH);
+        setTitle("Proyecto 1 de SO - Gestor de Procesos");
 
         pack();
-        setLocationRelativeTo(null);
     }// </editor-fold>//GEN-END:initComponents
-
-    /**
-     * Nombre: btnCargarActionPerformed
-     * Entradas: evt, evento de accion que genero el clic
-     * Salidas: ninguna
-     * Restricciones: ninguna
-     * Descripcion: delega en el controlador la carga de un archivo .asm.
-     */
-    private void btnCargarActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnCargarActionPerformed
-        controlador.alCargarArchivo();
-    }//GEN-LAST:event_btnCargarActionPerformed
-
-    /**
-     * Nombre: btnEjecutarActionPerformed
-     * Entradas: evt, evento de accion que genero el clic
-     * Salidas: ninguna
-     * Restricciones: ninguna
-     * Descripcion: delega en el controlador el arranque de la ejecucion
-     *              automatica.
-     */
-    private void btnEjecutarActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnEjecutarActionPerformed
-        controlador.alEjecutar();
-    }//GEN-LAST:event_btnEjecutarActionPerformed
-
-    /**
-     * Nombre: btnPasoActionPerformed
-     * Entradas: evt, evento de accion que genero el clic
-     * Salidas: ninguna
-     * Restricciones: ninguna
-     * Descripcion: delega en el controlador la ejecucion de una sola
-     *              instruccion.
-     */
-    private void btnPasoActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnPasoActionPerformed
-        controlador.alPasoAPaso();
-    }//GEN-LAST:event_btnPasoActionPerformed
-
-    /**
-     * Nombre: btnReiniciarActionPerformed
-     * Entradas: evt, evento de accion que genero el clic
-     * Salidas: ninguna
-     * Restricciones: ninguna
-     * Descripcion: delega en el controlador el reinicio del programa.
-     */
-    private void btnReiniciarActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnReiniciarActionPerformed
-        controlador.alReiniciar();
-    }//GEN-LAST:event_btnReiniciarActionPerformed
-
-    /**
-     * Nombre: btnLimpiarActionPerformed
-     * Entradas: evt, evento de accion que genero el clic
-     * Salidas: ninguna
-     * Restricciones: ninguna
-     * Descripcion: delega en el controlador el vaciado de la maquina.
-     */
-    private void btnLimpiarActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnLimpiarActionPerformed
-        controlador.alLimpiar();
-    }//GEN-LAST:event_btnLimpiarActionPerformed
-
-    /**
-     * Nombre: btnConfigActionPerformed
-     * Entradas: evt, evento de accion que genero el clic
-     * Salidas: ninguna
-     * Restricciones: el dialogo es modal, de modo que bloquea esta ventana
-     *                mientras este abierto
-     * Descripcion: abre el dialogo de configuracion de memoria y velocidad.
-     */
-    private void btnConfigActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnConfigActionPerformed
-        new DialogoConfiguracion(this, true, controlador).setVisible(true);
-    }//GEN-LAST:event_btnConfigActionPerformed
-
-    /**
-     * Nombre: btnEstadisticasActionPerformed
-     * Entradas: evt, evento de accion que genero el clic
-     * Salidas: ninguna
-     * Restricciones: el dialogo es modal, de modo que bloquea esta ventana
-     *                mientras este abierto
-     * Descripcion: abre el dialogo con el resumen de la ejecucion.
-     */
-    private void btnEstadisticasActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnEstadisticasActionPerformed
-        new DialogoEstadisticas(this, true, controlador).setVisible(true);
-    }//GEN-LAST:event_btnEstadisticasActionPerformed
-
-    // Variables declaration - do not modify//GEN-BEGIN:variables
-    private javax.swing.JButton btnCargar;
-    private javax.swing.JButton btnConfig;
-    private javax.swing.JButton btnEjecutar;
-    private javax.swing.JButton btnEstadisticas;
-    private javax.swing.JButton btnLimpiar;
-    private javax.swing.JButton btnPaso;
-    private javax.swing.JButton btnReiniciar;
-    private javax.swing.JLabel jLabel1;
-    private javax.swing.JLabel jLabel10;
-    private javax.swing.JLabel jLabel11;
-    private javax.swing.JLabel jLabel12;
-    private javax.swing.JLabel jLabel13;
-    private javax.swing.JLabel jLabel14;
-    private javax.swing.JLabel jLabel15;
-    private javax.swing.JLabel jLabel16;
-    private javax.swing.JLabel jLabel2;
-    private javax.swing.JLabel jLabel3;
-    private javax.swing.JLabel jLabel4;
-    private javax.swing.JLabel jLabel5;
-    private javax.swing.JLabel jLabel6;
-    private javax.swing.JLabel jLabel7;
-    private javax.swing.JLabel jLabel8;
-    private javax.swing.JLabel jLabel9;
-    private javax.swing.JLabel lblAcValor;
-    private javax.swing.JLabel lblArchivo;
-    private javax.swing.JLabel lblArchivoValor;
-    private javax.swing.JLabel lblAxValor;
-    private javax.swing.JLabel lblBaseValor;
-    private javax.swing.JLabel lblBxValor;
-    private javax.swing.JLabel lblCiclosValor;
-    private javax.swing.JLabel lblCxValor;
-    private javax.swing.JLabel lblDxValor;
-    private javax.swing.JLabel lblEjecutadasValor;
-    private javax.swing.JLabel lblHoraCreacionValor;
-    private javax.swing.JLabel lblEstado;
-    private javax.swing.JLabel lblEstadoBcpValor;
-    private javax.swing.JLabel lblEstadoValor;
-    private javax.swing.JLabel lblIrBinValor;
-    private javax.swing.JLabel lblIrTextoValor;
-    private javax.swing.JLabel lblLimiteValor;
-    private javax.swing.JLabel lblPcValor;
-    private javax.swing.JLabel lblPidValor;
-    private javax.swing.JLabel lblProgramaValor;
-    private javax.swing.JLabel lblSepA;
-    private javax.swing.JLabel lblSepB;
-    private javax.swing.JLabel lblUsoMemoria;
-    private javax.swing.JProgressBar pbUsoMemoria;
-    private javax.swing.JPanel pnlBCP;
-    private javax.swing.JPanel pnlBcpCampos;
-    private javax.swing.JPanel pnlBcpInterior;
-    private javax.swing.JPanel pnlConsola;
-    private javax.swing.JPanel pnlContabilidad;
-    private javax.swing.JPanel pnlContexto;
-    private javax.swing.JPanel pnlContextoCpu;
-    private javax.swing.JPanel pnlInstrucciones;
-    private javax.swing.JPanel pnlMemoria;
-    private javax.swing.JPanel pnlMemoriaProceso;
-    private javax.swing.JPanel pnlProceso;
-    private javax.swing.JPanel pnlRegistros;
-    private javax.swing.JPanel pnlSuperior;
-    private javax.swing.JScrollPane scrBcp;
-    private javax.swing.JScrollPane scrConsola;
-    private javax.swing.JScrollPane scrInstrucciones;
-    private javax.swing.JScrollPane scrMemoria;
-    private javax.swing.JToolBar.Separator sepConfiguracion;
-    private javax.swing.JToolBar.Separator sepEjecucion;
-    private javax.swing.JSplitPane spPrincipal;
-    private javax.swing.JSplitPane spSecundario;
-    private javax.swing.JTable tblInstrucciones;
-    private javax.swing.JTable tblMemoria;
-    private javax.swing.JToolBar tbBarra;
-    private javax.swing.JTextArea txtConsola;
-    // End of variables declaration//GEN-END:variables
 }

@@ -1,4 +1,4 @@
 MOV AX, 5
 JUMP 100
 ADD EX
-MOV BX, 300
+MOV BX, tres

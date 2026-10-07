@@ -11,7 +11,7 @@ import java.awt.Font;
  * Entradas: la fila que apunta el PC, fijada desde afuera
  * Salidas: el componente ya pintado que la tabla dibuja en cada celda
  * Restricciones: solo tiene sentido aplicado a la tabla de instrucciones,
- *                porque supone que la columna 2 contiene el binario
+ *                porque supone que la fila coincide con el orden del programa
  * Descripcion: pinta la tabla de instrucciones distinguiendo tres situaciones:
  *              la instruccion que esta por ejecutarse, las que ya se
  *              ejecutaron y las que faltan. Ver de un vistazo que instruccion
@@ -64,10 +64,10 @@ public class RenderInstruccionActual extends DefaultTableCellRenderer {
      * Salidas: el componente con el formato ya aplicado
      * Restricciones: si la fila esta seleccionada se respeta el color de
      *                seleccion del sistema y no se pinta nada encima
-     * Descripcion: aplica fuente monoespaciada a la columna del binario, para
-     *              que los ceros y unos queden alineados, y despues elige el
-     *              color de fondo segun la fila sea la actual, una ya
-     *              ejecutada o una pendiente.
+     * Descripcion: restablece la fuente de la tabla, porque el renderer se
+     *              reutiliza entre celdas, y despues elige el color de fondo
+     *              segun la fila sea la actual, una ya ejecutada o una
+     *              pendiente.
      */
     @Override
     public Component getTableCellRendererComponent(JTable tabla, Object valor,
@@ -76,10 +76,7 @@ public class RenderInstruccionActual extends DefaultTableCellRenderer {
         Component celda = super.getTableCellRendererComponent(
                 tabla, valor, seleccionada, tieneFoco, fila, columna);
 
-        // La columna del binario se lee mucho mejor en fuente monoespaciada.
-        celda.setFont(columna == 2
-                ? new Font(Font.MONOSPACED, Font.PLAIN, 12)
-                : tabla.getFont());
+        celda.setFont(tabla.getFont());
 
         if (seleccionada) {
             return celda;

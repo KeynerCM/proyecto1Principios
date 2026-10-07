@@ -1,7 +1,6 @@
 package com.mycompany.minipc.gui.modelo;
 
-import com.mycompany.minipc.core.CeldaMemoria;
-import com.mycompany.minipc.core.Memoria;
+import com.mycompany.minipc.hardware.Memoria;
 
 import javax.swing.table.AbstractTableModel;
 
@@ -15,27 +14,31 @@ import javax.swing.table.AbstractTableModel;
  *              del procesador cada vez que la tabla se dibuja, asi nunca
  *              queda desfasado respecto al estado real y refrescar la vista
  *              se reduce a disparar fireTableDataChanged. Las columnas son la
- *              posicion, la zona a la que pertenece, el contenido legible y
- *              su codificacion binaria.
+ *              posicion, el campo (que es y de quien es la celda, por ejemplo
+ *              "P2.PC", calculado a partir de la direccion) y el valor, que es
+ *              el texto guardado tal cual.
  */
 public class ModeloTablaMemoria extends AbstractTableModel {
 
     private static final long serialVersionUID = 1L;
 
-    private static final String[] COLUMNAS = {"Pos", "Zona", "Contenido", "Binario"};
+    private static final String[] COLUMNAS = {"Pos", "Campo", "Valor"};
 
     private final Memoria memoria;
+    private final MapaMemoria mapa;
 
     /**
      * Nombre: ModeloTablaMemoria
-     * Entradas: memoria, memoria a reflejar en la tabla
+     * Entradas: memoria, memoria a reflejar en la tabla; mapa, quien dice que
+     *           es cada celda
      * Salidas: el modelo construido
      * Restricciones: la memoria no debe ser nula y debe seguir existiendo
      *                mientras la tabla se muestre
      * Descripcion: guarda la referencia a la memoria, sin copiar su contenido.
      */
-    public ModeloTablaMemoria(Memoria memoria) {
+    public ModeloTablaMemoria(Memoria memoria, MapaMemoria mapa) {
         this.memoria = memoria;
+        this.mapa = mapa;
     }
 
     /**
@@ -54,7 +57,7 @@ public class ModeloTablaMemoria extends AbstractTableModel {
     /**
      * Nombre: getColumnCount
      * Entradas: ninguna
-     * Salidas: cuantas columnas tiene la tabla, siempre cuatro
+     * Salidas: cuantas columnas tiene la tabla, siempre tres
      * Restricciones: ninguna
      * Descripcion: Swing la consulta para saber cuantas columnas dibujar.
      */
@@ -91,23 +94,20 @@ public class ModeloTablaMemoria extends AbstractTableModel {
     /**
      * Nombre: getValueAt
      * Entradas: fila, direccion de memoria; columna, dato pedido
-     * Salidas: la direccion, la zona, el contenido o el binario
+     * Salidas: la direccion, el campo o el valor
      * Restricciones: la fila debe ser una direccion valida de la memoria
      * Descripcion: la fila coincide con la direccion, de modo que la tabla
      *              refleja el mapa de memoria sin ninguna traduccion.
      */
     @Override
     public Object getValueAt(int fila, int columna) {
-        CeldaMemoria celda = memoria.leer(fila);
         switch (columna) {
             case 0:
                 return fila;
             case 1:
-                return memoria.esDireccionKernel(fila) ? "Kernel" : "Usuario";
+                return mapa.describir(fila);
             case 2:
-                return contenidoDe(celda, fila);
-            case 3:
-                return celda.getBinario();
+                return contenidoDe(fila);
             default:
                 return "";
         }
@@ -115,19 +115,12 @@ public class ModeloTablaMemoria extends AbstractTableModel {
 
     /**
      * Nombre: contenidoDe
-     * Entradas: celda, posicion de memoria a describir; fila, su direccion
+     * Entradas: fila, direccion de memoria a describir
      * Salidas: el texto a mostrar en la columna de contenido
      * Restricciones: ninguna
-     * Descripcion: devuelve la etiqueta de la instruccion si la celda guarda
-     *              una, la marca "[reservada]" si pertenece al kernel, y texto
-     *              vacio si esta libre. Distinguir reservada de libre importa:
-     *              una celda del kernel no esta disponible aunque no tenga
-     *              nada escrito.
+     * Descripcion: devuelve el texto guardado en la posicion tal cual.
      */
-    private String contenidoDe(CeldaMemoria celda, int fila) {
-        if (!celda.estaLibre() && celda.getTipo() != CeldaMemoria.Tipo.RESERVADA_KERNEL) {
-            return celda.getEtiqueta();
-        }
-        return memoria.esDireccionKernel(fila) ? "[reservada]" : "";
+    private String contenidoDe(int fila) {
+        return memoria.leer(fila);
     }
 }

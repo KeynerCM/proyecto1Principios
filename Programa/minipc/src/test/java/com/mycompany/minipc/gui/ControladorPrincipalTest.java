@@ -1,9 +1,13 @@
 package com.mycompany.minipc.gui;
 
-import com.mycompany.minipc.core.BCP;
-import com.mycompany.minipc.core.EstadoProceso;
-import com.mycompany.minipc.isa.Instruccion;
+import com.mycompany.minipc.config.Configuracion;
+import com.mycompany.minipc.config.LectorConfiguracion;
+import com.mycompany.minipc.hardware.EntradaIndice;
+import com.mycompany.minipc.excepciones.ConfiguracionException;
 import com.mycompany.minipc.isa.RegistroID;
+import com.mycompany.minipc.so.procesos.EstadoProceso;
+import com.mycompany.minipc.so.procesos.Proceso;
+import com.mycompany.minipc.so.trabajos.Trabajo;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -20,6 +24,8 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -37,10 +43,11 @@ class ControladorPrincipalTest {
      */
     private static class VistaFalsa implements VistaPrincipal {
 
-        private File archivoAEntregar;
-        private List<Instruccion> instrucciones = Collections.emptyList();
+        private List<File> archivosAEntregar = Collections.emptyList();
+        private int refrescosDisco;
+        private List<String> instrucciones = Collections.emptyList();
         private int filaResaltada = -1;
-        private BCP ultimoBcp;
+        private Proceso ultimoProceso;
         private final List<String> consola = new ArrayList<>();
         private String tituloError;
         private List<String> errores = Collections.emptyList();
@@ -50,9 +57,16 @@ class ControladorPrincipalTest {
         private String archivoEnBarra = "";
         private String estadoEnBarra = "";
         private int usoMemoria = -1;
+        private List<String> pantalla = Collections.emptyList();
+        private boolean tecladoHabilitado;
+        private String destinoTeclado;
+        private String reloj = "";
+        private List<Proceso> colas = Collections.emptyList();
+        private int admitidos = -1;
+        private int estadisticasMostradas;
 
         @Override
-        public void mostrarInstrucciones(List<Instruccion> programa) {
+        public void mostrarInstrucciones(List<String> programa) {
             this.instrucciones = programa;
         }
 
@@ -67,8 +81,8 @@ class ControladorPrincipalTest {
         }
 
         @Override
-        public void mostrarBCP(BCP bcp) {
-            this.ultimoBcp = bcp;
+        public void mostrarBCP(Proceso proceso) {
+            this.ultimoProceso = proceso;
         }
 
         @Override
@@ -107,8 +121,49 @@ class ControladorPrincipalTest {
         }
 
         @Override
-        public File seleccionarArchivoAsm() {
-            return archivoAEntregar;
+        public void refrescarDisco() {
+            refrescosDisco++;
+        }
+
+        @Override
+        public List<File> seleccionarArchivosAsm() {
+            return archivosAEntregar;
+        }
+
+        @Override
+        public void mostrarPantalla(List<String> lineas) {
+            this.pantalla = new ArrayList<>(lineas);
+        }
+
+        @Override
+        public void habilitarTeclado(boolean habilitado, String destino) {
+            this.tecladoHabilitado = habilitado;
+            this.destinoTeclado = destino;
+        }
+
+        @Override
+        public void mostrarReloj(String reloj) {
+            this.reloj = reloj;
+        }
+
+        @Override
+        public void mostrarColas(List<Proceso> procesos) {
+            this.colas = procesos;
+        }
+
+        @Override
+        public void mostrarResumen(int usoDisco, int admitidos) {
+            this.admitidos = admitidos;
+        }
+
+        @Override
+        public void mostrarEstadisticas() {
+            estadisticasMostradas++;
+        }
+
+        /** Fija los archivos que "elegira" el usuario; sin argumentos, cancela. */
+        void entregar(File... archivos) {
+            this.archivosAEntregar = List.of(archivos);
         }
 
         boolean consolaContiene(String fragmento) {
@@ -131,7 +186,7 @@ class ControladorPrincipalTest {
         return archivo.toFile();
     }
 
-    private File ejemploDelEnunciado(Path carpeta) throws IOException {
+    private File programaDeEjemplo(Path carpeta) throws IOException {
         return crearAsm(carpeta, "file.asm",
                 "MOV AX, 5\nMOV BX, 3\nLOAD AX\nADD BX\nSUB AX\nSTORE AX\nMOV BX, -8\n");
     }
@@ -144,91 +199,190 @@ class ControladorPrincipalTest {
         return controlador.getProcesador().getRegistros().leer(RegistroID.BX);
     }
 
+    /** Configuracion con el disco por defecto, FCFS, y la memoria y velocidad indicadas. */
+    private static Configuracion config(int memoria, int msPorSegundo)
+            throws ConfiguracionException {
+        return new Configuracion(memoria, 512, 64, msPorSegundo, "FCFS");
+    }
+
+    private List<Trabajo> trabajos() {
+        return controlador.getSistemaOperativo().getListaTrabajos().getTrabajos();
+    }
+
+    private Proceso enEjecucion() {
+        return controlador.getSistemaOperativo().getEnEjecucion();
+    }
+
+
     @Test
-    @DisplayName("Cargar un archivo valido llena la tabla y deja el programa listo")
+    @DisplayName("Cargar un archivo valido lo deja en la lista de trabajos y admitido")
     void cargaUnProgramaValido(@TempDir Path carpeta) throws Exception {
-        vista.archivoAEntregar = ejemploDelEnunciado(carpeta);
+        vista.entregar(programaDeEjemplo(carpeta));
 
-        controlador.alCargarArchivo();
+        controlador.alCargarArchivos();
 
-        assertEquals(7, vista.instrucciones.size());
-        assertEquals(7, controlador.getModeloInstrucciones().getRowCount());
-        assertEquals("MOV AX, 5", controlador.getModeloInstrucciones().getValueAt(0, 1));
-        assertEquals("0011 0001 00000101",
-                controlador.getModeloInstrucciones().getValueAt(0, 2));
+        assertEquals(1, trabajos().size());
+        assertEquals(EstadoProceso.PREPARADO, trabajos().get(0).getEstado());
+        assertEquals("P1", controlador.getModeloTrabajos().getValueAt(0, 0));
+        assertEquals("PREPARADO", controlador.getModeloTrabajos().getValueAt(0, 2));
         assertTrue(vista.hayPrograma);
         assertFalse(vista.termino);
-        assertEquals("file.asm", vista.archivoEnBarra);
-        assertEquals(EstadoProceso.LISTO.name(), vista.estadoEnBarra);
-        assertTrue(vista.consolaContiene("Programa cargado en la posicion 64"));
+        assertEquals("(CPU libre)", vista.archivoEnBarra, "Todavia no se despacho");
+        assertEquals("CPU LIBRE", vista.estadoEnBarra);
+        assertTrue(vista.consolaContiene("Planificador de trabajos: admite P1 (file.asm)"));
+    }
+
+    @Test
+    @DisplayName("El programa cargado queda guardado en el disco y en su indice")
+    void elProgramaQuedaEnElDisco(@TempDir Path carpeta) throws Exception {
+        vista.entregar(programaDeEjemplo(carpeta));
+
+        controlador.alCargarArchivos();
+
+        EntradaIndice entrada = controlador.getDisco().buscar("file.asm");
+        assertNotNull(entrada);
+        assertEquals(20, entrada.getDireccionInicio());
+        assertEquals(7, entrada.getTamano());
+        assertEquals("file.asm|20|7", controlador.getModeloDisco().getValueAt(0, 2),
+                "La tabla muestra la celda del indice tal como esta guardada");
+        assertEquals("Indice", controlador.getModeloDisco().getValueAt(0, 1));
+        assertEquals("MOV AX, 5", controlador.getModeloDisco().getValueAt(20, 2));
+        assertEquals("Virtual", controlador.getModeloDisco().getValueAt(448, 1));
+        assertTrue(vista.refrescosDisco > 0, "La tabla del disco debio refrescarse");
+        assertTrue(vista.consolaContiene("Guardado en disco: file.asm, posiciones 20 a 26"));
+    }
+
+    @Test
+    @DisplayName("Se pueden cargar varios archivos a la vez y todos entran a la lista")
+    void cargaVariosArchivos(@TempDir Path carpeta) throws Exception {
+        File a = crearAsm(carpeta, "a.asm", "MOV AX, 1\nMOV BX, 2\n");
+        File b = crearAsm(carpeta, "b.asm", "MOV CX, 3\nMOV DX, 4\nADD CX\n");
+        vista.entregar(a, b);
+
+        controlador.alCargarArchivos();
+
+        assertEquals(2, controlador.getDisco().getIndice().size());
+        assertEquals(22, controlador.getDisco().buscar("b.asm").getDireccionInicio());
+        assertEquals(2, trabajos().size());
+        assertEquals(2, controlador.getSistemaOperativo().getTablaBCP().getProcesosAdmitidos());
+        assertEquals(2, vista.colas.size(), "Las colas se arman con la lista de procesos en memoria");
+        assertEquals(2, vista.admitidos);
+        assertNull(vista.tituloError, "No hubo errores");
+    }
+
+    @Test
+    @DisplayName("Un archivo invalido no impide guardar los validos y se reporta con su nombre")
+    void unArchivoInvalidoNoFrenaALosDemas(@TempDir Path carpeta) throws Exception {
+        File malo = crearAsm(carpeta, "malo.asm", "MOV AX, 5\nJUMP 100\n");
+        File bueno = crearAsm(carpeta, "bueno.asm", "MOV AX, 5\n");
+        vista.entregar(malo, bueno);
+
+        controlador.alCargarArchivos();
+
+        assertEquals("Errores al cargar archivos", vista.tituloError);
+        assertEquals("malo.asm: 1 error(es) de sintaxis", vista.errores.get(0));
+        assertTrue(vista.errores.get(1).contains("Linea 2"), vista.errores.get(1));
+        assertNull(controlador.getDisco().buscar("malo.asm"));
+        assertNotNull(controlador.getDisco().buscar("bueno.asm"));
+        assertEquals(1, trabajos().size());
+        assertEquals("bueno.asm", trabajos().get(0).getPrograma());
+    }
+
+    @Test
+    @DisplayName("Cargar dos veces el mismo archivo guarda una copia numerada")
+    void mismoArchivoDosVeces(@TempDir Path carpeta) throws Exception {
+        File archivo = programaDeEjemplo(carpeta);
+        vista.entregar(archivo, archivo);
+
+        controlador.alCargarArchivos();
+
+        assertNotNull(controlador.getDisco().buscar("file.asm"));
+        assertNotNull(controlador.getDisco().buscar("file (2).asm"));
+        assertEquals(2, trabajos().size());
+        assertNull(vista.tituloError);
     }
 
     @Test
     @DisplayName("Si el usuario cancela el dialogo no pasa nada")
     void cancelarNoHaceNada() {
-        vista.archivoAEntregar = null;
-        controlador.alCargarArchivo();
+        vista.entregar();
+        controlador.alCargarArchivos();
         assertFalse(vista.hayPrograma);
-        assertEquals(0, controlador.getModeloInstrucciones().getRowCount());
+        assertTrue(trabajos().isEmpty());
+        assertTrue(controlador.getDisco().getIndice().isEmpty());
     }
 
     @Test
-    @DisplayName("Un archivo con errores de sintaxis los reporta todos y no carga nada")
+    @DisplayName("Un archivo con errores de sintaxis los reporta todos y no guarda nada")
     void reportaErroresDeSintaxis(@TempDir Path carpeta) throws Exception {
-        vista.archivoAEntregar = crearAsm(carpeta, "error-sintaxis.asm",
-                "MOV AX, 5\nJUMP 100\nADD EX\nMOV BX, 300\n");
+        vista.entregar(crearAsm(carpeta, "error-sintaxis.asm",
+                "MOV AX, 5\nJUMP 100\nADD EX\nMOV BX, tres\n"));
 
-        controlador.alCargarArchivo();
+        controlador.alCargarArchivos();
 
-        assertEquals("Errores de sintaxis", vista.tituloError);
-        assertEquals(3, vista.errores.size());
-        assertTrue(vista.errores.get(0).contains("Linea 2"));
-        assertTrue(vista.errores.get(1).contains("Linea 3"));
-        assertTrue(vista.errores.get(2).contains("Linea 4"));
+        assertEquals("Errores al cargar archivos", vista.tituloError);
+        assertEquals(4, vista.errores.size(), "Una linea con el archivo y tres errores");
+        assertEquals("error-sintaxis.asm: 3 error(es) de sintaxis", vista.errores.get(0));
+        assertTrue(vista.errores.get(1).contains("Linea 2"));
+        assertTrue(vista.errores.get(2).contains("Linea 3"));
+        assertTrue(vista.errores.get(3).contains("Linea 4"));
         assertFalse(vista.hayPrograma, "No debio cargarse nada");
-        assertEquals(0, controlador.getModeloInstrucciones().getRowCount());
+        assertTrue(controlador.getDisco().getIndice().isEmpty());
     }
 
     @Test
-    @DisplayName("Un archivo que no cabe en memoria se rechaza con su mensaje")
+    @DisplayName("Un programa mas grande que la memoria de usuario se rechaza al cargarlo")
     void reportaMemoriaInsuficiente(@TempDir Path carpeta) throws Exception {
-        controlador.alConfigurar(128, 120, 500);
+        controlador.alConfigurar(new Configuracion(160, 80, 512, 64, 500, "FCFS"));
 
         StringBuilder largo = new StringBuilder();
-        for (int i = 0; i < 10; i++) {
+        for (int i = 0; i < 40; i++) {
             largo.append("MOV AX, 1\n");
         }
-        vista.archivoAEntregar = crearAsm(carpeta, "largo.asm", largo.toString());
+        vista.entregar(crearAsm(carpeta, "largo.asm", largo.toString()));
 
-        controlador.alCargarArchivo();
+        controlador.alCargarArchivos();
 
-        assertEquals("Memoria insuficiente", vista.tituloError);
-        assertTrue(vista.errores.get(0).contains("requiere 10"), vista.errores.get(0));
-        assertTrue(vista.errores.get(0).contains("dispone de 8"), vista.errores.get(0));
+        assertEquals("Errores al cargar archivos", vista.tituloError);
+        String error = vista.errores.get(0);
+        assertTrue(error.startsWith("largo.asm"), error);
+        assertTrue(error.contains("40 instrucciones"), error);
+        assertTrue(error.contains("32 posiciones"), error);
         assertFalse(vista.hayPrograma);
+        assertNull(controlador.getDisco().buscar("largo.asm"), "No se guarda algo que no correra");
     }
 
     @Test
     @DisplayName("Un archivo que no es .asm se rechaza")
     void rechazaExtensionInvalida(@TempDir Path carpeta) throws Exception {
-        vista.archivoAEntregar = crearAsm(carpeta, "programa.txt", "MOV AX, 5\n");
+        vista.entregar(crearAsm(carpeta, "programa.txt", "MOV AX, 5\n"));
 
-        controlador.alCargarArchivo();
+        controlador.alCargarArchivos();
 
-        assertEquals("No se pudo leer el archivo", vista.tituloError);
+        assertEquals("Errores al cargar archivos", vista.tituloError);
+        assertTrue(vista.errores.get(0).startsWith("programa.txt: "), vista.errores.get(0));
+        assertTrue(vista.errores.get(0).contains(".asm"), vista.errores.get(0));
         assertFalse(vista.hayPrograma);
+        assertTrue(controlador.getDisco().getIndice().isEmpty());
     }
 
     @Test
-    @DisplayName("Paso a paso avanza una instruccion y mueve el resaltado")
+    @DisplayName("Siguiente despacha el proceso, ejecuta un segundo y mueve el resaltado")
     void pasoAPasoAvanza(@TempDir Path carpeta) throws Exception {
-        vista.archivoAEntregar = ejemploDelEnunciado(carpeta);
-        controlador.alCargarArchivo();
-        assertEquals(0, vista.filaResaltada);
+        vista.entregar(programaDeEjemplo(carpeta));
+        controlador.alCargarArchivos();
+        assertEquals(-1, vista.filaResaltada, "Todavia no hay proceso en la CPU");
 
         controlador.alPasoAPaso();
         assertEquals(5, ax());
         assertEquals(1, vista.filaResaltada);
+        assertEquals(7, vista.instrucciones.size(), "Se muestra el programa en ejecucion");
+        assertEquals("file.asm", vista.archivoEnBarra);
+        assertEquals(EstadoProceso.EJECUCION.name(), vista.estadoEnBarra);
+        assertNotNull(vista.ultimoProceso);
+        assertEquals(5, vista.ultimoProceso.getRegistro(RegistroID.AX),
+                "El panel del BCP lee de la memoria");
+        assertTrue(vista.consolaContiene("Despachador: P1 pasa a EJECUCION"));
 
         controlador.alPasoAPaso();
         assertEquals(3, bx());
@@ -236,35 +390,62 @@ class ControladorPrincipalTest {
     }
 
     @Test
-    @DisplayName("El programa completo deja el resultado del enunciado")
+    @DisplayName("El programa de ejemplo completo deja el resultado esperado en su BCP")
     void ejecucionCompleta(@TempDir Path carpeta) throws Exception {
-        vista.archivoAEntregar = ejemploDelEnunciado(carpeta);
-        controlador.alCargarArchivo();
+        vista.entregar(programaDeEjemplo(carpeta));
+        controlador.alCargarArchivos();
 
-        for (int i = 0; i < 7; i++) {
+        // Pesos: MOV 1, MOV 1, LOAD 2, ADD 3, SUB 3, STORE 2 = 12 s; MOV BX, -8 = 1 s.
+        for (int i = 0; i < 12; i++) {
             controlador.alPasoAPaso();
         }
+        Proceso p = enEjecucion();
+        assertEquals(3, p.getAc());
+        assertEquals(3, p.getRegistro(RegistroID.AX));
+        assertEquals(0, vista.estadisticasMostradas);
 
-        assertEquals(3, controlador.getProcesador().getAc());
-        assertEquals(3, ax());
-        assertEquals(-8, bx());
+        controlador.alPasoAPaso();
         assertTrue(vista.termino);
         assertEquals(-1, vista.filaResaltada, "Ya no hay instruccion pendiente");
-        assertEquals(EstadoProceso.TERMINADO.name(), vista.estadoEnBarra);
-        assertTrue(vista.consolaContiene("7 instrucciones ejecutadas"));
+        assertEquals("FINALIZADO", vista.estadoEnBarra);
+        assertEquals(EstadoProceso.FINALIZADO, trabajos().get(0).getEstado());
+        assertEquals(13, trabajos().get(0).getTiempoCpu(), "Suma de los pesos");
+        assertTrue(vista.consolaContiene("Todos los trabajos finalizaron"));
+        assertEquals(1, vista.estadisticasMostradas, "Al final se muestran las estadisticas");
+    }
+
+    @Test
+    @DisplayName("Con dos programas, FCFS ejecuta el primero completo y luego el segundo")
+    void dosProgramasConFcfs(@TempDir Path carpeta) throws Exception {
+        File a = crearAsm(carpeta, "a.asm", "MOV AX, 1\nINT 20H\n");
+        File b = crearAsm(carpeta, "b.asm", "MOV AX, 2\nINT 20H\n");
+        vista.entregar(a, b);
+        controlador.alCargarArchivos();
+
+        controlador.alPasoAPaso();
+        assertEquals("a.asm", vista.archivoEnBarra);
+        assertEquals("PREPARADO", controlador.getModeloTrabajos().getValueAt(1, 2));
+        controlador.alPasoAPaso();
+        controlador.alPasoAPaso();
+        assertEquals("FINALIZADO", controlador.getModeloTrabajos().getValueAt(0, 2),
+                "MOV (1 s) + INT 20H (2 s)");
+
+        controlador.alPasoAPaso();
+        assertEquals("b.asm", vista.archivoEnBarra, "Cambio de contexto al segundo");
+        assertEquals(2, ax());
     }
 
     @Test
     @DisplayName("Al terminar la ejecucion automatica los botones vuelven a habilitarse")
     void ejecucionAutomaticaRehabilitaBotones(@TempDir Path carpeta) throws Exception {
-        controlador.alConfigurar(256, 64, 50);
-        vista.archivoAEntregar = ejemploDelEnunciado(carpeta);
-        controlador.alCargarArchivo();
+        controlador.alConfigurar(config(256, 50));
+        vista.entregar(programaDeEjemplo(carpeta));
+        controlador.alCargarArchivos();
 
         controlador.alEjecutar();
         assertTrue(vista.enEjecucion, "Mientras corre, los botones quedan bloqueados");
 
-        // Siete instrucciones a 50 ms tardan unos 350 ms; se espera con margen.
+        // Siete segundos de CPU a 50 ms tardan unos 350 ms; se espera con margen.
         long limite = System.currentTimeMillis() + 5000;
         while (vista.enEjecucion && System.currentTimeMillis() < limite) {
             Thread.sleep(20);
@@ -273,49 +454,45 @@ class ControladorPrincipalTest {
         assertFalse(vista.enEjecucion, "El temporizador debio detenerse y refrescar la vista");
         assertTrue(vista.termino);
         assertTrue(vista.hayPrograma, "El boton de estadisticas depende de esto");
-        assertEquals(3, controlador.getProcesador().getAc());
-        assertEquals(-8, bx());
+        assertEquals(EstadoProceso.FINALIZADO, trabajos().get(0).getEstado());
     }
 
     @Test
-    @DisplayName("Un desbordamiento detiene la ejecucion y avisa")
-    void desbordamientoSeInforma(@TempDir Path carpeta) throws Exception {
-        vista.archivoAEntregar = crearAsm(carpeta, "desborde.asm",
-                "MOV AX, 100\nMOV BX, 100\nLOAD AX\nADD BX\n");
-        controlador.alCargarArchivo();
+    @DisplayName("Un error de ejecucion se muestra y el proceso finaliza")
+    void errorDeEjecucion(@TempDir Path carpeta) throws Exception {
+        vista.entregar(crearAsm(carpeta, "vacia.asm", "POP AX\nINT 20H\n"));
+        controlador.alCargarArchivos();
 
-        for (int i = 0; i < 4; i++) {
-            controlador.alPasoAPaso();
-        }
+        controlador.alPasoAPaso();
 
         assertEquals("Error de ejecucion", vista.tituloError);
-        assertTrue(vista.errores.get(0).contains("200"), vista.errores.get(0));
-        assertEquals(EstadoProceso.BLOQUEADO_ERROR.name(), vista.estadoEnBarra);
-        assertTrue(vista.termino);
+        assertTrue(vista.errores.get(0).contains("Pila vacia"), vista.errores.get(0));
+        assertEquals("FINALIZADO (error)", controlador.getModeloTrabajos().getValueAt(0, 2));
     }
 
     @Test
-    @DisplayName("Reiniciar vuelve al inicio conservando el programa")
+    @DisplayName("Reiniciar devuelve los trabajos a PREPARADO y el reloj a cero")
     void reiniciarConservaElPrograma(@TempDir Path carpeta) throws Exception {
-        vista.archivoAEntregar = ejemploDelEnunciado(carpeta);
-        controlador.alCargarArchivo();
+        vista.entregar(programaDeEjemplo(carpeta));
+        controlador.alCargarArchivos();
         controlador.alPasoAPaso();
         controlador.alPasoAPaso();
 
         controlador.alReiniciar();
 
-        assertEquals(0, ax());
-        assertEquals(0, vista.filaResaltada);
+        assertEquals(0, controlador.getSistemaOperativo().getReloj());
+        assertEquals(EstadoProceso.PREPARADO, trabajos().get(0).getEstado());
+        assertEquals(-1, vista.filaResaltada);
         assertTrue(vista.hayPrograma);
-        assertEquals(7, controlador.getModeloInstrucciones().getRowCount());
-        assertEquals(EstadoProceso.LISTO.name(), vista.estadoEnBarra);
+        assertEquals("CPU LIBRE", vista.estadoEnBarra);
+        assertNotNull(controlador.getDisco().buscar("file.asm"), "El disco se conserva");
     }
 
     @Test
     @DisplayName("Limpiar descarga todo y vacia las tablas")
     void limpiarDescargaTodo(@TempDir Path carpeta) throws Exception {
-        vista.archivoAEntregar = ejemploDelEnunciado(carpeta);
-        controlador.alCargarArchivo();
+        vista.entregar(programaDeEjemplo(carpeta));
+        controlador.alCargarArchivos();
         controlador.alPasoAPaso();
 
         controlador.alLimpiar();
@@ -323,55 +500,169 @@ class ControladorPrincipalTest {
         assertFalse(vista.hayPrograma);
         assertEquals(0, controlador.getModeloInstrucciones().getRowCount());
         assertEquals(0, controlador.getProcesador().getMemoria().getPosicionesUsadas());
-        assertEquals("(ninguno)", vista.archivoEnBarra);
+        assertTrue(trabajos().isEmpty());
+        assertTrue(controlador.getDisco().getIndice().isEmpty(), "El disco tambien se vacia");
+        assertEquals("(CPU libre)", vista.archivoEnBarra);
         assertEquals("SIN PROGRAMA", vista.estadoEnBarra);
     }
 
     @Test
-    @DisplayName("Configurar cambia la memoria y la velocidad")
-    void configurarCambiaLaMemoria() {
-        controlador.alConfigurar(512, 128, 250);
+    @DisplayName("Configurar cambia la memoria, el disco y la velocidad")
+    void configurarCambiaLaMemoria(@TempDir Path carpeta) throws Exception {
+        vista.entregar(programaDeEjemplo(carpeta));
+        controlador.alCargarArchivos();
+
+        controlador.alConfigurar(new Configuracion(512, 1024, 128, 250, "FCFS"));
 
         assertEquals(512, controlador.getProcesador().getMemoria().getTamano());
-        assertEquals(128, controlador.getProcesador().getMemoria().getLimiteKernel());
+        assertEquals(256, controlador.getProcesador().getMemoria().getLimiteKernel(),
+                "El kernel es el 50 % de la memoria nueva");
+        assertEquals(1024, controlador.getDisco().getTamano());
+        assertEquals(896, controlador.getDisco().getInicioMemoriaVirtual());
+        assertTrue(controlador.getDisco().getIndice().isEmpty(), "Reconfigurar vacia el disco");
+        assertTrue(trabajos().isEmpty());
+        assertEquals(1024, controlador.getModeloDisco().getRowCount());
         assertEquals(250, controlador.getVelocidadMs());
-        assertTrue(vista.consolaContiene("512 posiciones"));
+        assertEquals(250, controlador.getConfiguracion().getMsPorSegundo());
+        assertTrue(vista.consolaContiene("Memoria de 512 posiciones"));
+        assertTrue(vista.consolaContiene("Planificacion: FCFS"));
     }
 
     @Test
-    @DisplayName("Una configuracion invalida se rechaza sin romper nada")
-    void configuracionInvalida() {
-        controlador.alConfigurar(128, 200, 500);
+    @DisplayName("Sin archivo de configuracion se usan los valores por defecto")
+    void sinArchivoUsaLosValoresPorDefecto() {
+        assertEquals(256, controlador.getProcesador().getMemoria().getTamano());
+        assertEquals(128, controlador.getProcesador().getMemoria().getLimiteKernel());
+        assertEquals(512, controlador.getDisco().getTamano());
+        assertEquals(1000, controlador.getVelocidadMs());
+        assertEquals("FCFS", controlador.getSistemaOperativo().getAlgoritmo().getNombre());
+    }
+
+    @Test
+    @DisplayName("Al arrancar se lee el archivo de configuracion")
+    void leeLaConfiguracionAlArrancar(@TempDir Path carpeta) throws Exception {
+        Path archivo = carpeta.resolve("config.properties");
+        Files.writeString(archivo, "memoria.tamano=300\ndisco.tamano=600\n",
+                StandardCharsets.UTF_8);
+
+        ControladorPrincipal conArchivo = new ControladorPrincipal(vista,
+                new LectorConfiguracion(archivo));
+        conArchivo.inicializarVista();
+
+        assertEquals(300, conArchivo.getProcesador().getMemoria().getTamano());
+        assertEquals(600, conArchivo.getDisco().getTamano());
+        assertNull(vista.tituloError);
+        assertTrue(vista.consolaContiene("Configuracion leida de"));
+    }
+
+    @Test
+    @DisplayName("Un archivo de configuracion invalido se informa y se usan los valores por defecto")
+    void configuracionInvalidaAlArrancar(@TempDir Path carpeta) throws Exception {
+        Path archivo = carpeta.resolve("config.properties");
+        Files.writeString(archivo, "memoria.tamano=10\n", StandardCharsets.UTF_8);
+
+        ControladorPrincipal conArchivo = new ControladorPrincipal(vista,
+                new LectorConfiguracion(archivo));
+        conArchivo.inicializarVista();
 
         assertEquals("Configuracion invalida", vista.tituloError);
-        assertEquals(256, controlador.getProcesador().getMemoria().getTamano(),
-                "La memoria no debio cambiar");
+        assertTrue(vista.errores.stream().anyMatch(e -> e.contains("no cabe ningun BCP")));
+        assertEquals(256, conArchivo.getProcesador().getMemoria().getTamano());
     }
 
     @Test
-    @DisplayName("El modelo de memoria refleja el programa cargado")
+    @DisplayName("Aceptar una configuracion la guarda en el archivo")
+    void configurarGuardaElArchivo(@TempDir Path carpeta) throws Exception {
+        LectorConfiguracion lector = new LectorConfiguracion(carpeta.resolve("config.properties"));
+        ControladorPrincipal conArchivo = new ControladorPrincipal(vista, lector);
+
+        conArchivo.alConfigurar(new Configuracion(384, 768, 32, 400, "FCFS"));
+
+        Configuracion guardada = lector.cargar();
+        assertEquals(384, guardada.getTamanoMemoria());
+        assertEquals(768, guardada.getTamanoDisco());
+        assertEquals(32, guardada.getTamanoMemoriaVirtual());
+        assertEquals(400, guardada.getMsPorSegundo());
+        assertEquals("FCFS", guardada.getAlgoritmo());
+    }
+
+    @Test
+    @DisplayName("La tabla de memoria nombra la cabecera, los campos del BCP y el programa")
     void modeloDeMemoriaRefleja(@TempDir Path carpeta) throws Exception {
-        vista.archivoAEntregar = ejemploDelEnunciado(carpeta);
-        controlador.alCargarArchivo();
+        vista.entregar(programaDeEjemplo(carpeta));
+        controlador.alCargarArchivos();
 
         assertEquals(256, controlador.getModeloMemoria().getRowCount());
-        assertEquals("Kernel", controlador.getModeloMemoria().getValueAt(0, 1));
-        assertEquals("[reservada]", controlador.getModeloMemoria().getValueAt(0, 2));
-        assertEquals("Usuario", controlador.getModeloMemoria().getValueAt(64, 1));
-        assertEquals("MOV AX, 5", controlador.getModeloMemoria().getValueAt(64, 2));
-        assertEquals("0011 0001 00000101", controlador.getModeloMemoria().getValueAt(64, 3));
+        assertEquals("SO.En ejecucion", controlador.getModeloMemoria().getValueAt(0, 1));
+        assertEquals("SO.Admitidos", controlador.getModeloMemoria().getValueAt(2, 1));
+        assertEquals("1", controlador.getModeloMemoria().getValueAt(2, 2));
+        assertEquals("P1.PID", controlador.getModeloMemoria().getValueAt(3, 1));
+        assertEquals("1", controlador.getModeloMemoria().getValueAt(3, 2));
+        assertEquals("P1.Estado", controlador.getModeloMemoria().getValueAt(5, 1));
+        assertEquals("PREPARADO", controlador.getModeloMemoria().getValueAt(5, 2));
+        assertEquals("BCP libre", controlador.getModeloMemoria().getValueAt(28, 1));
+        assertEquals("P1", controlador.getModeloMemoria().getValueAt(128, 1));
+        assertEquals("MOV AX, 5", controlador.getModeloMemoria().getValueAt(128, 2));
         assertEquals("", controlador.getModeloMemoria().getValueAt(200, 2));
     }
 
     @Test
     @DisplayName("Las estadisticas quedan disponibles al terminar")
     void estadisticasDisponibles(@TempDir Path carpeta) throws Exception {
-        vista.archivoAEntregar = ejemploDelEnunciado(carpeta);
-        controlador.alCargarArchivo();
-        for (int i = 0; i < 7; i++) {
+        vista.entregar(programaDeEjemplo(carpeta));
+        controlador.alCargarArchivos();
+        for (int i = 0; i < 13; i++) {
             controlador.alPasoAPaso();
         }
 
         assertEquals(7, controlador.obtenerEstadisticas().getTotalInstrucciones());
+        Trabajo t = trabajos().get(0);
+        assertEquals(0, t.getInicio());
+        assertEquals(13, t.getFin(), "El reloj avanza segun los pesos");
+        assertEquals("00:00:13", vista.reloj);
+    }
+
+    @Test
+    @DisplayName("INT 09H habilita el teclado; el valor llega al proceso y se ve en la pantalla")
+    void tecladoYPantalla(@TempDir Path carpeta) throws Exception {
+        vista.entregar(crearAsm(carpeta, "teclado.asm", "INT 09H\nINT 10H\nINT 20H\n"));
+        controlador.alCargarArchivos();
+        assertFalse(vista.tecladoHabilitado);
+
+        controlador.alPasoAPaso();
+        assertTrue(vista.tecladoHabilitado, "El proceso espera el teclado");
+        assertEquals(List.of("[P1] >> Ingresar valor:"), vista.pantalla);
+        assertEquals("P1", vista.destinoTeclado, "El rotulo dice a quien le llega el valor");
+        assertEquals("EN_ESPERA", controlador.getModeloTrabajos().getValueAt(0, 2));
+
+        controlador.alEnviarTeclado("300");
+        assertEquals("Teclado", vista.tituloError);
+        assertTrue(vista.tecladoHabilitado, "Un valor invalido no se acepta");
+
+        controlador.alEnviarTeclado("42");
+        assertFalse(vista.tecladoHabilitado);
+        assertEquals("PREPARADO", controlador.getModeloTrabajos().getValueAt(0, 2));
+
+        controlador.alPasoAPaso();
+        controlador.alPasoAPaso();
+        assertEquals(List.of("[P1] >> Ingresar valor: 42", "[P1] 42"), vista.pantalla,
+                "Eco en la linea del aviso y luego INT 10H imprime DX");
+    }
+
+    @Test
+    @DisplayName("Pausar detiene la ejecucion automatica y se puede seguir con Siguiente")
+    void pausarLaEjecucionAutomatica(@TempDir Path carpeta) throws Exception {
+        controlador.alConfigurar(config(256, 2000));
+        vista.entregar(programaDeEjemplo(carpeta));
+        controlador.alCargarArchivos();
+
+        controlador.alEjecutar();
+        assertTrue(vista.enEjecucion);
+        controlador.alPausar();
+        assertFalse(vista.enEjecucion, "El temporizador se detuvo");
+        assertTrue(vista.consolaContiene("en pausa"));
+
+        controlador.alPasoAPaso();
+        assertEquals(EstadoProceso.EJECUCION, trabajos().get(0).getEstado());
     }
 }

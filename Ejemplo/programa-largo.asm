@@ -1,7 +1,7 @@
 ; ==========================================================
 ; programa-largo.asm
 ; Ejercita las cinco operaciones y los cuatro registros.
-; 35 instrucciones, todas dentro del rango -127 a 127.
+; 35 instrucciones.
 ; ==========================================================
 
 ; --- Bloque 1: carga inicial de los cuatro registros ---
@@ -31,7 +31,7 @@ LOAD CX
 ADD DX
 STORE CX
 
-; --- Bloque 5: extremos del rango representable ---
+; --- Bloque 5: valores grandes y negativos ---
 MOV AX, 127
 LOAD AX
 SUB AX

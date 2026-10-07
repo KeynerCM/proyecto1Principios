@@ -1,7 +1,7 @@
 package com.mycompany.minipc.gui.modelo;
 
-import com.mycompany.minipc.core.CeldaMemoria;
-import com.mycompany.minipc.core.Memoria;
+import com.mycompany.minipc.gui.Tema;
+import com.mycompany.minipc.hardware.Memoria;
 
 import javax.swing.JTable;
 import javax.swing.table.DefaultTableCellRenderer;
@@ -14,36 +14,36 @@ import java.awt.Font;
  * Entradas: la memoria que se esta dibujando y la direccion que apunta el PC
  * Salidas: el componente ya pintado que la tabla dibuja en cada celda
  * Restricciones: solo tiene sentido aplicado a la tabla de memoria, porque
- *                supone que la fila coincide con la direccion y que la
- *                columna 3 contiene el binario
- * Descripcion: pinta la tabla de memoria distinguiendo las zonas. La
- *              separacion entre kernel y usuario es uno de los requisitos del
- *              enunciado, y verla en colores la vuelve evidente sin tener que
- *              leer numeros de direccion.
+ *                supone que la fila coincide con la direccion
+ * Descripcion: pinta la tabla de memoria distinguiendo las zonas. La cabecera
+ *              del sistema operativo va en gris; cada ranura de BCP tiene un
+ *              color, y el programa del mismo proceso en la zona de usuario va
+ *              en una version mas clara de ese color. Asi se ve donde y como
+ *              quedo guardado cada proceso.
  */
 public class RenderZonaMemoria extends DefaultTableCellRenderer {
 
     private static final long serialVersionUID = 1L;
 
     /** Zona reservada al sistema operativo. */
-    private static final Color FONDO_KERNEL = new Color(232, 232, 232);
+    private static final Color FONDO_KERNEL = Tema.KERNEL_LIBRE;
 
     private static final Color TEXTO_KERNEL = new Color(120, 120, 120);
 
-    /** Zona de usuario ocupada por instrucciones del programa. */
-    private static final Color FONDO_INSTRUCCION = new Color(214, 234, 248);
 
     /** Posicion que apunta el PC en este momento. */
-    private static final Color FONDO_ACTUAL = new Color(255, 235, 156);
+    private static final Color FONDO_ACTUAL = Tema.RESALTADO;
 
     private static final Color TEXTO_ACTUAL = new Color(70, 50, 0);
 
     private final Memoria memoria;
+    private final MapaMemoria mapa;
     private int direccionActual = -1;
 
     /**
      * Nombre: RenderZonaMemoria
-     * Entradas: memoria, memoria que se esta dibujando
+     * Entradas: memoria, memoria que se esta dibujando; mapa, quien dice de
+     *           que proceso es cada celda
      * Salidas: el renderer construido
      * Restricciones: la memoria no debe ser nula, porque se consulta en cada
      *                celda para saber a que zona pertenece
@@ -51,8 +51,9 @@ public class RenderZonaMemoria extends DefaultTableCellRenderer {
      *              este renderer lo crea el controlador y no la ventana: la
      *              ventana no conoce el nucleo.
      */
-    public RenderZonaMemoria(Memoria memoria) {
+    public RenderZonaMemoria(Memoria memoria, MapaMemoria mapa) {
         this.memoria = memoria;
+        this.mapa = mapa;
     }
 
     /**
@@ -74,10 +75,11 @@ public class RenderZonaMemoria extends DefaultTableCellRenderer {
      * Salidas: el componente con el formato ya aplicado
      * Restricciones: si la fila esta seleccionada se respeta el color de
      *                seleccion del sistema y no se pinta nada encima
-     * Descripcion: aplica fuente monoespaciada a la columna del binario y
-     *              elige el color de fondo en este orden de prioridad: la
-     *              posicion actual, la zona de kernel, una celda con
-     *              instruccion, y por ultimo el fondo normal de la tabla.
+     * Descripcion: restablece la fuente de la tabla y elige el color de fondo
+     *              en este orden de prioridad: la posicion actual, la
+     *              cabecera del sistema operativo, el color del proceso dueno
+     *              de la celda, una ranura de BCP libre, y por ultimo el fondo
+     *              normal de la tabla.
      */
     @Override
     public Component getTableCellRendererComponent(JTable tabla, Object valor,
@@ -86,9 +88,7 @@ public class RenderZonaMemoria extends DefaultTableCellRenderer {
         Component celda = super.getTableCellRendererComponent(
                 tabla, valor, seleccionada, tieneFoco, fila, columna);
 
-        celda.setFont(columna == 3
-                ? new Font(Font.MONOSPACED, Font.PLAIN, 12)
-                : tabla.getFont());
+        celda.setFont(tabla.getFont());
 
         if (seleccionada) {
             return celda;
@@ -100,14 +100,34 @@ public class RenderZonaMemoria extends DefaultTableCellRenderer {
             celda.setBackground(FONDO_ACTUAL);
             celda.setForeground(TEXTO_ACTUAL);
             celda.setFont(celda.getFont().deriveFont(Font.BOLD));
+        } else {
+            pintarZona(celda, tabla, fila);
+        }
+        return celda;
+    }
+
+    /**
+     * Nombre: pintarZona
+     * Entradas: celda, componente a pintar; tabla, tabla dibujada; fila,
+     *           direccion de memoria
+     * Salidas: ninguna
+     * Restricciones: ninguna
+     * Descripcion: elige el color segun la zona y el proceso dueno.
+     */
+    private void pintarZona(Component celda, JTable tabla, int fila) {
+        int ranura = mapa.ranuraDe(fila);
+        if (ranura == MapaMemoria.CABECERA) {
+            celda.setBackground(Tema.CABECERA_SO);
+            celda.setForeground(Color.WHITE);
+        } else if (ranura >= 0) {
+            boolean esKernel = memoria.esDireccionKernel(fila);
+            celda.setBackground(esKernel ? Tema.colorProceso(ranura)
+                    : Tema.colorProcesoClaro(ranura));
         } else if (memoria.esDireccionKernel(fila)) {
             celda.setBackground(FONDO_KERNEL);
             celda.setForeground(TEXTO_KERNEL);
-        } else if (memoria.leer(fila).getTipo() == CeldaMemoria.Tipo.INSTRUCCION) {
-            celda.setBackground(FONDO_INSTRUCCION);
         } else {
             celda.setBackground(tabla.getBackground());
         }
-        return celda;
     }
 }

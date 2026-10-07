@@ -1,242 +1,205 @@
-# Mini PC — Simulador del ciclo de instrucción
+# Proyecto 1: Gestor de Procesos (Mini PC)
 ## Integrantes:
 ### 2024108270 Keyner Cerdas Morales
 
 ### Estado del proyecto: 1
-### Enlace del video: [Ver en YouTube](https://youtu.be/hx8HYF0uV9c)
+### Enlace del video: [Ver en YouTube](https://youtu.be/fQ6zucnVZGE)
 
+**Curso:** IC-6600 Principios de Sistemas Operativos, Centro Académico Limón
+**Profesor:** Ing. Cristian Campos Agüero
 
 ---
 
 ## Descripción
 
-Simulador visual del ciclo de instrucción de un procesador, basado en la máquina
-hipotética que describe Stallings en *Operating Systems: Internals and Design
-Principles*, 9na edición, capítulo 1.3.
+Simulador de una minicomputadora con CPU, memoria principal, disco, pantalla y teclado, y de un sistema operativo que administra la ejecución de varios programas escritos en un mini ensamblador (`.asm`).
 
-El programa lee un archivo de texto con instrucciones del lenguaje
-ensamblador ASM, las traduce a binario, las carga en una memoria simulada y las
-ejecuta una por una, mostrando en pantalla cómo cambian el contador de programa,
-el registro de instrucción, el acumulador, los registros de propósito general y
-el Bloque de Control de Proceso.
+Al cargar uno o varios archivos, el sistema:
 
-La ejecución puede seguirse **paso a paso** o dejarse correr de forma
-**automática** a una velocidad configurable.
+1. valida la sintaxis de cada línea con expresiones regulares;
+2. guarda los programas en el disco, con su entrada en el índice;
+3. los pone en la **lista de trabajos** (hasta 20);
+4. los admite como **procesos** (hasta 5), cada uno con su **BCP en la memoria del kernel**;
+5. los ejecuta con planificación **FCFS**, pasando por el **despachador** y el **cambio de contexto**.
 
-> Todo es simulado. La "memoria" es un arreglo de objetos Java y los "registros"
-> son campos enteros. El programa no accede al hardware de la computadora: lo
-> único que hace fuera de su propio proceso es leer el archivo `.asm` del disco.
+Cada instrucción dura tantos segundos de CPU como su peso. La ejecución puede avanzar de a un segundo con **Siguiente** o de forma **automática** con **Ejecutar**. Al final se muestran las estadísticas de cada proceso.
+
+El diseño sigue los conceptos de Stallings, *Operating Systems: Internals and Design Principles*, 9.ª edición: ciclo de instrucción, interrupciones, modelo de 7 estados, BCP, despachador, cambio de contexto, memoria virtual y planificación.
 
 ## Requisitos
 
-- **JDK 17** o superior
-- **Maven 3.8+** (NetBeans lo trae incorporado)
-- Sistema operativo con entorno gráfico (Windows, Linux o macOS)
+- **JDK 17** o superior.
+- **Maven** (NetBeans lo trae incorporado). La única dependencia externa es FlatLaf 3.7.2 (apariencia de la interfaz), que Maven descarga sola. Si no estuviera disponible, el programa usa la apariencia del sistema.
+- Sistema operativo con entorno gráfico.
 
-## Compilación y ejecución
+## Instrucciones de ejecución
 
 ### Desde NetBeans
 
-1. `File` → `Open Project…` y seleccionar la carpeta `Programa/minipc`.
-2. Clic derecho sobre el proyecto → `Run`.
+1. `File` -> `Open Project...` y seleccionar la carpeta `Programa/minipc`.
+2. Clic derecho sobre el proyecto -> `Run`.
 
 ### Desde la terminal
 
 ```bash
 cd Programa/minipc
 mvn clean package
-java -jar target/minipc-1.0.jar
+mvn exec:java
 ```
 
-### Para correr las pruebas
+### Pruebas automáticas
 
 ```bash
 cd Programa/minipc
 mvn test
 ```
 
-## Guía de uso
+## Uso
 
-| Botón | Qué hace |
-|---|---|
-| **Cargar .asm** | Abre el selector de archivos, valida el formato y carga el programa en memoria |
-| **Ejecutar** | Corre el programa completo de forma automática |
-| **Paso a paso** | Ejecuta una sola instrucción |
-| **Reiniciar** | Vuelve al inicio del programa sin descargarlo de memoria |
-| **Limpiar** | Vacía la memoria de usuario, los registros, las tablas y la consola |
-| **Configurar** | Tamaño de memoria, límite de kernel y velocidad de ejecución |
-| **Estadísticas** | Resumen de la ejecución |
+| Botón | Atajo | Qué hace |
+|---|---|---|
+| **Cargar archivos** | Ctrl+O | Abre el selector para elegir uno o varios `.asm` (Ctrl o Shift + clic, o el botón "Seleccionar todos los .asm"). Los valida, los guarda en el disco y los agrega a la lista de trabajos. Volver a usarlo agrega más trabajos. |
+| **Ejecutar** | F5 | Ejecuta todos los procesos de forma automática hasta su finalización. |
+| **Siguiente** | F8 | Avanza un segundo de CPU. |
+| **Pausar** | | Detiene la ejecución automática. |
+| **Reiniciar** | | Devuelve todos los trabajos a NUEVO para ejecutarlos de nuevo. |
+| **Limpiar** | | Vacía la lista de trabajos, la memoria, el disco y la pantalla. |
+| **Estadísticas** | | Muestra el resumen de la ejecución. También se abre solo al terminar el último proceso. |
+| **Configuración** | | Tamaño de la memoria, del disco y de la memoria virtual, velocidad de la ejecución automática y algoritmo de planificación. |
 
-La ventana se divide en cuatro áreas:
+La ventana muestra:
+- la lista de trabajos con su estado;
+- la lista de procesos en memoria y sus colas (en CPU, preparados, en espera y suspendidos);
+- el BCP del proceso en ejecución con sus registros, IR, AC, PC y pila;
+- la memoria principal y el disco celda por celda;
+- la pantalla con el teclado, la consola del sistema operativo y el programa en ejecución;
+- el reloj simulado.
 
-- **Instrucciones** — el programa fuente junto a su traducción binaria. La fila
-  ámbar es la próxima a ejecutarse; las grises ya se ejecutaron.
-- **Memoria** — todas las posiciones. Gris la zona de kernel, azul las celdas
-  con instrucciones, ámbar la posición que apunta el PC.
-- **BCP actual** — los atributos del Bloque de Control de Proceso, agrupados en
-  cinco secciones.
-- **Consola** — registro de la actividad, con la hora de cada evento.
+## Configuración
 
-## Juego de instrucciones
+Los valores no quedan en el código: se leen del archivo [`Programa/minipc/config.properties`](Programa/minipc/config.properties), que se puede editar a mano o desde el menú Configuración.
 
-| Mnemónico | Opcode | Sintaxis | Semántica |
-|---|---|---|---|
-| `LOAD` | `0001` | `LOAD Rx` | `AC ← Rx` |
-| `STORE` | `0010` | `STORE Rx` | `Rx ← AC` |
-| `MOV` | `0011` | `MOV Rx, n` | `Rx ← n` |
-| `SUB` | `0100` | `SUB Rx` | `AC ← AC − Rx` |
-| `ADD` | `0101` | `ADD Rx` | `AC ← AC + Rx` |
-
-**Registros:** `AX = 0001`, `BX = 0010`, `CX = 0011`, `DX = 0100`
-
-## Formato binario
-
-### Instrucción — palabra de 16 bits
-
-```
- bit 15   12 11    8 7                     0
-   +--------+--------+----------------------+
-   | OPCODE | REGIS. |       OPERANDO       |
-   +--------+--------+----------------------+
-     4 bits   4 bits         8 bits
-```
-
-Ejemplo: `MOV AX, 5` → `0011 0001 00000101`
-
-### Entero — 8 bits en signo-magnitud
-
-```
- bit 7                            bit 0
-   +---+-------------------------------+
-   | S |           MAGNITUD            |
-   +---+-------------------------------+
-
-   S = 0 positivo  |  S = 1 negativo
-```
-
-Ejemplo: `-8` → `10001000`
-
-- Rango representable: **−127 a 127**
-- El formato admite dos ceros (`00000000` y `10000000`); el programa normaliza
-  siempre al positivo.
+| Clave | Por defecto | Significado |
+|---|---:|---|
+| `memoria.tamano` | 256 | Celdas de la memoria principal (a los programas les deben quedar al menos 32) |
+| `memoria.kernelPorcentaje` | 50 | Porcentaje de la memoria que ocupa el kernel (10 a 90). De su tamaño sale cuántos BCP caben, como máximo 5 |
+| `disco.tamano` | 512 | Celdas del disco (las primeras 20 son el índice) |
+| `disco.memoriaVirtual` | 64 | Celdas al final del disco reservadas para la memoria virtual |
+| `ejecucion.msPorSegundo` | 1000 | Milisegundos reales que dura cada segundo de CPU en la ejecución automática |
+| `planificacion.algoritmo` | FCFS | Algoritmo de planificación de procesos |
 
 ## Formato del archivo `.asm`
 
-Una instrucción por línea. Se aceptan:
+- Una instrucción por línea. Las líneas vacías se ignoran.
+- Comentarios con `;` o `//`, al inicio de la línea o después de una instrucción.
+- Los operandos se separan con **exactamente una coma**: `MOV AX, 5`. Formas como `MOV AX 5` o `MOV AX,, 5` se rechazan.
+- No distingue mayúsculas de minúsculas.
+- Los números pueden ser decimales (`-8`) o hexadecimales con sufijo `h` (`3Ch`).
+- Registros: `AX`, `BX`, `CX`, `DX`, y `AH` y `AL` (mitades alta y baja de AX).
 
-- Comentarios con `;` o `//`, al inicio de la línea o después de una instrucción
-- Líneas vacías, que no ocupan posición en memoria
-- La coma como separador opcional: `MOV AX, 5` y `MOV AX 5` son equivalentes
-- Mayúsculas y minúsculas indistintas
+Los errores de sintaxis se reportan todos juntos, cada uno con su número de línea y un mensaje claro.
 
-```asm
-; Programa de ejemplo del enunciado
-MOV AX, 5
-MOV BX, 3
-LOAD AX
-ADD BX
-SUB AX
-STORE AX
-MOV BX, -8
-```
+## Juego de instrucciones
+
+| Instrucción | Peso | Descripción |
+|---|---:|---|
+| `LOAD reg` | 2 | AC = reg |
+| `STORE reg` | 2 | reg = AC |
+| `MOV reg, reg` / `MOV reg, num` | 1 | Copia un valor al registro |
+| `MOV DX, "archivo.txt"` | 1 | Deja en DX la posición del nombre del archivo (para `INT 21H`) |
+| `ADD reg` | 3 | AC = AC + reg |
+| `SUB reg` | 3 | AC = AC - reg |
+| `INC` / `INC reg` | 1 | Suma 1 al AC o al registro |
+| `DEC` / `DEC reg` | 1 | Resta 1 al AC o al registro |
+| `SWAP reg, reg` | 1 | Intercambia los valores de dos registros |
+| `INT 20H` | 2 | Finaliza el programa |
+| `INT 10H` | 2 | Imprime en la pantalla el valor de DX |
+| `INT 09H` | variable | Pide un valor al teclado (0 a 255) y lo guarda en DX al presionar ENTER |
+| `INT 21H` | 5 | Archivos: AH = 3Ch crear, 3Dh abrir, 4Dh leer, 40h escribir, 41h eliminar; el byte va en AL |
+| `JMP ±desp` | 2 | Salta según el desplazamiento |
+| `CMP reg, reg` | 2 | Compara dos registros |
+| `JE ±desp` / `JNE ±desp` | 2 | Salta si eran iguales / distintos |
+| `PARAM v1[, v2[, v3]]` | 3 | Guarda hasta 3 valores en la pila |
+| `PUSH reg` | 1 | Guarda el registro en la pila |
+| `POP reg` | 1 | Saca un valor de la pila al registro |
+
+## Diseño
+
+Resumen de la estructura. La explicación completa y el diagrama de paquetes están en el PDF de diseño.
+
+- **Paquetes:**
+  - `hardware`: CPU, memoria, disco, pantalla, registros y pila;
+  - `isa`: instrucciones y ensamblador;
+  - `so`: sistema operativo, con los subpaquetes:
+    - `trabajos`: lista de trabajos y planificador de trabajos;
+    - `procesos`: BCP, proceso y lista de procesos;
+    - `planificacion`: algoritmos;
+    - `despacho`: despachador y cambio de contexto;
+    - `memoria`: memoria, memoria virtual e intercambio;
+    - `interrupciones`;
+    - `archivos`;
+  - `gui`: interfaz;
+  - `config`: configuración externa.
+- **Memoria y kernel:** la memoria es un arreglo de celdas de texto. El kernel es un porcentaje configurable de la memoria (K = memoria x porcentaje / 100) y de su tamaño se calcula cuántos BCP caben: P = (K - 3) / 25, como máximo 5 (3 celdas de cabecera y 25 por BCP). Con 256 y 50 % el kernel mide 128 celdas (0 a 127), caben los 5 BCP y los programas van en la zona de usuario (128 a 255). Se eligió 50 % porque es el menor porcentaje en el que caben los 5 BCP con la memoria por defecto; con 20 % el kernel mediría 51 celdas y cabría un solo proceso a la vez.
+- **BCP en memoria:** la información de cada proceso vive en las celdas del kernel, no en objetos de Java. Cada elemento de la pila ocupa su propia celda. Los BCP forman una lista enlazada con el campo "siguiente BCP".
+- **Estados:** NUEVO, PREPARADO, EJECUCION, EN_ESPERA, SUSPENDIDO_PREPARADO, SUSPENDIDO_EN_ESPERA y FINALIZADO.
+- **Planificación:** FCFS con el patrón Estrategia, para poder agregar otros algoritmos en el Proyecto 2 sin cambiar el resto del sistema.
+- **Teclado:** con `INT 09H` el proceso pasa a EN_ESPERA y la CPU lo espera hasta el ENTER. Los procesos se ejecutan de uno en uno, en orden de llegada.
+- **Memoria virtual:** si un proceso admitido no cabe en la memoria principal, su programa pasa al área de memoria virtual del disco (SUSPENDIDO_PREPARADO) y vuelve a la memoria cuando se libera espacio.
+- **Disco:** índice en las primeras 20 celdas (`nombre|inicio|tamaño`), luego el área de archivos y al final la memoria virtual.
+- **Protección y seguridad:**
+  - cada proceso solo puede ejecutar dentro de su región (registros base y alcance);
+  - el kernel no se puede leer desde un programa;
+  - DX es relativo a la base del programa;
+  - `INT 21H` no puede borrar programas;
+  - un error termina solo al proceso que lo causó.
+- **Tiempo:** reloj simulado que avanza un segundo por cada segundo de CPU; las estadísticas se miden con él.
 
 ## Programas de ejemplo
 
 En la carpeta [`Ejemplo/`](Ejemplo/):
 
-| Archivo | Contenido |
+| Archivo | Qué muestra |
 |---|---|
-| `file.asm` | 7 instrucciones |
-| `programa-largo.asm` | 35 instrucciones, usa las cinco operaciones y los cuatro registros |
-| `ejemplo2.asm` | Programa corto con valores negativos |
-| `error-sintaxis.asm` | Provoca tres errores de sintaxis a la vez |
-| `desbordamiento.asm` | Provoca un desbordamiento aritmético en ejecución |
+| `file.asm` | El ejemplo del enunciado |
+| `ejemplo2.asm` | Programa corto |
+| `registros.asm` | MOV, LOAD, STORE, ADD, SUB, INC, DEC y SWAP |
+| `saltos.asm` | Bucle con CMP y JNE |
+| `pila.asm` | PARAM, PUSH y POP |
+| `desbordamiento-pila.asm` | Desbordamiento de la pila de 5 posiciones |
+| `pantalla.asm` | INT 10H |
+| `teclado.asm` | INT 09H |
+| `archivos.asm` | INT 21H: crea, escribe y lee un archivo |
+| `programa-largo.asm` | Programa de 35 instrucciones |
+| `error-comas.asm`, `error-sintaxis.asm` | Mensajes de error de la validación |
+| `memoria-virtual-a.asm` a `memoria-virtual-d.asm` | Cargados juntos: el último no cabe en memoria y pasa a la memoria virtual |
 
-## Modelo de memoria
+## Objetivos alcanzados
 
-```
-  0                    63 64                            255
-  +----------------------+--------------------------------+
-  |     ZONA KERNEL      |        ZONA DE USUARIO         |
-  |  (sistema operativo) |   (aquí se carga el programa)  |
-  +----------------------+--------------------------------+
-```
+- Carga de uno o varios archivos `.asm`, con validación de sintaxis por expresiones regulares y mensajes claros con número de línea.
+- Programas guardados en el disco, con índice en sus primeras posiciones.
+- Lista de trabajos, planificador de trabajos y lista de procesos enlazada en memoria.
+- BCP completo en la memoria del kernel, con el tamaño del kernel calculado como porcentaje de la memoria: estados, PC, registros AC, AX, BX, CX, DX, IR, pila de 5 con control de desbordamiento, información contable (CPU, tiempo de inicio, tiempo empleado), archivos abiertos, enlace al siguiente BCP, base, alcance y prioridad.
+- Los 7 estados del proceso.
+- Ejecución de las instrucciones según su peso, en los dos modos (Siguiente y Ejecutar).
+- Interrupciones y llamadas al sistema: INT 20H, 10H, 09H y 21H (manejo de archivos completo).
+- Pantalla y teclado simulados.
+- Despachador y cambio de contexto, con cada paso en la consola del sistema operativo.
+- Planificación FCFS modular.
+- Memoria virtual: los procesos que no caben en memoria pasan al disco y vuelven cuando hay espacio.
+- Protección y seguridad: base y alcance, kernel inaccesible, DX relativo y programas protegidos.
+- Visualización del BCP actual, de cómo se guardan los BCP en memoria, de los registros (IR, AC, PC), de la lista de trabajos y su estado, y del tiempo de ejecución.
+- Configuración externa en un archivo y menú de configuración.
+- Estadísticas al final: proceso, hora de inicio, hora final y duración en segundos, además del tiempo de CPU, la espera y la ocupación máxima de la memoria.
+- 280 pruebas automáticas con JUnit 5.
 
-| Parámetro | Por defecto | Restricción |
-|---|---|---|
-| Tamaño de memoria | 256 | mínimo 128 |
-| Límite de kernel | 64 | mínimo 16, menor que el tamaño total |
-| Zona de usuario | 64 – 255 | el resto de la memoria |
+## Objetivos no alcanzados
 
-Cada posición guarda una palabra de 16 bits, de modo que **una línea de programa
-ocupa exactamente una posición**.
+Todos los requisitos del enunciado están implementados.
 
-El proceso de usuario no puede leer la zona de kernel: el intento lanza una
-excepción. Es el equivalente de una violación de segmento.
-
-## Bloque de Control de Proceso
-
-Reúne todo lo que el sistema operativo necesitaría para suspender el proceso y
-reanudarlo exactamente donde quedó. Se actualiza después de cada instrucción.
-
-| Sección | Atributos |
-|---|---|
-| Proceso | PID, nombre del programa, estado |
-| Contexto del CPU | PC, IR (binario), IR (texto), AC |
-| Registros | AX, BX, CX, DX |
-| Memoria del proceso | dirección base, límite |
-| Contabilidad | instrucciones ejecutadas, ciclos de reloj, hora de creación |
-
-**Estados del proceso:** `NUEVO → LISTO → EJECUCION → TERMINADO`, con una
-transición alternativa a `BLOQUEADO_ERROR` ante un desbordamiento aritmético.
-
-## Validaciones
-
-El programa rechaza y explica:
-
-- Operación desconocida, con el número de línea
-- Registro inexistente, con el número de línea
-- Registro u operando faltante
-- Operandos sobrantes
-- Valor no numérico
-- Valor fuera del rango −127 a 127
-- Archivo sin ninguna instrucción
-- Archivo con extensión distinta de `.asm`
-- Programa que no cabe en la zona de usuario, indicando cuántas posiciones
-  requiere y cuántas hay disponibles
-- Desbordamiento aritmético durante la ejecución
-
-Los errores de sintaxis **se reportan todos juntos**: el ensamblador recorre el
-archivo completo antes de fallar, para que el usuario corrija en una sola pasada.
-
-## Decisiones de diseño
-
-**Opcodes de 4 bits, no de 3.** Se usó la versión de cuatro bits, que es la de los ejemplos binarios del propio enunciado y la de la figura 1.3d de Stallings.
-
-**Palabra de memoria de 16 bits, una línea por posición.** Permite que una
-instrucción completa quepa en una sola celda, como pide el enunciado.
-
-**Enteros en signo-magnitud escritos a mano.** Java usa complemento a dos
-internamente, de modo que `Integer.toBinaryString(-8)` produciría `11111000` en
-lugar de `10001000`. La conversión está implementada explícitamente en
-`util/BinUtil`.
-
-**Aritmética resuelta en decimal.** Las sumas y restas usan enteros; el binario existe solo en tres momentos: al ensamblar, al decodificar la
-palabra leída de memoria, y al mostrar los valores en pantalla.
-
-**El desbordamiento detiene el proceso** en lugar de saturar el valor en el
-límite y permite demostrar el manejo
-del error.
-
-**La carga en memoria es atómica.** Se valida el espacio antes de limpiar, de
-modo que un programa que no cabe no destruye el que ya estaba cargado.
-
-**La ejecución automática usa `javax.swing.Timer`**, nunca un bucle. Un bucle
-dentro del hilo de despacho de eventos congelaría la ventana hasta terminar y no
-se vería nada de la ejecución, es un error que sucedio y se tuvo que cambiar a esta manera.
-
+- Por indicación del profesor, en este proyecto la CPU espera al proceso que pidió el teclado en lugar de pasar a otro. Por eso la transición EN_ESPERA -> SUSPENDIDO_EN_ESPERA (suspender un proceso bloqueado para traer otro) está implementada y probada, pero no se usa todavía; queda lista para el Proyecto 2.
+- Los algoritmos SPN, SRT, RR y HRRN corresponden al Proyecto 2; el diseño ya permite agregarlos.
 
 ## Referencia
 
-Stallings, W. *Operating Systems: Internals and Design Principles*, 9na edición.
-Capítulo 1, sección 1.3 «Instruction Execution» — figuras 1.2, 1.3 y 1.4.
+Stallings, W. *Operating Systems: Internals and Design Principles*, 9.ª edición. Capítulos 1 (ciclo de instrucción e interrupciones), 3 (procesos, estados y BCP), 7 (gestión de memoria) y 9 (planificación).

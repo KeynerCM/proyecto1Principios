@@ -7,19 +7,18 @@ package com.mycompany.minipc.excepciones;
  * Restricciones: es una excepcion no verificada, porque puede originarse en
  *                medio del ciclo de ejecucion, dentro de Procesador.paso(),
  *                cuyo contrato no declara excepciones
- * Descripcion: se lanza cuando un valor no cabe en el formato de entero de
- *              ocho bits en signo-magnitud del Mini PC, es decir cuando
- *              queda fuera del rango -127 a 127. El controlador de la
- *              interfaz la atrapa y deja el proceso en BLOQUEADO_ERROR.
+ * Descripcion: se lanza cuando una estructura de tamano fijo del proceso se
+ *              desborda, por ejemplo la pila, o cuando un salto lleva fuera
+ *              del programa. Es un caso particular de error de ejecucion.
  */
-public class DesbordamientoException extends RuntimeException {
+public class DesbordamientoException extends EjecucionException {
 
     private static final long serialVersionUID = 1L;
 
     /**
      * Nombre: DesbordamientoException
-     * Entradas: mensaje, texto que explica que valor desbordo y cual era el
-     *           rango admitido
+     * Entradas: mensaje, texto que explica que se desbordo y cual era el
+     *           limite admitido
      * Salidas: la excepcion construida
      * Restricciones: ninguna
      * Descripcion: crea la excepcion con un mensaje que la interfaz muestra

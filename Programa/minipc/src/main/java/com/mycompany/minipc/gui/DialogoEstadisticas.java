@@ -1,30 +1,36 @@
 package com.mycompany.minipc.gui;
 
-import com.mycompany.minipc.core.BCP;
-import com.mycompany.minipc.core.Estadisticas;
-import com.mycompany.minipc.core.Procesador;
-import com.mycompany.minipc.gui.modelo.ModeloTablaEstadisticas;
-import com.mycompany.minipc.isa.OpCode;
+import java.awt.Component;
+import java.util.List;
 
 import javax.swing.JProgressBar;
+import javax.swing.JTable;
+import javax.swing.table.DefaultTableCellRenderer;
+
+import com.mycompany.minipc.gui.modelo.ModeloTablaDuraciones;
+import com.mycompany.minipc.gui.modelo.ModeloTablaEstadisticas;
+import com.mycompany.minipc.gui.panel.Tablas;
+import com.mycompany.minipc.hardware.Disco;
+import com.mycompany.minipc.hardware.Estadisticas;
+import com.mycompany.minipc.hardware.Memoria;
+import com.mycompany.minipc.so.SistemaOperativo;
+import com.mycompany.minipc.so.trabajos.Trabajo;
 
 /**
  * Nombre: DialogoEstadisticas
  * Entradas: la ventana padre y el controlador del que se leen los datos
- * Salidas: la presentacion en pantalla del resumen de la ejecucion
+ * Salidas: la presentacion en pantalla de las estadisticas de la ejecucion
  * Restricciones: toma una foto de los datos al abrirse; si la ejecucion
  *                continua despues, hay que volver a abrirlo para verla
- * Descripcion: resumen de la ejecucion. Muestra tres cosas: el estado en que
- *              quedo el proceso, cuantas veces se ejecuto cada operacion, y el
- *              detalle de accesos y tiempos. El reparto por operacion se
- *              dibuja con barras de proporcion en lugar de solo numeros, para
- *              que se vea de un golpe cual domina el programa.
+ * Descripcion: las estadisticas al final de la ejecucion: por cada proceso, su
+ *              hora de inicio, su hora final y su duracion en segundos, medidas
+ *              con el reloj simulado (un segundo por unidad de peso). Arriba va
+ *              un resumen (trabajos, reloj, uso de la CPU y de la memoria) y
+ *              abajo los contadores de la CPU.
  */
 public class DialogoEstadisticas extends javax.swing.JDialog {
 
     private static final long serialVersionUID = 1L;
-
-    private final ModeloTablaEstadisticas modelo;
 
     /**
      * Nombre: DialogoEstadisticas
@@ -32,117 +38,175 @@ public class DialogoEstadisticas extends javax.swing.JDialog {
      *           bloquear la ventana de atras; controlador, del que se toman
      *           los datos
      * Salidas: el dialogo construido y ya poblado
-     * Restricciones: el controlador no debe ser nulo; el BCP si puede serlo, y
-     *                en ese caso el encabezado muestra guiones
-     * Descripcion: arma los componentes y llena de una vez las tres secciones
-     *              con los datos actuales del procesador.
+     * Restricciones: el controlador no debe ser nulo
+     * Descripcion: arma los componentes y llena las tres secciones con los
+     *              datos actuales del sistema operativo.
      */
     public DialogoEstadisticas(java.awt.Frame padre, boolean modal,
             ControladorPrincipal controlador) {
         super(padre, modal);
         initComponents();
 
-        this.modelo = new ModeloTablaEstadisticas();
-        tblEstadisticas.setModel(modelo);
+        SistemaOperativo so = controlador.getSistemaOperativo();
+        List<Trabajo> trabajos = so.getListaTrabajos().getTrabajos();
+        int cpuOcupada = 0;
+        for (Trabajo trabajo : trabajos) {
+            cpuOcupada += ModeloTablaDuraciones.tiempoCpu(trabajo);
+        }
 
-        Procesador cpu = controlador.getProcesador();
-        Estadisticas datos = controlador.obtenerEstadisticas();
+        llenarResumen(so, trabajos, cpuOcupada);
+        llenarProcesos(trabajos);
+        llenarContadores(so, controlador.obtenerEstadisticas(), trabajos, cpuOcupada);
 
-        llenarEncabezado(cpu);
-        llenarOperaciones(datos);
-        llenarDetalle(cpu, datos);
-
+        Tema.pintarBoton(btnCerrar, Tema.BOTON_UTILIDAD);
         getRootPane().setDefaultButton(btnCerrar);
         pack();
         setLocationRelativeTo(padre);
     }
 
     /**
-     * Nombre: llenarEncabezado
-     * Entradas: cpu, procesador del que se leen el BCP y la memoria
-     * Salidas: ninguna; actualiza las etiquetas y la barra del resumen
-     * Restricciones: tolera que el BCP sea nulo
-     * Descripcion: muestra el programa, el estado final del proceso y la
-     *              ocupacion de la zona de usuario, esta ultima con el
-     *              porcentaje y las cifras absolutas a la vez.
-     */
-    private void llenarEncabezado(Procesador cpu) {
-        BCP bcp = cpu.getBcp();
-        lblProgramaValor.setText(bcp != null ? bcp.getNombrePrograma() : "-");
-        lblEstadoFinalValor.setText(bcp != null ? bcp.getEstado().name() : "-");
-
-        int porcentaje = cpu.getMemoria().getPorcentajeUso();
-        pbUsoMemoria.setValue(porcentaje);
-        pbUsoMemoria.setString(porcentaje + " %  ("
-                + cpu.getMemoria().getPosicionesUsadas() + " de "
-                + cpu.getMemoria().getEspacioUsuario() + " posiciones)");
-    }
-
-    /**
-     * Nombre: llenarOperaciones
-     * Entradas: datos, contabilidad de la ejecucion
-     * Salidas: ninguna; actualiza las cinco barras y sus etiquetas
+     * Nombre: llenarResumen
+     * Entradas: so, sistema operativo; trabajos, los de la lista de trabajos;
+     *           cpuOcupada, segundos en que la CPU ejecuto algun proceso
+     * Salidas: ninguna; actualiza las etiquetas y las barras del resumen
      * Restricciones: ninguna
-     * Descripcion: dibuja una barra por operacion, proporcional al total
-     *              ejecutado, que es el grafico de barras por tipo de
-     *              operacion que pedia el diseno.
+     * Descripcion: cuantos trabajos hay y como terminaron, el reloj simulado,
+     *              el porcentaje del tiempo en que la CPU estuvo ocupada y la
+     *              ocupacion maxima de la zona de usuario. Se usa el maximo y
+     *              no la ocupacion actual porque al terminar todos los
+     *              procesos ya liberaron su memoria y la actual es cero.
      */
-    private void llenarOperaciones(Estadisticas datos) {
-        int total = datos.getTotalInstrucciones();
-        barra(pbMov, lblMovValor, datos.getConteo(OpCode.MOV), total);
-        barra(pbLoad, lblLoadValor, datos.getConteo(OpCode.LOAD), total);
-        barra(pbStore, lblStoreValor, datos.getConteo(OpCode.STORE), total);
-        barra(pbAdd, lblAddValor, datos.getConteo(OpCode.ADD), total);
-        barra(pbSub, lblSubValor, datos.getConteo(OpCode.SUB), total);
+    private void llenarResumen(SistemaOperativo so, List<Trabajo> trabajos, int cpuOcupada) {
+        int finalizados = 0;
+        int conError = 0;
+        for (Trabajo trabajo : trabajos) {
+            if (trabajo.getEstado().esFinal()) {
+                finalizados++;
+            }
+            if (trabajo.getError() != null) {
+                conError++;
+            }
+        }
+        lblTrabajosValor.setText(trabajos.size() + " (" + finalizados + " finalizados"
+                + (conError == 0 ? "" : ", " + conError + " con error") + ")");
+        int reloj = so.getReloj();
+        lblRelojValor.setText(SistemaOperativo.formatearReloj(reloj) + "  (" + reloj + " s)");
+        barra(pbCpu, cpuOcupada, reloj, cpuOcupada + " de " + reloj + " s");
+
+        Memoria memoria = so.getMemoria();
+        int maxima = so.getOcupacionMaxima();
+        barra(pbUsoMemoria, maxima, memoria.getEspacioUsuario(),
+                maxima + " de " + memoria.getEspacioUsuario() + " posiciones a la vez");
     }
 
     /**
      * Nombre: barra
-     * Entradas: barra, indicador a ajustar; etiqueta, donde se escribe la
-     *           cifra; conteo, veces que se ejecuto la operacion; total,
-     *           instrucciones ejecutadas en total
+     * Entradas: barra, indicador a ajustar; valor y total, la proporcion;
+     *           detalle, texto que acompana al porcentaje
      * Salidas: ninguna
      * Restricciones: si el total es cero el maximo se fuerza a uno, porque un
      *                JProgressBar con maximo cero se dibuja mal
-     * Descripcion: ajusta una barra a la proporcion que representa la
-     *              operacion y escribe al lado el conteo y su porcentaje.
+     * Descripcion: ajusta la barra y escribe el porcentaje y el detalle.
      */
-    private void barra(JProgressBar barra, javax.swing.JLabel etiqueta,
-            int conteo, int total) {
+    private static void barra(JProgressBar barra, int valor, int total, String detalle) {
         barra.setMaximum(Math.max(total, 1));
-        barra.setValue(conteo);
-        int porcentaje = total == 0 ? 0 : (conteo * 100) / total;
-        etiqueta.setText(conteo + "  (" + porcentaje + " %)");
+        barra.setValue(valor);
+        int porcentaje = total == 0 ? 0 : (valor * 100) / total;
+        barra.setString(porcentaje + " %  (" + detalle + ")");
     }
 
     /**
-     * Nombre: llenarDetalle
-     * Entradas: cpu, procesador del que se leen memoria y ciclos; datos,
-     *           contabilidad de la ejecucion
-     * Salidas: ninguna; llena la tabla de metricas
-     * Restricciones: llama a refrescar una sola vez al final, para no
-     *                redibujar la tabla por cada fila agregada
-     * Descripcion: agrega las diez metricas del detalle. La fila de escrituras
-     *              dice "en registros" y no "en memoria" porque en este juego
-     *              de instrucciones ninguna operacion escribe datos en una
-     *              direccion: STORE copia el acumulador a un registro.
+     * Nombre: llenarProcesos
+     * Entradas: trabajos, los de la lista de trabajos
+     * Salidas: ninguna; llena la tabla de duraciones
+     * Restricciones: ninguna
+     * Descripcion: una fila por proceso con inicio, fin, duracion, tiempo de
+     *              CPU, espera y resultado. Los errores se pintan en rojo.
      */
-    private void llenarDetalle(Procesador cpu, Estadisticas datos) {
+    private void llenarProcesos(List<Trabajo> trabajos) {
+        tblProcesos.setModel(new ModeloTablaDuraciones(trabajos));
+        Tablas.estilo(tblProcesos, new int[]{60, 170, 75, 75, 90, 60, 75, 255});
+        tblProcesos.getColumnModel().getColumn(7).setCellRenderer(new RenderResultado());
+    }
+
+    /**
+     * Nombre: llenarContadores
+     * Entradas: so, sistema operativo; datos, contadores de la CPU;
+     *           trabajos, para el promedio; cpuOcupada, segundos de CPU usados
+     * Salidas: ninguna; llena la tabla de contadores
+     * Restricciones: llama a refrescar una sola vez al final
+     * Descripcion: lo que conto la CPU (instrucciones, lecturas y escrituras),
+     *              el tiempo ocupado y ocioso, la duracion promedio y como
+     *              quedo repartida la memoria.
+     */
+    private void llenarContadores(SistemaOperativo so, Estadisticas datos,
+            List<Trabajo> trabajos, int cpuOcupada) {
+        ModeloTablaEstadisticas modelo = new ModeloTablaEstadisticas();
+        int suma = 0;
+        int terminados = 0;
+        for (Trabajo trabajo : trabajos) {
+            if (trabajo.getFin() >= 0) {
+                suma += trabajo.getFin() - trabajo.getInicio();
+                terminados++;
+            }
+        }
+        Memoria memoria = so.getMemoria();
+        Disco disco = so.getDisco();
         modelo.agregar("Instrucciones ejecutadas", datos.getTotalInstrucciones());
-        modelo.agregar("Ciclos de reloj", cpu.getCiclosReloj());
-        modelo.agregar("Lecturas de memoria", datos.getAccesosLectura());
+        modelo.agregar("Lecturas de memoria (fetch)", datos.getAccesosLectura());
         modelo.agregar("Escrituras en registros", datos.getAccesosEscritura());
-        modelo.agregar("Posiciones de memoria ocupadas",
-                cpu.getMemoria().getPosicionesUsadas());
-        modelo.agregar("Tamano total de la memoria",
-                cpu.getMemoria().getTamano() + " posiciones");
-        modelo.agregar("Zona de kernel",
-                "0 a " + (cpu.getMemoria().getLimiteKernel() - 1));
-        modelo.agregar("Zona de usuario", cpu.getMemoria().getLimiteKernel()
-                + " a " + (cpu.getMemoria().getTamano() - 1));
-        modelo.agregar("Direccion base del programa", cpu.getDireccionBase());
-        modelo.agregar("Tiempo de ejecucion", datos.getTiempoTotalMs() + " ms");
+        modelo.agregar("CPU ocupada / ociosa", cpuOcupada + " s / "
+                + Math.max(0, so.getReloj() - cpuOcupada) + " s");
+        modelo.agregar("Duracion promedio", terminados == 0 ? "-"
+                : String.format("%.1f s (%d procesos finalizados)",
+                        (double) suma / terminados, terminados));
+        modelo.agregar("Kernel", "0 a " + (memoria.getLimiteKernel() - 1) + ": "
+                + so.describirKernel());
+        modelo.agregar("Zona de usuario", memoria.getLimiteKernel() + " a "
+                + (memoria.getTamano() - 1));
+        modelo.agregar("Memoria virtual (disco)", disco.getTamanoMemoriaVirtual() == 0
+                ? "ninguna" : disco.getInicioMemoriaVirtual() + " a " + (disco.getTamano() - 1)
+                + ", uso maximo " + so.getMemoriaVirtualMaxima() + " de "
+                + disco.getTamanoMemoriaVirtual() + " posiciones");
+        modelo.agregar("Ocupacion actual (usuario)",
+                memoria.getPosicionesUsadas() + " de " + memoria.getEspacioUsuario()
+                + " posiciones");
         modelo.refrescar();
+        tblContadores.setModel(modelo);
+        Tablas.estilo(tblContadores, new int[]{220, 640});
+    }
+
+    /**
+     * Nombre: RenderResultado
+     * Entradas: no aplica
+     * Salidas: no aplica
+     * Restricciones: ninguna
+     * Descripcion: pinta en rojo los procesos que terminaron por un error y
+     *              muestra el mensaje completo al pasar el raton.
+     */
+    private static final class RenderResultado extends DefaultTableCellRenderer {
+
+        private static final long serialVersionUID = 1L;
+
+        /**
+         * Nombre: getTableCellRendererComponent
+         * Entradas: los datos de la celda
+         * Salidas: el componente ya pintado
+         * Restricciones: ninguna
+         * Descripcion: ver la descripcion de la clase.
+         */
+        @Override
+        public Component getTableCellRendererComponent(JTable tabla, Object valor,
+                boolean seleccionada, boolean foco, int fila, int columna) {
+            super.getTableCellRendererComponent(tabla, valor, seleccionada, foco, fila, columna);
+            String texto = String.valueOf(valor);
+            boolean error = texto.startsWith("Error");
+            if (!seleccionada) {
+                setForeground(error ? Tema.colorError() : Tema.TEXTO);
+            }
+            setToolTipText(error ? texto : null);
+            return this;
+        }
     }
 
     /**
@@ -161,32 +225,21 @@ public class DialogoEstadisticas extends javax.swing.JDialog {
     private void initComponents() {
 
         pnlEncabezado = new javax.swing.JPanel();
-        lblPrograma = new javax.swing.JLabel();
-        lblProgramaValor = new javax.swing.JLabel();
-        lblEstadoFinal = new javax.swing.JLabel();
-        lblEstadoFinalValor = new javax.swing.JLabel();
+        lblTrabajos = new javax.swing.JLabel();
+        lblTrabajosValor = new javax.swing.JLabel();
+        lblReloj = new javax.swing.JLabel();
+        lblRelojValor = new javax.swing.JLabel();
+        lblCpu = new javax.swing.JLabel();
+        pbCpu = new javax.swing.JProgressBar();
         lblOcupacion = new javax.swing.JLabel();
         pbUsoMemoria = new javax.swing.JProgressBar();
         pnlCentro = new javax.swing.JPanel();
-        pnlOperaciones = new javax.swing.JPanel();
-        lblMov = new javax.swing.JLabel();
-        pbMov = new javax.swing.JProgressBar();
-        lblMovValor = new javax.swing.JLabel();
-        lblLoad = new javax.swing.JLabel();
-        pbLoad = new javax.swing.JProgressBar();
-        lblLoadValor = new javax.swing.JLabel();
-        lblStore = new javax.swing.JLabel();
-        pbStore = new javax.swing.JProgressBar();
-        lblStoreValor = new javax.swing.JLabel();
-        lblAdd = new javax.swing.JLabel();
-        pbAdd = new javax.swing.JProgressBar();
-        lblAddValor = new javax.swing.JLabel();
-        lblSub = new javax.swing.JLabel();
-        pbSub = new javax.swing.JProgressBar();
-        lblSubValor = new javax.swing.JLabel();
-        pnlDetalle = new javax.swing.JPanel();
-        scrEstadisticas = new javax.swing.JScrollPane();
-        tblEstadisticas = new javax.swing.JTable();
+        pnlProcesos = new javax.swing.JPanel();
+        scrProcesos = new javax.swing.JScrollPane();
+        tblProcesos = new javax.swing.JTable();
+        pnlContadores = new javax.swing.JPanel();
+        scrContadores = new javax.swing.JScrollPane();
+        tblContadores = new javax.swing.JTable();
         pnlBotones = new javax.swing.JPanel();
         btnCerrar = new javax.swing.JButton();
 
@@ -197,21 +250,27 @@ public class DialogoEstadisticas extends javax.swing.JDialog {
         pnlEncabezado.setBorder(javax.swing.BorderFactory.createTitledBorder("Resumen"));
         pnlEncabezado.setLayout(new java.awt.GridLayout(0, 2, 10, 4));
 
-        lblPrograma.setText("Programa:");
-        pnlEncabezado.add(lblPrograma);
+        lblTrabajos.setText("Trabajos:");
+        pnlEncabezado.add(lblTrabajos);
 
-        lblProgramaValor.setFont(new java.awt.Font("Segoe UI", 1, 12)); // NOI18N
-        lblProgramaValor.setText("-");
-        pnlEncabezado.add(lblProgramaValor);
+        lblTrabajosValor.setFont(new java.awt.Font("Segoe UI", 1, 12)); // NOI18N
+        lblTrabajosValor.setText("-");
+        pnlEncabezado.add(lblTrabajosValor);
 
-        lblEstadoFinal.setText("Estado del proceso:");
-        pnlEncabezado.add(lblEstadoFinal);
+        lblReloj.setText("Reloj simulado:");
+        pnlEncabezado.add(lblReloj);
 
-        lblEstadoFinalValor.setFont(new java.awt.Font("Segoe UI", 1, 12)); // NOI18N
-        lblEstadoFinalValor.setText("-");
-        pnlEncabezado.add(lblEstadoFinalValor);
+        lblRelojValor.setFont(new java.awt.Font("Segoe UI", 1, 12)); // NOI18N
+        lblRelojValor.setText("-");
+        pnlEncabezado.add(lblRelojValor);
 
-        lblOcupacion.setText("Ocupacion de la zona de usuario:");
+        lblCpu.setText("Uso de la CPU:");
+        pnlEncabezado.add(lblCpu);
+
+        pbCpu.setStringPainted(true);
+        pnlEncabezado.add(pbCpu);
+
+        lblOcupacion.setText("Ocupacion maxima de la zona de usuario:");
         pnlEncabezado.add(lblOcupacion);
 
         pbUsoMemoria.setStringPainted(true);
@@ -221,64 +280,29 @@ public class DialogoEstadisticas extends javax.swing.JDialog {
 
         pnlCentro.setLayout(new java.awt.BorderLayout());
 
-        pnlOperaciones.setBorder(javax.swing.BorderFactory.createTitledBorder("Instrucciones por operacion"));
-        pnlOperaciones.setLayout(new java.awt.GridLayout(0, 3, 8, 4));
+        pnlProcesos.setBorder(javax.swing.BorderFactory.createTitledBorder("Duracion de cada proceso"));
+        pnlProcesos.setLayout(new java.awt.BorderLayout());
 
-        lblMov.setFont(new java.awt.Font("Monospaced", 0, 12)); // NOI18N
-        lblMov.setText("MOV");
-        pnlOperaciones.add(lblMov);
-        pnlOperaciones.add(pbMov);
+        scrProcesos.setPreferredSize(new java.awt.Dimension(860, 170));
 
-        lblMovValor.setText("0");
-        pnlOperaciones.add(lblMovValor);
+        tblProcesos.setAutoResizeMode(javax.swing.JTable.AUTO_RESIZE_LAST_COLUMN);
+        scrProcesos.setViewportView(tblProcesos);
 
-        lblLoad.setFont(new java.awt.Font("Monospaced", 0, 12)); // NOI18N
-        lblLoad.setText("LOAD");
-        pnlOperaciones.add(lblLoad);
-        pnlOperaciones.add(pbLoad);
+        pnlProcesos.add(scrProcesos, java.awt.BorderLayout.CENTER);
 
-        lblLoadValor.setText("0");
-        pnlOperaciones.add(lblLoadValor);
+        pnlCentro.add(pnlProcesos, java.awt.BorderLayout.CENTER);
 
-        lblStore.setFont(new java.awt.Font("Monospaced", 0, 12)); // NOI18N
-        lblStore.setText("STORE");
-        pnlOperaciones.add(lblStore);
-        pnlOperaciones.add(pbStore);
+        pnlContadores.setBorder(javax.swing.BorderFactory.createTitledBorder("Contadores de la CPU"));
+        pnlContadores.setLayout(new java.awt.BorderLayout());
 
-        lblStoreValor.setText("0");
-        pnlOperaciones.add(lblStoreValor);
+        scrContadores.setPreferredSize(new java.awt.Dimension(860, 212));
 
-        lblAdd.setFont(new java.awt.Font("Monospaced", 0, 12)); // NOI18N
-        lblAdd.setText("ADD");
-        pnlOperaciones.add(lblAdd);
-        pnlOperaciones.add(pbAdd);
+        tblContadores.setAutoResizeMode(javax.swing.JTable.AUTO_RESIZE_ALL_COLUMNS);
+        scrContadores.setViewportView(tblContadores);
 
-        lblAddValor.setText("0");
-        pnlOperaciones.add(lblAddValor);
+        pnlContadores.add(scrContadores, java.awt.BorderLayout.CENTER);
 
-        lblSub.setFont(new java.awt.Font("Monospaced", 0, 12)); // NOI18N
-        lblSub.setText("SUB");
-        pnlOperaciones.add(lblSub);
-        pnlOperaciones.add(pbSub);
-
-        lblSubValor.setText("0");
-        pnlOperaciones.add(lblSubValor);
-
-        pnlCentro.add(pnlOperaciones, java.awt.BorderLayout.NORTH);
-
-        pnlDetalle.setBorder(javax.swing.BorderFactory.createTitledBorder("Detalle"));
-        pnlDetalle.setLayout(new java.awt.BorderLayout());
-
-        scrEstadisticas.setPreferredSize(new java.awt.Dimension(420, 180));
-
-        tblEstadisticas.setAutoResizeMode(javax.swing.JTable.AUTO_RESIZE_ALL_COLUMNS);
-        tblEstadisticas.setRowHeight(22);
-        tblEstadisticas.setShowVerticalLines(false);
-        scrEstadisticas.setViewportView(tblEstadisticas);
-
-        pnlDetalle.add(scrEstadisticas, java.awt.BorderLayout.CENTER);
-
-        pnlCentro.add(pnlDetalle, java.awt.BorderLayout.CENTER);
+        pnlCentro.add(pnlContadores, java.awt.BorderLayout.SOUTH);
 
         getContentPane().add(pnlCentro, java.awt.BorderLayout.CENTER);
 
@@ -312,33 +336,22 @@ public class DialogoEstadisticas extends javax.swing.JDialog {
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
     private javax.swing.JButton btnCerrar;
-    private javax.swing.JLabel lblAdd;
-    private javax.swing.JLabel lblAddValor;
-    private javax.swing.JLabel lblEstadoFinal;
-    private javax.swing.JLabel lblEstadoFinalValor;
-    private javax.swing.JLabel lblLoad;
-    private javax.swing.JLabel lblLoadValor;
-    private javax.swing.JLabel lblMov;
-    private javax.swing.JLabel lblMovValor;
+    private javax.swing.JLabel lblCpu;
     private javax.swing.JLabel lblOcupacion;
-    private javax.swing.JLabel lblPrograma;
-    private javax.swing.JLabel lblProgramaValor;
-    private javax.swing.JLabel lblStore;
-    private javax.swing.JLabel lblStoreValor;
-    private javax.swing.JLabel lblSub;
-    private javax.swing.JLabel lblSubValor;
-    private javax.swing.JProgressBar pbAdd;
-    private javax.swing.JProgressBar pbLoad;
-    private javax.swing.JProgressBar pbMov;
-    private javax.swing.JProgressBar pbStore;
-    private javax.swing.JProgressBar pbSub;
+    private javax.swing.JLabel lblReloj;
+    private javax.swing.JLabel lblRelojValor;
+    private javax.swing.JLabel lblTrabajos;
+    private javax.swing.JLabel lblTrabajosValor;
+    private javax.swing.JProgressBar pbCpu;
     private javax.swing.JProgressBar pbUsoMemoria;
     private javax.swing.JPanel pnlBotones;
     private javax.swing.JPanel pnlCentro;
-    private javax.swing.JPanel pnlDetalle;
+    private javax.swing.JPanel pnlContadores;
     private javax.swing.JPanel pnlEncabezado;
-    private javax.swing.JPanel pnlOperaciones;
-    private javax.swing.JScrollPane scrEstadisticas;
-    private javax.swing.JTable tblEstadisticas;
+    private javax.swing.JPanel pnlProcesos;
+    private javax.swing.JScrollPane scrContadores;
+    private javax.swing.JScrollPane scrProcesos;
+    private javax.swing.JTable tblContadores;
+    private javax.swing.JTable tblProcesos;
     // End of variables declaration//GEN-END:variables
 }
